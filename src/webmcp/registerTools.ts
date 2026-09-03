@@ -80,6 +80,17 @@ function titleKey(m: { mediaType: string; tmdbId?: number; id?: number }): strin
   return `${m.mediaType}:${m.tmdbId ?? m.id}`;
 }
 
+/** One-line human-readable summary for a tool result's `content` part. Tools
+ * that already explain themselves carry a `message`; the rest get a compact
+ * JSON rendering, which is still far more useful to an agent than nothing. */
+function summarize(result: unknown): string {
+  if (result && typeof result === 'object') {
+    const r = result as Record<string, unknown>;
+    if (typeof r.message === 'string') return r.message;
+  }
+  return JSON.stringify(result);
+}
+
 /** Registers every Spotlight WebMCP tool. No-ops quietly in a browser that
  * doesn't implement document.modelContext yet (i.e. almost all of them
  * today) — the site works exactly as before there. */
@@ -88,10 +99,29 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
   if (!modelContext?.registerTool) return;
 
   const opts = { signal };
-  const register = (tool: Parameters<typeof modelContext.registerTool>[0]) =>
-    modelContext.registerTool(tool, opts).catch((err) => {
+
+  // Each tool below returns a plain result object, which is the useful shape
+  // for our own code. The spec's wire contract is a `content` array of typed
+  // parts, so wrap on the way out rather than making twenty call sites repeat
+  // it: agents get the spec shape (with a readable text summary they can act
+  // on directly), plus `structuredContent` carrying the same data machine-
+  // readably. See https://github.com/webmachinelearning/webmcp.
+  const register = (tool: Parameters<typeof modelContext.registerTool>[0]) => {
+    const inner = tool.execute;
+    const wrapped = {
+      ...tool,
+      execute: async (input: Record<string, unknown>, options?: { signal?: AbortSignal }) => {
+        const result = await inner(input, options);
+        return {
+          content: [{ type: 'text', text: summarize(result) }],
+          structuredContent: result,
+        };
+      },
+    };
+    return modelContext.registerTool(wrapped, opts).catch((err) => {
       console.error(`[webmcp] failed to register tool "${tool.name}"`, err);
     });
+  };
 
   await Promise.all([
     register({

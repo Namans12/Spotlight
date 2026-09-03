@@ -22,6 +22,56 @@ It runs **every Wednesday and Friday at 2:00 PM IST** (plus a nightly refresh) u
 
 The Wed/Fri run also sends a **Telegram alert scoped to your own watchlist** — nothing broadcast, nobody else's data — whenever a title on it releases (see [Watchlist-drop alerts](#watchlist-drop-alerts)). The pipeline can still send the full Out Now/Coming Up digest as a broadcast (Telegram and/or email; see `SEND_BROADCAST_DIGEST` and `EMAIL_ENABLED` in [Configuration](#configuration-env-vars)) if you want that instead of, or alongside, the watchlist alert — it's just off by default in this deployment.
 
+## Testing this in 60 seconds (for judges)
+
+**Live app:** https://spotlighthub.vercel.app — no login required, a demo
+session starts automatically on page load.
+
+To see the WebMCP tools themselves:
+
+1. Chrome 149+ → open `chrome://flags/#enable-webmcp-testing` → **Enabled** → relaunch.
+2. Open https://spotlighthub.vercel.app/list/watchlist and open DevTools → Console.
+3. Confirm all nine tools are registered and discoverable:
+
+   ```js
+   (await document.modelContext.getTools()).map(t => t.name)
+   // → ['add_to_watchlist', 'correct_watch_order', 'get_calendar',
+   //    'get_release_digest', 'get_watch_order', 'mark_watched',
+   //    'plan_watch_order', 'reorder_watchlist', 'search_titles']
+   ```
+
+4. Run the flagship tool and watch the watchlist fill in, in correct watch
+   order, without a page reload:
+
+   ```js
+   const tools = await document.modelContext.getTools();
+   const plan = tools.find(t => t.name === 'plan_watch_order');
+   await document.modelContext.executeTool(plan, JSON.stringify({ title: 'John Wick' }));
+   ```
+
+5. Mark the first film watched, then run the same plan again — it adds
+   nothing and reports the film as already watched, because it read your real
+   watch history:
+
+   ```js
+   const mw = (await document.modelContext.getTools()).find(t => t.name === 'mark_watched');
+   await document.modelContext.executeTool(mw, JSON.stringify({ title: 'John Wick' }));
+   await document.modelContext.executeTool(plan, JSON.stringify({ title: 'John Wick' }));
+   ```
+
+> **Note on argument encoding.** Chrome 149's experimental implementation
+> expects `executeTool`'s arguments as a **JSON string**, not the plain object
+> the specification's own examples show. Passing an object fails with
+> `UnknownError: Failed to parse input arguments`. This is caller-side only —
+> the browser hands the registered `execute()` a correctly parsed object
+> either way.
+
+> **On agents.** No shipping conversational agent routes through WebMCP yet —
+> ChatGPT's desktop browsing uses generic Computer-Use/DOM automation, which
+> we verified directly. The calls above are the specification's own invocation
+> path (`getTools` / `executeTool`), which is exactly what an agent issues
+> once one does.
+
 ## What's On The Site
 
 Out Now / Coming Up, split into three sections, grouped by streaming platform — this is the same data the broadcast digest above draws from when it's turned on:
