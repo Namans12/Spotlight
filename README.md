@@ -2,6 +2,20 @@
 
 *Find what's worth watching.*
 
+> **WebMCP Challenge submission note.** Spotlight has been live in
+> production since June 2026 (first commit `2933cfd`, 2026-06-01) — well
+> before this hackathon's Submission Period (2026-08-25 to 2026-09-03). Every
+> commit through `df16001` (2026-09-03) is pre-existing work. **Everything
+> under `src/webmcp/`, the guest sign-in path in `api/auth.ts` /
+> `lib/usersDb.ts`, and the `LICENSE` file were added in a single commit,
+> `d6a4e75` ("Add WebMCP tools: an agent co-pilot for the watchlist"), on
+> 2026-09-03, during the Submission Period.** That commit is the entire diff
+> of what's new for this submission — see the [WebMCP section](#webmcp-an-agent-co-pilot-for-your-watchlist)
+> below for what it does. This repository mirrors the production app's full
+> git history so that history is independently verifiable; the hackathon
+> submission is deployed separately from Spotlight's live production
+> deployment so the two never share risk.
+
 A twice-weekly OTT release radar for India, plus a personal watchlist — one React app, backed by Postgres, deployed on Vercel.
 
 It runs **every Wednesday and Friday at 2:00 PM IST** (plus a nightly refresh) using GitHub Actions: fetches OTT release data from TMDB and writes it to Postgres. The live site reads precomputed data straight from Postgres — no TMDB calls happen on a visitor's request.
