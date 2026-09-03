@@ -7,6 +7,7 @@ import { queryClient } from '@/lib/queryClient';
 import { WatchlistProvider } from '@/contexts/WatchlistContext';
 import { WebMcpBridge } from '@/webmcp/WebMcpBridge';
 import { AutoGuestSession } from '@/webmcp/AutoGuestSession';
+import { AgentChat } from '@/webmcp/AgentChat';
 import { AppShell } from '@/components/layout/AppShell';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { IntroGate } from '@/components/intro/IntroGate';
@@ -33,6 +34,7 @@ function NotFound() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <WebMcpBridge />
+    <AgentChat />
     <WatchlistProvider>
       <TooltipProvider>
         <IntroGate>

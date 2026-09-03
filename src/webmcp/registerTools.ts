@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { Movie } from '@/types/movie';
 import type { AddWatchlistItemBody, Bucket, WatchlistItemDTO } from '../../shared/types/watchlist';
+import type { WatchlistState } from '@/types/movie';
 import { searchMovies } from '@/lib/tmdb';
 import { fetchDigest, fetchCalendarMonth } from '@/lib/api';
 import { fetchRelations, suppressRelation, relatedToMovie, MAX_DEPTH } from '@/lib/relations';
@@ -91,6 +92,32 @@ function summarize(result: unknown): string {
   return JSON.stringify(result);
 }
 
+/** Wraps a tool's plain-object return in the spec's `content` shape (see
+ * `summarize`) and registers it, logging rather than throwing on failure —
+ * one registration failing (e.g. a duplicate name) shouldn't take the rest
+ * down. Shared by the static tool set and the dynamic ones in
+ * registerDynamicTools, so both go through one code path. */
+function registerWrapped(
+  modelContext: ModelContext,
+  tool: ModelContextTool,
+  opts: { signal?: AbortSignal },
+): Promise<void> {
+  const inner = tool.execute;
+  const wrapped: ModelContextTool = {
+    ...tool,
+    execute: async (input, options) => {
+      const result = await inner(input, options);
+      return {
+        content: [{ type: 'text', text: summarize(result) }],
+        structuredContent: result,
+      };
+    },
+  };
+  return modelContext.registerTool(wrapped, opts).catch((err) => {
+    console.error(`[webmcp] failed to register tool "${tool.name}"`, err);
+  });
+}
+
 /** Registers every Spotlight WebMCP tool. No-ops quietly in a browser that
  * doesn't implement document.modelContext yet (i.e. almost all of them
  * today) — the site works exactly as before there. */
@@ -99,29 +126,7 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
   if (!modelContext?.registerTool) return;
 
   const opts = { signal };
-
-  // Each tool below returns a plain result object, which is the useful shape
-  // for our own code. The spec's wire contract is a `content` array of typed
-  // parts, so wrap on the way out rather than making twenty call sites repeat
-  // it: agents get the spec shape (with a readable text summary they can act
-  // on directly), plus `structuredContent` carrying the same data machine-
-  // readably. See https://github.com/webmachinelearning/webmcp.
-  const register = (tool: Parameters<typeof modelContext.registerTool>[0]) => {
-    const inner = tool.execute;
-    const wrapped = {
-      ...tool,
-      execute: async (input: Record<string, unknown>, options?: { signal?: AbortSignal }) => {
-        const result = await inner(input, options);
-        return {
-          content: [{ type: 'text', text: summarize(result) }],
-          structuredContent: result,
-        };
-      },
-    };
-    return modelContext.registerTool(wrapped, opts).catch((err) => {
-      console.error(`[webmcp] failed to register tool "${tool.name}"`, err);
-    });
-  };
+  const register = (tool: ModelContextTool) => registerWrapped(modelContext, tool, opts);
 
   await Promise.all([
     register({
@@ -346,57 +351,6 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
     }),
 
     register({
-      name: 'mark_watched',
-      description: "Mark a title already on the user's watchlist or watch-later list as watched.",
-      inputSchema: {
-        type: 'object',
-        properties: { title: { type: 'string' } },
-        required: ['title'],
-      },
-      async execute({ title }) {
-        await ensureAuthenticated(queryClient);
-        const state = await watchlistApi.fetchWatchlistState();
-        const item = findInBuckets([...state.watchlist, ...state.watchLater], String(title));
-        if (!item) return { ok: false, message: `Couldn't find "${title}" on the watchlist or watch-later list.` };
-
-        await watchlistApi.moveWatchlistItem(item.dbId, 'watched');
-        await invalidateWatchlist(queryClient);
-        return { ok: true, markedWatched: item.title };
-      },
-    }),
-
-    register({
-      name: 'reorder_watchlist',
-      description:
-        "Reorder the user's watchlist. Give the titles in the desired order (a prefix is fine — anything not mentioned keeps its relative order after the ones you listed).",
-      inputSchema: {
-        type: 'object',
-        properties: {
-          orderedTitles: { type: 'array', items: { type: 'string' }, description: 'Titles in the desired order' },
-        },
-        required: ['orderedTitles'],
-      },
-      async execute({ orderedTitles }) {
-        await ensureAuthenticated(queryClient);
-        const state = await watchlistApi.fetchWatchlistState();
-        const remaining = [...state.watchlist];
-        const matched: WatchlistItemDTO[] = [];
-
-        for (const t of orderedTitles as string[]) {
-          const idx = remaining.findIndex((i) => i.title.toLowerCase().includes(String(t).toLowerCase()));
-          if (idx !== -1) matched.push(...remaining.splice(idx, 1));
-        }
-
-        const finalOrder = [...matched, ...remaining];
-        if (matched.length === 0) return { ok: false, message: "None of those titles are on the watchlist." };
-
-        await watchlistApi.reorderBucket('watchlist', null, finalOrder.map((i) => i.dbId));
-        await invalidateWatchlist(queryClient);
-        return { ok: true, newOrder: finalOrder.map((i) => i.title) };
-      },
-    }),
-
-    register({
       name: 'correct_watch_order',
       description:
         "Hide one title from another's watch-order connections when a suggested link is wrong for the user. This only affects their own view; it doesn't delete the edge for anyone else.",
@@ -423,4 +377,108 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
       },
     }),
   ]);
+
+  registerDynamicTools(modelContext, queryClient, signal);
+}
+
+/** `mark_watched` and `reorder_watchlist` register and unregister themselves
+ * as the watchlist actually changes shape — the spec's own explainer
+ * describes exactly this pattern (a tool appearing once the user picks a
+ * template, in its graphic-design example) via the `toolchange` event, which
+ * fires automatically whenever registerTool/AbortController add or remove a
+ * tool. There's nothing to act on "mark as watched" against an empty list,
+ * and reordering one title is a no-op — so neither tool exists until it
+ * would do something, instead of existing everywhere and failing loudly.
+ * `getTools()` reflects this live: run it before and after adding a title
+ * and the returned array is a different length. */
+function registerDynamicTools(modelContext: ModelContext, queryClient: QueryClient, parentSignal: AbortSignal): void {
+  // Independent controllers, not one shared one: mark_watched and
+  // reorder_watchlist have different eligibility thresholds (>0 items vs.
+  // >=2), so a single shared "is anything registered" flag would latch true
+  // on whichever tool qualifies first and then ignore the other tool's own
+  // eligibility changing — which is exactly the bug a first pass at this had
+  // (reorder_watchlist never appeared at 2 items if mark_watched had already
+  // registered at 1).
+  let markWatchedController: AbortController | null = null;
+  let reorderController: AbortController | null = null;
+
+  const markWatchedTool: ModelContextTool = {
+    name: 'mark_watched',
+    description: "Mark a title already on the user's watchlist or watch-later list as watched.",
+    inputSchema: {
+      type: 'object',
+      properties: { title: { type: 'string' } },
+      required: ['title'],
+    },
+    async execute({ title }) {
+      await ensureAuthenticated(queryClient);
+      const state = await watchlistApi.fetchWatchlistState();
+      const item = findInBuckets([...state.watchlist, ...state.watchLater], String(title));
+      if (!item) return { ok: false, message: `Couldn't find "${title}" on the watchlist or watch-later list.` };
+
+      await watchlistApi.moveWatchlistItem(item.dbId, 'watched');
+      await invalidateWatchlist(queryClient);
+      return { ok: true, markedWatched: item.title };
+    },
+  };
+
+  const reorderTool: ModelContextTool = {
+    name: 'reorder_watchlist',
+    description:
+      "Reorder the user's watchlist. Give the titles in the desired order (a prefix is fine — anything not mentioned keeps its relative order after the ones you listed).",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        orderedTitles: { type: 'array', items: { type: 'string' }, description: 'Titles in the desired order' },
+      },
+      required: ['orderedTitles'],
+    },
+    async execute({ orderedTitles }) {
+      await ensureAuthenticated(queryClient);
+      const state = await watchlistApi.fetchWatchlistState();
+      const remaining = [...state.watchlist];
+      const matched: WatchlistItemDTO[] = [];
+
+      for (const t of orderedTitles as string[]) {
+        const idx = remaining.findIndex((i) => i.title.toLowerCase().includes(String(t).toLowerCase()));
+        if (idx !== -1) matched.push(...remaining.splice(idx, 1));
+      }
+
+      const finalOrder = [...matched, ...remaining];
+      if (matched.length === 0) return { ok: false, message: 'None of those titles are on the watchlist.' };
+
+      await watchlistApi.reorderBucket('watchlist', null, finalOrder.map((i) => i.dbId));
+      await invalidateWatchlist(queryClient);
+      return { ok: true, newOrder: finalOrder.map((i) => i.title) };
+    },
+  };
+
+  function syncOne(eligible: boolean, current: AbortController | null, tool: ModelContextTool): AbortController | null {
+    if (eligible && !current) {
+      const controller = new AbortController();
+      parentSignal.addEventListener('abort', () => controller.abort());
+      registerWrapped(modelContext, tool, { signal: controller.signal });
+      return controller;
+    }
+    if (!eligible && current) {
+      current.abort();
+      return null;
+    }
+    return current;
+  }
+
+  function sync(state: WatchlistState | undefined) {
+    const canMarkWatched = (state?.watchlist.length ?? 0) + (state?.watchLater.length ?? 0) > 0;
+    const canReorder = (state?.watchlist.length ?? 0) >= 2;
+    markWatchedController = syncOne(canMarkWatched, markWatchedController, markWatchedTool);
+    reorderController = syncOne(canReorder, reorderController, reorderTool);
+  }
+
+  sync(queryClient.getQueryData<WatchlistState>(WATCHLIST_KEY));
+  const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+    if (event.query.queryKey.length === 1 && event.query.queryKey[0] === 'watchlist') {
+      sync(event.query.state.data as WatchlistState | undefined);
+    }
+  });
+  parentSignal.addEventListener('abort', unsubscribe);
 }

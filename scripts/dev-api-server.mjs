@@ -43,6 +43,7 @@ function resolveHandlerFile(pathname) {
   if (pathname === "/api/ratings") return "api/ratings.ts";
   if (pathname === "/api/seasons") return "api/seasons.ts";
   if (pathname === "/api/relations") return "api/relations.ts";
+  if (pathname === "/api/agent-relay") return "api/agent-relay.ts";
   // More specific files win over a catch-all one level up — same precedence
   // Vercel's real filesystem router applies. Getting this wrong here once
   // already hid a production bug: this file used to route every
