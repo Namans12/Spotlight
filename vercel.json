@@ -10,5 +10,8 @@
     "env": {
       "UV_LINK_MODE": "copy"
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
 }
