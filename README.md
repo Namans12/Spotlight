@@ -24,6 +24,8 @@ The Wed/Fri run also sends a **Telegram alert scoped to your own watchlist** —
 
 ## Testing this in 60 seconds (for judges)
 
+**Demo video:** https://youtu.be/bbvMvbdw4s8
+
 **Live app:** https://spotlighthub.vercel.app — no login required, a demo
 session starts automatically on page load.
 
