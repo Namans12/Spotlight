@@ -14,7 +14,13 @@ import { MessageCircle, Send, Settings, X } from 'lucide-react';
 
 const KEY_STORAGE = 'spotlight:agent-openai-key';
 const MODEL_STORAGE = 'spotlight:agent-model';
-const DEFAULT_MODEL = 'gpt-5.6-sol';
+const BASE_URL_STORAGE = 'spotlight:agent-base-url';
+// Groq by default: an OpenAI-wire-format endpoint (Bearer auth, identical
+// tool_calls shape — confirmed directly), and free to get a key for. Any
+// other OpenAI-compatible endpoint works by changing the base URL below —
+// this isn't Groq-specific, Groq is just a default that works out of the box.
+const DEFAULT_BASE_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const DEFAULT_MODEL = 'openai/gpt-oss-120b';
 const MAX_TOOL_ROUNDS = 6;
 
 interface ToolCallLog {
@@ -60,6 +66,7 @@ export function AgentChat() {
   const [showSettings, setShowSettings] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState(DEFAULT_MODEL);
+  const [baseUrl, setBaseUrl] = useState(DEFAULT_BASE_URL);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [busyStep, setBusyStep] = useState('');
@@ -72,6 +79,7 @@ export function AgentChat() {
     try {
       setApiKey(localStorage.getItem(KEY_STORAGE) ?? '');
       setModel(localStorage.getItem(MODEL_STORAGE) ?? DEFAULT_MODEL);
+      setBaseUrl(localStorage.getItem(BASE_URL_STORAGE) ?? DEFAULT_BASE_URL);
     } catch {
       // Private browsing or storage disabled — key just won't persist across reloads.
     }
@@ -99,11 +107,20 @@ export function AgentChat() {
     }
   }
 
+  function saveBaseUrl(value: string) {
+    setBaseUrl(value);
+    try {
+      localStorage.setItem(BASE_URL_STORAGE, value);
+    } catch {
+      /* ignore */
+    }
+  }
+
   async function callRelay(msgs: OpenAIMessage[], tools: unknown[]): Promise<OpenAIMessage> {
     const res = await fetch('/api/agent-relay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey, model, messages: msgs, tools }),
+      body: JSON.stringify({ apiKey, model, baseUrl, messages: msgs, tools }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error?.message || data?.error || `Request failed (${res.status})`);
@@ -225,25 +242,36 @@ export function AgentChat() {
           {showSettings && (
             <div className="space-y-2 border-b border-border bg-secondary/40 px-4 py-3">
               <label className="block text-xs font-medium text-muted-foreground">
-                Your OpenAI API key — stored only in this browser, never on Spotlight's servers.
+                API key — stored only in this browser, never on Spotlight's servers.
               </label>
               <input
                 type="password"
                 value={apiKey}
                 onChange={(e) => saveApiKey(e.target.value)}
-                placeholder="sk-..."
+                placeholder="gsk_... (Groq) or sk-... (OpenAI)"
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground"
               />
+              <label className="block text-xs font-medium text-muted-foreground pt-1">Base URL</label>
+              <input
+                type="text"
+                value={baseUrl}
+                onChange={(e) => saveBaseUrl(e.target.value)}
+                placeholder={DEFAULT_BASE_URL}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground font-mono"
+              />
+              <label className="block text-xs font-medium text-muted-foreground pt-1">Model</label>
               <input
                 type="text"
                 value={model}
                 onChange={(e) => saveModel(e.target.value)}
                 placeholder={DEFAULT_MODEL}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground font-mono"
               />
               <p className="text-[11px] leading-snug text-muted-foreground">
-                Sent to a stateless relay (api/agent-relay.ts) that forwards it to OpenAI and back — required only
-                because api.openai.com blocks direct browser requests. Nothing is logged or stored server-side.
+                Defaults to Groq (free key at console.groq.com) — any OpenAI-compatible, Bearer-auth endpoint works by
+                changing the base URL. Sent to a stateless relay (api/agent-relay.ts) that forwards it and back —
+                required only because these providers block direct browser requests. Nothing is logged or stored
+                server-side.
               </p>
             </div>
           )}
