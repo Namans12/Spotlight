@@ -32,9 +32,21 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   }
 
   if (req.method === "POST") {
+    // Parsed outside the main try so a malformed body is a 400 and everything
+    // below — which includes two database writes — can be a 500. Collapsing
+    // the two (as this used to) reported a Postgres outage as a client error
+    // AND echoed the driver's message to the browser from a public,
+    // unauthenticated endpoint.
+    let parsed: Record<string, unknown>;
     try {
-      const body = await readBody(req);
-      const parsed = JSON.parse(body || "{}");
+      parsed = JSON.parse((await readBody(req)) || "{}");
+    } catch {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: "body must be JSON" }));
+      return;
+    }
+
+    try {
 
       // Guest sign-in: no Google identity involved, just the same session
       // cookie pointing at one fixed demo account — lets a WebMCP tool call
@@ -83,8 +95,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       res.setHeader("Set-Cookie", createSessionCookie(user.id));
       res.end(JSON.stringify({ ok: true, user }));
     } catch (err) {
-      res.statusCode = 400;
-      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+      // Reached only by a genuine server-side failure now (a database write,
+      // a missing AUTH_SECRET). Logged in full, reported generically —
+      // matching api/calendar.ts and the watchlist routes.
+      console.error("[auth] sign-in failed", err);
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: "could not complete sign-in" }));
     }
     return;
   }
