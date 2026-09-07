@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { DEMO_GUEST_ENABLED } from '@/webmcp/demoGuest';
 import { Sparkles, Loader2 } from 'lucide-react';
 
 interface LocationState {
@@ -89,15 +90,20 @@ export default function Login() {
       {!scriptReady && !error && <Loader2 size={20} className="animate-spin text-accent mb-4" />}
       <div ref={buttonRef} />
 
-      <button
-        type="button"
-        onClick={continueAsGuest}
-        disabled={loginGuest.isPending}
-        className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-muted-foreground underline decoration-dotted underline-offset-4 transition-colors hover:text-foreground disabled:opacity-60"
-      >
-        {loginGuest.isPending && <Loader2 size={12} className="animate-spin" />}
-        Continue as guest (shared demo account, no sign-in)
-      </button>
+      {/* Hidden unless this build is the demo deployment — the server refuses
+          guest sign-in without DEMO_GUEST=1, so showing the button elsewhere
+          would just offer an action that always fails. */}
+      {DEMO_GUEST_ENABLED && (
+        <button
+          type="button"
+          onClick={continueAsGuest}
+          disabled={loginGuest.isPending}
+          className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-muted-foreground underline decoration-dotted underline-offset-4 transition-colors hover:text-foreground disabled:opacity-60"
+        >
+          {loginGuest.isPending && <Loader2 size={12} className="animate-spin" />}
+          Continue as guest (shared demo account, no sign-in)
+        </button>
+      )}
 
       {error && <p className="text-xs text-danger font-medium mt-4">{error}</p>}
     </div>

@@ -3,9 +3,13 @@ import { requireUserId } from "../lib/auth.js";
 import { getDb } from "../lib/db.js";
 import { checkRefreshRateLimit, recordRefreshDispatch } from "../lib/refreshDispatchDb.js";
 
-const REPO_OWNER = "Namans12";
-const REPO_NAME = "ms-trigger";
-const WORKFLOW_FILE = "ott-radar-nightly.yml";
+// Which repository's workflow this endpoint triggers. Env-configured rather
+// than hardcoded so a fork, a staging deployment, or a renamed repo does not
+// need a code change — and so the public source does not name the private
+// automation target of whatever deployment happens to be running it.
+const REPO_OWNER = process.env.GITHUB_DISPATCH_OWNER || "Namans12";
+const REPO_NAME = process.env.GITHUB_DISPATCH_REPO || "ms-trigger";
+const WORKFLOW_FILE = process.env.GITHUB_DISPATCH_WORKFLOW || "ott-radar-nightly.yml";
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   const userId = requireUserId(req, res);
@@ -51,12 +55,15 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     );
 
     if (!ghRes.ok) {
-      const body = await ghRes.text();
+      // GitHub's own body can name the repository, the workflow file, and the
+      // token's scopes — none of which a caller needs, and all of which help
+      // someone probing this endpoint. Logged in full, reported as a status.
+      console.error(`[releases-refresh] GitHub dispatch failed ${ghRes.status}`, await ghRes.text());
       // Counts toward the global cooldown (it was a real attempt that reached
       // GitHub) but never the per-user quota — ok=false.
       await recordRefreshDispatch(sql, userId, false);
       res.statusCode = 502;
-      res.end(JSON.stringify({ error: `GitHub dispatch failed: ${ghRes.status} ${body}` }));
+      res.end(JSON.stringify({ error: `could not queue a refresh (upstream returned ${ghRes.status})` }));
       return;
     }
 
@@ -68,7 +75,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     // it (best-effort) so the global cooldown still applies, same reasoning
     // as the 502 case above.
     await recordRefreshDispatch(sql, userId, false).catch(() => {});
+    console.error("[releases-refresh] dispatch failed", err);
     res.statusCode = 500;
-    res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    res.end(JSON.stringify({ error: "could not queue a refresh" }));
   }
 }

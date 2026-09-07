@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "http";
 import { createSessionCookie, clearSessionCookie, getSessionUserId, verifyGoogleIdToken } from "../lib/auth.js";
 import { getDb } from "../lib/db.js";
-import { upsertUserFromGoogle, upsertGuestUser, getUserById } from "../lib/usersDb.js";
+import { upsertUserFromGoogle, upsertGuestUser, getUserById, guestSessionsEnabled } from "../lib/usersDb.js";
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -41,7 +41,18 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       // establish a session on its own, with nothing for a judge to click
       // through first. See upsertGuestUser for why it's the same account
       // every time rather than a fresh row per visit.
+      //
+      // Gated on DEMO_GUEST because that shared account is only acceptable on
+      // the hackathon deployment (see guestSessionsEnabled). A public host
+      // leaves it off and every visitor signs in with Google, which is what
+      // makes "private per account" actually true. 404, not 403: with the
+      // flag off this route does not exist on this deployment.
       if (parsed.guest === true) {
+        if (!guestSessionsEnabled()) {
+          res.statusCode = 404;
+          res.end(JSON.stringify({ error: "guest sessions are not enabled on this deployment" }));
+          return;
+        }
         const user = await upsertGuestUser(getDb());
         res.statusCode = 200;
         res.setHeader("Set-Cookie", createSessionCookie(user.id));
