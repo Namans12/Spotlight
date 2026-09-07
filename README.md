@@ -226,6 +226,7 @@ And one repo **variable** (not secret) under the same page's "Variables" tab:
 | `GITHUB_DISPATCH_OWNER` | `Namans12` | Repo owner whose workflow `/api/releases-refresh` triggers |
 | `GITHUB_DISPATCH_REPO` | `ms-trigger` | Repo name for the same |
 | `GITHUB_DISPATCH_WORKFLOW` | `ott-radar-nightly.yml` | Workflow file for the same |
+| `SITE_URL` | Vercel's production domain, else `https://spotlighthub.vercel.app` | Canonical origin baked into prerendered pages, the sitemap and Open Graph tags. Set it on a fork or a custom domain |
 
 ## Accounts & Google Sign-In
 
@@ -447,6 +448,40 @@ never overwrite a higher-trust one, so a wrong TMDB collection edge cannot be
 fixed by re-seeding. No generator ever clears `suppressed`, so the correction
 survives a full regeneration. There is no un-suppress in the UI — reversing one
 is a single `UPDATE` on a single-owner app.
+
+## Search: prerendered pages, not a blank shell
+
+`"<franchise> watch order"` is a question people type into a search engine
+constantly, and this app has a programmatic answer for it. It was unreachable:
+Spotlight is a client-rendered SPA, so every route served the same
+`index.html` — one `<title>Spotlight</title>` and one description for the whole
+site — and a crawler fetching a watch-order page got an empty `<div>`.
+
+`scripts/prerender.ts` runs after `vite build` and writes real HTML for every
+page worth finding: a per-page title and description, canonical URL, Open Graph
+and Twitter cards (so a pasted link stops rendering as a blank grey box), a
+schema.org `ItemList` carrying the order itself, and the chain as plain markup
+inside `#root` that React replaces on mount. Plus a `sitemap.xml` and a
+`robots.txt` that points at it. Roughly 230 pages today, and it grows with the
+nightly relations sync.
+
+Prerendering rather than SSR for two reasons: the deployment already sits at
+Vercel Hobby's 12-serverless-function cap, so there is no room for a rendering
+function — and it matches how everything else here works, computing offline and
+serving static. Vercel checks the filesystem before applying `vercel.json`'s SPA
+rewrite, so a prerendered file wins and every other route still falls through to
+the SPA unchanged.
+
+The step fails soft by design. No `DATABASE_URL`, or Postgres briefly
+unreachable, and the build still ships — just without fresh title pages, which
+the next build picks up. A site that ships without new metadata is a setback; a
+site that does not ship is an outage.
+
+`shared/seo.ts` holds the strings, because they are produced twice: baked into
+HTML at build time (what a crawler reads) and applied on client-side navigation
+by `src/hooks/useDocumentMeta.ts` (what a share button copies once the SPA has
+taken over). If those drifted, the page a crawler indexed would not be the page
+a reader shares.
 
 ## WebMCP: an agent co-pilot for your watchlist
 
