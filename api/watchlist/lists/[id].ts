@@ -50,6 +50,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     }
     return sendJson(res, 405, { error: "method not allowed" });
   } catch (err) {
-    return sendJson(res, 500, { error: err instanceof Error ? err.message : String(err) });
+    console.error("[watchlist] list request failed", err);
+    return sendJson(res, 500, { error: "could not complete that request" });
   }
 }

@@ -7,6 +7,7 @@ import TitleConnections from './TitleConnections';
 import type { RelatedTitle, TitleRelations } from '@/lib/relations';
 
 vi.mock('@/lib/tmdbDetail', () => ({ fetchTitleDetail: vi.fn().mockResolvedValue(null) }));
+vi.mock('@/lib/seasons', () => ({ fetchSeasons: vi.fn().mockResolvedValue(null) }));
 vi.mock('@/lib/relations', async () => {
   const actual = await vi.importActual<typeof import('@/lib/relations')>('@/lib/relations');
   return {
@@ -24,6 +25,7 @@ vi.mock('@/lib/relations', async () => {
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ isAuthenticated: false }) }));
 
 import { fetchRelations } from '@/lib/relations';
+import { fetchSeasons } from '@/lib/seasons';
 
 function related(overrides: Partial<RelatedTitle>): RelatedTitle {
   return {
@@ -72,11 +74,11 @@ function TitleDetailStub() {
   );
 }
 
-function renderApp() {
+function renderApp(connectionsPath = '/title/movie/1/connections') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/before', '/title/movie/1', '/title/movie/1/connections']} initialIndex={2}>
+      <MemoryRouter initialEntries={['/before', '/title/movie/1', connectionsPath]} initialIndex={2}>
         <Routes>
           <Route path="/before" element={<p>Before Page</p>} />
           <Route path="/title/:type/:id" element={<TitleDetailStub />} />
@@ -169,5 +171,145 @@ describe('Must Watch and Can Watch merged into one timeline', () => {
     // Two required entries (Required Prequel + Current Film) — the two
     // can-watch extras must not inflate this count to 4.
     expect(await screen.findByText('Part 2 of 2')).toBeInTheDocument();
+  });
+});
+
+describe('release order vs story order', () => {
+  // Star Wars is the canonical divergence: The Phantom Menace released 16
+  // years after Return of the Jedi but comes first in the story. Ids are real
+  // so they resolve against the curated order in data/collection-shapes.json.
+  const STAR_WARS_CHAIN = titleRelations({
+    origin: { title: 'Return of the Jedi', posterUrl: null, releaseDate: '1983-05-25' },
+    mustWatch: {
+      before: [
+        related({ tmdbId: 11, title: 'Star Wars', releaseDate: '1977-05-25' }),
+        related({ tmdbId: 1891, title: 'The Empire Strikes Back', releaseDate: '1980-05-20' }),
+      ],
+      after: [],
+    },
+    canWatch: [
+      related({
+        tmdbId: 1893,
+        title: 'The Phantom Menace',
+        releaseDate: '1999-05-19',
+        reason: 'Same series — not required to follow this one.',
+      }),
+    ],
+  });
+
+  /** Rendered top-to-bottom order of the timeline, by node heading — the same
+   *  query the merged-timeline tests above use. */
+  async function renderedOrder(): Promise<string[]> {
+    return (await screen.findAllByRole('heading', { level: 3 })).map((h) => h.textContent ?? '');
+  }
+
+  it('offers the toggle only when a curated story order would change something', async () => {
+    vi.mocked(fetchRelations).mockResolvedValue(STAR_WARS_CHAIN);
+    renderApp();
+    expect(await screen.findByRole('tab', { name: /story order/i })).toBeInTheDocument();
+  });
+
+  it('hides the toggle for a franchise told in release order', async () => {
+    vi.mocked(fetchRelations).mockResolvedValue(titleRelations({
+      origin: { title: 'John Wick: Chapter 2', posterUrl: null, releaseDate: '2017-02-08' },
+      mustWatch: {
+        before: [related({ tmdbId: 245891, title: 'John Wick', releaseDate: '2014-10-16' })],
+        after: [],
+      },
+    }));
+    renderApp();
+    expect(await screen.findByText(/Part 2 of 2/)).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /story order/i })).not.toBeInTheDocument();
+  });
+
+  it('reorders the timeline when story order is selected', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchRelations).mockResolvedValue(STAR_WARS_CHAIN);
+    renderApp();
+
+    await screen.findByRole('tab', { name: /story order/i });
+    // Released 1999, so it lands last chronologically.
+    expect(await renderedOrder()).toEqual([
+      'Star Wars',
+      'The Empire Strikes Back',
+      'Return of the Jedi',
+      'The Phantom Menace',
+    ]);
+
+    await user.click(screen.getByRole('tab', { name: /story order/i }));
+    // Episode I opens the story, so it moves to the front.
+    expect(await renderedOrder()).toEqual([
+      'The Phantom Menace',
+      'Star Wars',
+      'The Empire Strikes Back',
+      'Return of the Jedi',
+    ]);
+  });
+
+  it('reads the initial order off the URL so the view is shareable', async () => {
+    vi.mocked(fetchRelations).mockResolvedValue(STAR_WARS_CHAIN);
+    renderApp('/title/movie/1/connections?order=story');
+    await screen.findByRole('tab', { name: /story order/i });
+    expect(screen.getByRole('tab', { name: /story order/i })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('counts "Part N of M" off the rendered order, not the raw before/after split', async () => {
+    // Under story order the current title's position changes, and the label
+    // has to follow the timeline rather than contradict it.
+    const user = userEvent.setup();
+    vi.mocked(fetchRelations).mockResolvedValue(titleRelations({
+      origin: { title: 'Return of the Jedi', posterUrl: null, releaseDate: '1983-05-25' },
+      mustWatch: {
+        before: [
+          related({ tmdbId: 11, title: 'Star Wars', releaseDate: '1977-05-25' }),
+          related({ tmdbId: 1891, title: 'The Empire Strikes Back', releaseDate: '1980-05-20' }),
+          related({ tmdbId: 1893, title: 'The Phantom Menace', releaseDate: '1999-05-19' }),
+        ],
+        after: [],
+      },
+    }));
+    renderApp();
+
+    // Release order: ANH, ESB, ROTJ(current), TPM -> the current title is 3rd.
+    expect(await screen.findByText(/Part 3 of 4/)).toBeInTheDocument();
+
+    // Story order: TPM, ANH, ESB, ROTJ(current) -> it becomes 4th.
+    await user.click(screen.getByRole('tab', { name: /story order/i }));
+    expect(await screen.findByText(/Part 4 of 4/)).toBeInTheDocument();
+  });
+});
+
+describe('a title with no chain', () => {
+  it('says a film stands on its own', async () => {
+    vi.mocked(fetchRelations).mockResolvedValue(titleRelations({}));
+    renderApp();
+    expect(await screen.findByText(/it stands on its own/i)).toBeInTheDocument();
+  });
+
+  // TMDB has no collection concept for TV, so a show outside the curated seed
+  // has no cross-series data at all. Claiming it "stands on its own" states as
+  // fact something that was never checked — the same class of error as
+  // reporting an outage as an answer.
+  it('does not claim a show stands alone when nothing was ever checked', async () => {
+    vi.mocked(fetchRelations).mockResolvedValue(titleRelations({}));
+    vi.mocked(fetchSeasons).mockResolvedValue(null);
+    renderApp('/title/tv/1/connections');
+
+    expect(await screen.findByText(/no connections recorded for this series/i)).toBeInTheDocument();
+    expect(screen.queryByText(/stands on its own/i)).not.toBeInTheDocument();
+  });
+
+  it('gives a multi-season show the watch order it actually has', async () => {
+    vi.mocked(fetchRelations).mockResolvedValue(titleRelations({}));
+    vi.mocked(fetchSeasons).mockResolvedValue({
+      tmdbId: 1,
+      mediaType: 'tv',
+      numberOfSeasons: 8,
+      fetchedAt: new Date().toISOString(),
+      stale: false,
+    });
+    renderApp('/title/tv/1/connections');
+
+    expect(await screen.findByText(/start at Season 1 and watch all 8 seasons in order/i)).toBeInTheDocument();
   });
 });

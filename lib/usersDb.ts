@@ -59,6 +59,21 @@ export async function getUserById(sql: postgres.Sql<any>, id: number): Promise<U
 // no real Google identity behind it.
 const GUEST_GOOGLE_ID = "webmcp-guest-demo";
 
+/** Whether this deployment hands out the shared demo session.
+ *
+ *  Off unless `DEMO_GUEST=1`, because the account is *shared*: every visitor
+ *  who takes it is the same user row, so they see each other's watchlist, can
+ *  delete each other's items, and their relation thumbs-downs apply to each
+ *  other. That is the right trade for a hackathon deployment where a judge or
+ *  an agent must be able to act without clicking through a login, and the
+ *  wrong one for a public host, where "private per account" has to be true.
+ *
+ *  Read at call time rather than module load so a test (and a serverless
+ *  instance that outlives a config change) sees the current value. */
+export function guestSessionsEnabled(): boolean {
+  return process.env.DEMO_GUEST === "1";
+}
+
 export async function upsertGuestUser(sql: postgres.Sql<any>): Promise<UserDTO> {
   return upsertUserFromGoogle(sql, {
     googleId: GUEST_GOOGLE_ID,

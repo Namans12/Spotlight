@@ -1,0 +1,35 @@
+{
+  // tsconfig.app.json only includes `src`, so until this file existed the
+  // serverless functions in `api/`, their data access in `lib/`, and the code
+  // in `shared/` that both halves import were never type-checked at all —
+  // `npm run typecheck` passed while they were free to be wrong. They are
+  // plain TypeScript run by Vercel's Node runtime rather than bundled by Vite,
+  // so they need their own resolution settings instead of being folded in.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM"],
+    // api/ and lib/ import each other with explicit .js specifiers (the form
+    // Node's ESM loader needs at runtime), which only nodenext resolves.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    // Not full `strict` (the app config isn't either, and turning it on here
+    // would bury real findings under hundreds of implicit-any notes), but
+    // strictNullChecks specifically is load-bearing: without it TypeScript
+    // will not narrow a discriminated union at all, so the `{ allowed: true }
+    // | { allowed: false, reason }` results this code returns read as errors
+    // at every use site and genuine null bugs go unseen.
+    "strict": false,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
+  },
+  "include": ["api", "lib", "shared", "scripts/dev-api-server.mjs"],
+  // The vitest suites under lib/ and shared/ are checked by the app config's
+  // own run via the test files' imports; including them here would demand
+  // vitest's globals in a Node-resolution context for no benefit.
+  "exclude": ["**/*.test.ts"]
+}

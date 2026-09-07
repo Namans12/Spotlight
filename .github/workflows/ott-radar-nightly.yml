@@ -59,6 +59,33 @@ jobs:
           SEASONS_MAX_CALLS: "400"
         run: python scripts/backfill_seasons.py
 
+      # Rebuilds Must Watch / Can Watch edges from TMDB collections, under the
+      # classification in data/collection-shapes.json (a continuous series, a
+      # multi-arc saga, or an anthology that gets no prerequisites at all).
+      #
+      # This was never in CI, which meant every edge in production came from
+      # the request-path warm in api/relations.ts and the curated seed was only
+      # as fresh as the last time someone ran it by hand. Idempotent and
+      # precedence-guarded: a re-run over unchanged data writes nothing, and a
+      # lower-trust source can never overwrite a higher-trust one.
+      - name: Sync watch-order edges from TMDB collections
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/sync_relations_tmdb.py --limit 500
+
+      # Loads the hand-authored continuity in data/relations_seed.json — the
+      # cross-franchise ordering (MCU, Star Wars TV) that no structured source
+      # gets right, and the only watch-order data this app has for shows.
+      # Runs after the TMDB sync deliberately: 'tmdb' outranks 'seed' in the
+      # precedence ladder, so ordering here changes nothing, but reading the
+      # seed's report against a just-synced table makes a conflict visible.
+      - name: Load curated watch-order seed
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/seed_relations.py
+
       # Keeps calendar_entries populated past whatever the one-time editorial
       # CSV covered. Region-aware theatrical dates + TV premieres (scoped to
       # --tv-countries to avoid TMDB's crowdsourced global noise), idempotent,

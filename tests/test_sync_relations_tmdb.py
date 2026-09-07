@@ -1,4 +1,4 @@
-"""consecutive_pairs must never chain a must-before edge across a trilogy
+"""consecutive_pairs must never chain a must-before edge across an arc
 boundary inside a bundled TMDB collection.
 
 TMDB's "Star Wars Collection" (id 10) lists all 9 mainline saga films —
@@ -10,8 +10,13 @@ date:
 
 A naive zip(parts, parts[1:]) walk invents two nonsense prerequisites at the
 trilogy boundaries: ROTJ-before-TPM and ROTS-before-TFA. Real single-story
-collections (Iron Man, X-Men, ...) are unaffected since they aren't listed in
-MULTI_ARC_COLLECTIONS and so still get the full linear chain.
+collections (Iron Man, Harry Potter, ...) are unaffected — they carry no entry
+in data/collection-shapes.json and so still get the full linear chain.
+
+The classification itself now lives in that shared JSON file rather than in a
+dict inside the generator, so lib/relationsDb.ts's request-path warm reaches
+the same verdict. tests/test_collection_shapes.py covers the engine directly;
+this file covers the generator's use of it.
 """
 
 from __future__ import annotations
@@ -50,13 +55,16 @@ def pair_titles(pairs: list[tuple[dict, dict]]) -> list[tuple[str, str]]:
 def test_star_wars_collection_splits_into_three_trilogies_not_one_chain():
     pairs = pair_titles(srt.consecutive_pairs(STAR_WARS_PARTS, STAR_WARS_COLLECTION_ID))
 
+    # The sequel trilogy continues the original directly, so those six are one
+    # arc; the prequels are a separate line that neither requires.
     assert pairs == [
         ("Star Wars", "The Empire Strikes Back"),
         ("The Empire Strikes Back", "Return of the Jedi"),
-        ("The Phantom Menace", "Attack of the Clones"),
-        ("Attack of the Clones", "Revenge of the Sith"),
+        ("Return of the Jedi", "The Force Awakens"),
         ("The Force Awakens", "The Last Jedi"),
         ("The Last Jedi", "The Rise of Skywalker"),
+        ("The Phantom Menace", "Attack of the Clones"),
+        ("Attack of the Clones", "Revenge of the Sith"),
     ]
 
 
@@ -65,10 +73,12 @@ def test_star_wars_collection_never_crosses_a_trilogy_boundary():
 
     assert ("Return of the Jedi", "The Phantom Menace") not in pairs
     assert ("Revenge of the Sith", "The Force Awakens") not in pairs
+    # ...and nothing else links a prequel to either of the other two trilogies.
+    assert not any("Menace" in a or "Clones" in a or "Sith" in a for a, b in pairs if "Menace" not in b and "Clones" not in b and "Sith" not in b)
 
 
 def test_ordinary_collection_still_gets_the_full_linear_chain():
-    """A collection absent from MULTI_ARC_COLLECTIONS (e.g. Iron Man) is
+    """A collection absent from data/collection-shapes.json (e.g. Iron Man) is
     unaffected — every release-date-consecutive pair is a real prerequisite."""
     iron_man_parts = [
         part("Iron Man", "2008-05-02", 1726),
@@ -84,12 +94,25 @@ def test_ordinary_collection_still_gets_the_full_linear_chain():
     ]
 
 
-def test_stale_arc_sizes_fall_back_to_one_arc_instead_of_misfiring():
-    """If TMDB ever adds a part to the Star Wars Collection without this
-    module's MULTI_ARC_COLLECTIONS entry being updated, the mismatch must be
-    caught (and logged) rather than silently applied to the wrong parts."""
+def test_stale_arc_ids_are_reported_rather_than_silently_misapplied():
+    """If TMDB adds a part to a curated collection without the JSON entry
+    being updated, the extra part must be reported and left out of the chain
+    rather than quietly appended to whichever arc happens to be last."""
     parts_with_extra = STAR_WARS_PARTS + [part("A New Spinoff", "2024-01-01", 999999)]
 
-    arcs = srt.split_into_arcs(parts_with_extra, STAR_WARS_COLLECTION_ID)
+    plan = srt.plan_collection(STAR_WARS_COLLECTION_ID, parts_with_extra)
 
-    assert arcs == [parts_with_extra]
+    assert any("not named in any arc" in w for w in plan.warnings)
+    assert 999999 in {p["id"] for p in plan.loose}
+    # The real arcs are still produced correctly alongside the warning.
+    assert ("Return of the Jedi", "The Phantom Menace") not in pair_titles(plan.must)
+
+
+def test_sorted_parts_puts_undated_entries_last():
+    unordered = [
+        part("Sequel", "2020-01-01", 2),
+        {"id": 3, "title": "Announced", "release_date": None},
+        part("Original", "2010-01-01", 1),
+    ]
+
+    assert [p["id"] for p in srt.sorted_parts({"parts": unordered})] == [1, 2, 3]

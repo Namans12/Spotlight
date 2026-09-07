@@ -44,6 +44,10 @@ sys.path.insert(0, str(ROOT))
 import psycopg  # noqa: E402
 import requests  # noqa: E402
 
+from lib_collection_shapes import (  # noqa: E402
+    plan_collection,
+    sort_by_release,
+)
 from lib_relations import (  # noqa: E402
     Candidate,
     TmdbUnavailable,
@@ -58,23 +62,23 @@ from lib_relations import (  # noqa: E402
 REQUEST_GAP_SECONDS = 0.1
 DEFAULT_LIMIT = 500
 
-# TMDB collections that bundle more than one narrative arc into a single
-# "collection" object. Most collections are one story told across N parts, so
-# release-date-consecutive pairs are always real prerequisites — but a saga
-# collection like TMDB id 10 ("Star Wars Collection") lists all three
-# trilogies (original, prequel, sequel) as one 9-part collection sorted by
-# release date, and the naive consecutive-pair walk invents nonsense edges at
-# the trilogy boundaries (e.g. "Return of the Jedi" before "Phantom Menace").
+# Mirrors SIBLING_CONFIDENCE in lib/relationsDb.ts: above CAN_CONFIDENCE_FLOOR
+# (0.5) so "same series" edges render, below MUST_CONFIDENCE_FLOOR (0.75) so
+# nothing reading confidence alone can promote one into a prerequisite.
+SIBLING_CONFIDENCE = 0.60
+
+# How a collection is classified — one continuous story, several independent
+# arcs, or an episodic anthology — lives in data/collection-shapes.json and is
+# applied by scripts/lib_collection_shapes.py, which the request-path warm
+# (lib/relationsDb.ts) reads too. Sharing that file is what stops a re-run of
+# this generator from overwriting the runtime's correct answer with a naive
+# chain, or the other way round.
 #
-# Keyed by TMDB collection id, value is the size of each arc in release-date
-# order. Deliberately a short, hand-verified exception list rather than a
-# gap-detection heuristic: a real direct-sequel chain can legitimately have a
-# large release-date gap (a decade-plus between installments is common), so
-# inferring boundaries from gap size would risk severing real prerequisite
-# edges elsewhere. Anything not listed here is treated as a single arc.
-MULTI_ARC_COLLECTIONS: dict[int, tuple[int, ...]] = {
-    10: (3, 3, 3),  # Star Wars Collection: original / prequel / sequel trilogies
-}
+# This replaced a local MULTI_ARC_COLLECTIONS dict keyed by *arc sizes*. Sizes
+# cannot describe a collection like Insidious, where The Red Door continues
+# Chapter 2 across two prequels released in between, so arcs are explicit id
+# groups now. The reasoning for a hand-verified list over a gap-detection
+# heuristic is unchanged and is restated in the JSON file's own $doc.
 
 
 def fetch_movie_detail(session: requests.Session, tmdb_key: str, tmdb_id: int) -> dict | None:
@@ -88,46 +92,14 @@ def fetch_collection(session: requests.Session, tmdb_key: str, collection_id: in
 def sorted_parts(collection: dict) -> list[dict]:
     """Release order. Undated parts sort last so they never slot in ahead of a
     dated one and invent a prerequisite that doesn't exist yet."""
-    parts = [p for p in (collection.get("parts") or []) if p.get("id")]
-    return sorted(parts, key=lambda p: p.get("release_date") or "9999-99-99")
-
-
-def split_into_arcs(parts: list[dict], collection_id: int) -> list[list[dict]]:
-    """Splits release-date-sorted parts into independent narrative arcs so the
-    caller never chains a "must-before" edge across an arc boundary.
-
-    Falls back to treating the whole collection as one arc when it isn't in
-    MULTI_ARC_COLLECTIONS, or when the configured arc sizes no longer match
-    the collection's actual part count (e.g. TMDB adds a new entry) — logging
-    rather than silently mis-chaining, since a stale exception-list entry is
-    exactly the kind of drift that should be visible in the sync output.
-    """
-    sizes = MULTI_ARC_COLLECTIONS.get(collection_id)
-    if sizes is None:
-        return [parts]
-    if sum(sizes) != len(parts):
-        print(
-            f"    [collection {collection_id}] expected {sum(sizes)} parts for "
-            f"known arcs {sizes}, found {len(parts)} — treating as one arc "
-            "(update MULTI_ARC_COLLECTIONS)"
-        )
-        return [parts]
-
-    arcs = []
-    start = 0
-    for size in sizes:
-        arcs.append(parts[start : start + size])
-        start += size
-    return arcs
+    return sort_by_release([p for p in (collection.get("parts") or []) if p.get("id")])
 
 
 def consecutive_pairs(parts: list[dict], collection_id: int) -> list[tuple[dict, dict]]:
     """Release-order (earlier, later) pairs to chain with a must-before edge,
-    one per adjacent pair within each arc — never across an arc boundary."""
-    pairs = []
-    for arc in split_into_arcs(parts, collection_id):
-        pairs.extend(zip(arc, arc[1:]))
-    return pairs
+    one per adjacent pair within each arc — never across an arc boundary, and
+    never at all for a collection classified episodic."""
+    return plan_collection(collection_id, parts).must
 
 
 def part_to_candidate(part: dict) -> Candidate:
@@ -205,9 +177,16 @@ def main() -> int:
                 parts = sorted_parts(collection)
                 if len(parts) < 2:
                     continue
-                print(f"  {collection_name}: {len(parts)} parts")
 
-                for earlier, later in consecutive_pairs(parts, collection_id):
+                plan = plan_collection(collection_id, parts)
+                for warning in plan.warnings:
+                    print(f"    WARN {warning}")
+                print(
+                    f"  {collection_name}: {len(parts)} parts, classified {plan.classification} "
+                    f"({len(plan.must)} must, {len(plan.can)} can)"
+                )
+
+                for earlier, later in plan.must:
                     candidate = prepare_edge("movie", later["id"], part_to_candidate(earlier), "before", None)
                     if candidate is None:
                         dropped += 1
@@ -236,6 +215,39 @@ def main() -> int:
                     if status != "skipped":
                         edges_written += 1
                         print(f"    {status} must: {label}")
+
+                # Titles that belong to no chain — every part of an episodic
+                # collection, a singleton arc, an excluded spin-off — are still
+                # worth surfacing, just never as a prerequisite. Written at
+                # SIBLING_CONFIDENCE so they render as Can Watch and can never
+                # be mistaken for one (see MUST_CONFIDENCE_FLOOR).
+                for source, target, reason in plan.can:
+                    candidate = prepare_edge("movie", source["id"], part_to_candidate(target), None, reason)
+                    if candidate is None:
+                        dropped += 1
+                        continue
+
+                    label = f"{source.get('title')} --[can]--> {target.get('title')}"
+                    if args.dry_run:
+                        print(f"    would write can: {label}")
+                        edges_written += 1
+                        continue
+
+                    status = upsert_edge(
+                        cur,
+                        "movie",
+                        source["id"],
+                        source.get("title") or "Untitled",
+                        source.get("poster_path"),
+                        source.get("release_date") or None,
+                        "can",
+                        "tmdb",
+                        SIBLING_CONFIDENCE,
+                        candidate,
+                    )
+                    counts[status] += 1
+                    if status != "skipped":
+                        edges_written += 1
 
         if not args.dry_run:
             conn.commit()

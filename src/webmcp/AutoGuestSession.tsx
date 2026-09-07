@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { DEMO_GUEST_ENABLED } from './demoGuest';
 
 interface LocationState {
   from?: { pathname: string };
@@ -11,6 +12,13 @@ interface LocationState {
  * tool in the first second — ever sees a login screen. Deliberately not part
  * of the real product, where per-account privacy should stay an explicit
  * choice; this only ships on the hackathon deployment of this repo.
+ *
+ * "Only ships on the hackathon deployment" is now enforced rather than
+ * intended: this renders nothing unless VITE_DEMO_GUEST=1 at build time, and
+ * the server refuses guest sign-in unless DEMO_GUEST=1 at run time (see
+ * lib/usersDb.ts guestSessionsEnabled). Both halves are needed — the client
+ * flag stops the pointless request, the server flag is what actually
+ * enforces it, since a client build flag is not a security boundary.
  *
  * RequireAuth's redirect to /login (with `state: {from}`) and this effect
  * both react to the same "not authenticated yet" moment, and RequireAuth's
@@ -27,6 +35,7 @@ export function AutoGuestSession() {
   locationRef.current = location;
 
   useEffect(() => {
+    if (!DEMO_GUEST_ENABLED) return;
     if (isLoading || isAuthenticated) return;
     loginGuest.mutate(undefined, {
       onSuccess: () => {

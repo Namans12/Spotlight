@@ -97,6 +97,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
     return sendJson(res, 404, { error: "not found" });
   } catch (err) {
-    return sendJson(res, 500, { error: err instanceof Error ? err.message : String(err) });
+    // Logged in full, reported generically: a raw driver message can carry
+    // table names, column names, constraint names and connection detail, and
+    // this route is reachable by any signed-in user. Matches api/calendar.ts.
+    console.error("[watchlist] request failed", err);
+    return sendJson(res, 500, { error: "could not complete that request" });
   }
 }
