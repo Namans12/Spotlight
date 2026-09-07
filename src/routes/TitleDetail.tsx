@@ -64,10 +64,8 @@ export default function TitleDetail() {
 
   const recommendationsQuery = useQuery({
     queryKey: ['tmdb', 'you-may-also-like', mediaType, tmdbId],
-    // Waits on `data` so the origin's own language is known before the
-    // /similar fallback filters by it.
-    queryFn: () => getYouMayAlsoLike(mediaType as MediaType, tmdbId, data?.originalLanguage),
-    enabled: Number.isFinite(tmdbId) && !!data,
+    queryFn: () => getYouMayAlsoLike(mediaType as MediaType, tmdbId),
+    enabled: Number.isFinite(tmdbId),
     staleTime: 60 * 60_000,
   });
   const recommendations = recommendationsQuery.data ?? [];
@@ -265,7 +263,18 @@ export default function TitleDetail() {
 
       {showRecommendations && recommendations.length > 0 && (
         <div className="px-1">
-          <PosterRow title="You may also like" icon={<Sparkles size={16} />} items={recommendations} />
+          <PosterRow
+            title="You may also like"
+            icon={<Sparkles size={16} />}
+            items={recommendations}
+            // The strongest reason only. A card carrying "Also stars Ranbir
+            // Kapoor" is a suggestion; three stacked reasons is a debug dump.
+            // Blank for the purely behavioural picks, which have nothing
+            // specific to say beyond "people who watched this watched that".
+            reasonFor={(movie) =>
+              recommendations.find((r) => r.id === movie.id && r.mediaType === movie.mediaType)?.reasons[0] ?? null
+            }
+          />
         </div>
       )}
     </div>

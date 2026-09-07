@@ -10,8 +10,10 @@ import {
   tmdbCredits,
   tmdbDiscover,
   tmdbWatchProvidersBatch,
+  tmdbRecommendationBuckets,
   type ProviderKey,
 } from "../../lib/tmdbProxy.js";
+import { scoreCandidates } from "../../lib/recommendations.js";
 import { isRateLimited } from "../../lib/rateLimit.js";
 
 // "movie:603,tv:1399" -> keys, same format api/ratings.ts's batch route uses.
@@ -68,6 +70,27 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       case "popular-tv":
         body = await tmdbPopularTV();
         break;
+      case "you-may-also-like": {
+        const type = url.searchParams.get("type");
+        const id = Number(url.searchParams.get("id"));
+        if ((type !== "movie" && type !== "tv") || !Number.isFinite(id)) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: "type (movie|tv) and id are required" }));
+          return;
+        }
+        // Composed server-side rather than in the browser: this is up to eight
+        // TMDB calls, and doing it here means one client request, one edge
+        // cache entry, and the TMDB key never leaving the server.
+        const { buckets, profile } = await tmdbRecommendationBuckets(type, id);
+        body = scoreCandidates(buckets, {
+          originId: id,
+          originLanguage: profile?.language,
+          originGenreIds: profile?.genreIds,
+          limit: 20,
+        });
+        cacheControl = "public, s-maxage=3600, stale-while-revalidate=86400";
+        break;
+      }
       case "detail":
       case "recommendations":
       case "similar":
