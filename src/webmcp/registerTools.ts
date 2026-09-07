@@ -4,8 +4,10 @@ import type { AddWatchlistItemBody, Bucket, WatchlistItemDTO } from '../../share
 import type { WatchlistState } from '@/types/movie';
 import { searchMovies } from '@/lib/tmdb';
 import { fetchDigest, fetchCalendarMonth } from '@/lib/api';
+import { fetchTitleDetail, titleDetailToMovie } from '@/lib/tmdbDetail';
 import { fetchRelations, suppressRelation, relatedToMovie, MAX_DEPTH } from '@/lib/relations';
 import * as watchlistApi from '@/lib/watchlistApi';
+import { DEMO_GUEST_ENABLED } from './demoGuest';
 
 // Every tool here wraps the exact same client-side functions the human UI
 // calls (src/lib/watchlistApi.ts, src/lib/relations.ts, src/lib/api.ts) —
@@ -13,10 +15,12 @@ import * as watchlistApi from '@/lib/watchlistApi';
 // produce identical results and the on-screen list updates live either way.
 //
 // Mutating tools call ensureAuthenticated() first rather than failing with
-// "please log in": a judge or an agent opening this app cold should be able
-// to just ask for something and have it work, not hit a login wall first.
-// See lib/usersDb.ts upsertGuestUser for the shared demo account this signs
-// into.
+// "please log in": on the demo deployment a judge or an agent opening this
+// app cold should be able to just ask for something and have it work, not
+// hit a login wall first. See lib/usersDb.ts upsertGuestUser for the shared
+// demo account this signs into, and src/webmcp/demoGuest.ts for why it is
+// gated off everywhere else — where these tools report "sign in with Google
+// first" instead, in words the agent can relay.
 
 const WATCHLIST_KEY = ['watchlist'];
 const AUTH_KEY = ['auth', 'session'];
@@ -31,6 +35,14 @@ interface SessionUser {
 async function ensureAuthenticated(queryClient: QueryClient): Promise<void> {
   const session = queryClient.getQueryData<{ authenticated: boolean }>(AUTH_KEY);
   if (session?.authenticated) return;
+
+  // On a deployment without the shared demo account (DEMO_GUEST unset — see
+  // lib/usersDb.ts guestSessionsEnabled), there is no session to start
+  // silently, and the agent needs to be told that in words it can relay to
+  // the user rather than being handed an opaque failure.
+  if (!DEMO_GUEST_ENABLED) {
+    throw new Error('Sign in with Google first — this action writes to your own private list.');
+  }
 
   const res = await fetch('/api/auth', {
     method: 'POST',
@@ -72,13 +84,72 @@ function movieToBody(movie: Movie, bucket: Bucket, listId?: number): AddWatchlis
   };
 }
 
-function findInBuckets(items: WatchlistItemDTO[], title: string): WatchlistItemDTO | undefined {
-  const needle = title.toLowerCase();
-  return items.find((i) => i.title.toLowerCase().includes(needle));
+/** Matches a user-supplied title against saved items, strongest match first.
+ *
+ * A bare `includes` (what this used to be) resolves "Dune" to whichever of
+ * "Dune" and "Dune: Part Two" happens to come first in the list, so
+ * `mark_watched('Dune')` could silently mark the sequel. Ranking by exactness
+ * makes the common case right, and `ambiguous` lets a caller report the
+ * remaining genuine ties instead of guessing.
+ */
+function matchTitle(
+  items: WatchlistItemDTO[],
+  title: string,
+): { match?: WatchlistItemDTO; ambiguous: WatchlistItemDTO[] } {
+  const needle = title.trim().toLowerCase();
+  if (!needle) return { ambiguous: [] };
+
+  const exact = items.filter((i) => i.title.toLowerCase() === needle);
+  if (exact.length > 0) return { match: exact[0], ambiguous: exact.length > 1 ? exact : [] };
+
+  const prefix = items.filter((i) => i.title.toLowerCase().startsWith(needle));
+  if (prefix.length === 1) return { match: prefix[0], ambiguous: [] };
+  if (prefix.length > 1) return { match: prefix[0], ambiguous: prefix };
+
+  const substring = items.filter((i) => i.title.toLowerCase().includes(needle));
+  if (substring.length === 1) return { match: substring[0], ambiguous: [] };
+  if (substring.length > 1) return { match: substring[0], ambiguous: substring };
+
+  return { ambiguous: [] };
 }
 
 function titleKey(m: { mediaType: string; tmdbId?: number; id?: number }): string {
   return `${m.mediaType}:${m.tmdbId ?? m.id}`;
+}
+
+/** Fills in the fields a relation edge doesn't carry.
+ *
+ * `relatedToMovie` can only recover what the edge denormalises — title,
+ * poster, release date — so overview, rating and language come back empty and
+ * a chain added by an agent renders visibly poorer than the same title added
+ * by a click. One detail call per title fixes that; they run in parallel, and
+ * any that fails keeps the edge's own values rather than failing the plan,
+ * since a missing overview is not worth losing the add over.
+ */
+async function enrichChain(chain: Movie[]): Promise<Movie[]> {
+  return Promise.all(
+    chain.map(async (m) => {
+      if (m.overview) return m; // the origin title came from search, already complete
+      try {
+        return { ...m, ...titleDetailToMovie(await fetchTitleDetail(m.mediaType, m.id)) };
+      } catch {
+        return m;
+      }
+    }),
+  );
+}
+
+/** Reads a required string argument, or throws a message the agent can act on.
+ *
+ * `String(x)` is not a substitute: handed an object it produces
+ * "[object Object]", which then reaches TMDB as a search query and comes back
+ * with a confident, wrong result rather than an error. Tool arguments come
+ * from a model, so malformed input is a normal event, not an exceptional one.
+ */
+function requireString(value: unknown, field: string): string {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  throw new Error(`"${field}" must be a non-empty string.`);
 }
 
 /** One-line human-readable summary for a tool result's `content` part. Tools
@@ -106,7 +177,18 @@ function registerWrapped(
   const wrapped: ModelContextTool = {
     ...tool,
     execute: async (input, options) => {
-      const result = await inner(input, options);
+      let result: unknown;
+      try {
+        result = await inner(input, options);
+      } catch (err) {
+        // An agent handed a rejected promise sees a transport-level failure
+        // and usually gives up or retries the same bad call. A structured
+        // `{ ok: false, message }` is something it can read and correct —
+        // which matters most for the two failures that actually happen here:
+        // malformed arguments (see requireString) and "sign in first" on a
+        // deployment without the demo account.
+        result = { ok: false, message: err instanceof Error ? err.message : 'That action failed.' };
+      }
       return {
         content: [{ type: 'text', text: summarize(result) }],
         structuredContent: result,
@@ -139,7 +221,7 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
         required: ['query'],
       },
       async execute({ query }) {
-        const results = await searchMovies(String(query));
+        const results = await searchMovies(requireString(query, 'query'));
         return {
           ok: true,
           results: results.slice(0, 10).map((m) => ({
@@ -196,7 +278,7 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
         required: ['month'],
       },
       async execute({ month }) {
-        const data = await fetchCalendarMonth(String(month));
+        const data = await fetchCalendarMonth(requireString(month, 'month'));
         return {
           ok: true,
           month: data.month,
@@ -224,7 +306,7 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
         required: ['title'],
       },
       async execute({ title, mediaType }) {
-        const movie = await resolveTitle(String(title), mediaType as 'movie' | 'tv' | undefined);
+        const movie = await resolveTitle(requireString(title, 'title'), mediaType as 'movie' | 'tv' | undefined);
         if (!movie) return { ok: false, message: `Couldn't find "${title}" in the catalog.` };
 
         const relations = await fetchRelations(movie.mediaType, movie.id, MAX_DEPTH);
@@ -246,6 +328,10 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
           resolvedTitle: movie.title,
           hasChain: before.length > 0 || after.length > 0,
           partOfChain: before.length + after.length > 0 ? `${before.length + 1} of ${before.length + 1 + after.length}` : null,
+          // The walk is capped at MAX_DEPTH hops per direction. Without this
+          // an agent reads a truncated chain as the whole thing and tells the
+          // user they are caught up when they are not.
+          chainComplete: relations?.hasMore !== true,
           mustWatchOrder: chain,
           optionalExtras: (relations?.canWatch ?? []).map((r) => ({
             title: r.title,
@@ -272,13 +358,13 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
       async execute({ title, mediaType }) {
         await ensureAuthenticated(queryClient);
 
-        const movie = await resolveTitle(String(title), mediaType as 'movie' | 'tv' | undefined);
+        const movie = await resolveTitle(requireString(title, 'title'), mediaType as 'movie' | 'tv' | undefined);
         if (!movie) return { ok: false, message: `Couldn't find "${title}" in the catalog.` };
 
         const relations = await fetchRelations(movie.mediaType, movie.id, MAX_DEPTH);
         const before = relations?.mustWatch.before ?? [];
         const after = relations?.mustWatch.after ?? [];
-        const chain: Movie[] = [...before.map(relatedToMovie), movie, ...after.map(relatedToMovie)];
+        const chain: Movie[] = await enrichChain([...before.map(relatedToMovie), movie, ...after.map(relatedToMovie)]);
 
         if (chain.length === 1) {
           return { ok: true, title: movie.title, added: [], message: 'This title stands on its own — nothing else to plan.' };
@@ -308,6 +394,31 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
           added.push(m.title);
         }
 
+        // Appending alone does NOT produce watch order once any part of the
+        // chain is already on the list. Adds take MAX(sort_order)+1, so
+        // planning John Wick with Chapter 4 already saved yields 4, 1, 2, 3 —
+        // while the tool claims "in watch order". Restating the whole bucket
+        // is the only thing that makes the claim true, so it runs whenever
+        // anything was added, not only in the partial case.
+        let reordered = false;
+        if (added.length > 0) {
+          const after = await watchlistApi.fetchWatchlistState();
+          const chainPositions = new Map(chain.map((m, i) => [titleKey(m), i]));
+          const inChain = after.watchlist.filter((i) => chainPositions.has(titleKey(i)));
+          const rest = after.watchlist.filter((i) => !chainPositions.has(titleKey(i)));
+          inChain.sort((a, b) => chainPositions.get(titleKey(a))! - chainPositions.get(titleKey(b))!);
+
+          // Chain first, then everything the user already had, each keeping
+          // its own relative order. Reordering is cosmetic, so a failure here
+          // must not turn a successful set of adds into a reported failure.
+          try {
+            await watchlistApi.reorderBucket('watchlist', null, [...inChain, ...rest].map((i) => i.dbId));
+            reordered = true;
+          } catch (err) {
+            console.error('[webmcp] plan_watch_order could not reorder the watchlist', err);
+          }
+        }
+
         await invalidateWatchlist(queryClient);
 
         return {
@@ -316,10 +427,14 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
           added,
           alreadyWatched,
           alreadyOnList,
+          // The chain is capped at MAX_DEPTH hops in each direction; say so
+          // rather than letting an agent present a truncated plan as complete.
+          chainComplete: relations?.hasMore !== true,
           message:
             added.length > 0
-              ? `Added ${added.length} title(s) to the watchlist in watch order.`
-              : "Nothing new to add — already caught up on this one.",
+              ? `Added ${added.length} title(s) to the watchlist${reordered ? ', in watch order' : ''}.` +
+                (relations?.hasMore ? ' The chain is longer than this — some titles were beyond the lookup depth.' : '')
+              : 'Nothing new to add — already caught up on this one.',
         };
       },
     }),
@@ -337,7 +452,7 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
       },
       async execute({ title, bucket }) {
         await ensureAuthenticated(queryClient);
-        const movie = await resolveTitle(String(title));
+        const movie = await resolveTitle(requireString(title, 'title'));
         if (!movie) return { ok: false, message: `Couldn't find "${title}" in the catalog.` };
 
         try {
@@ -364,7 +479,10 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
       },
       async execute({ fromTitle, toTitle }) {
         await ensureAuthenticated(queryClient);
-        const [from, to] = await Promise.all([resolveTitle(String(fromTitle)), resolveTitle(String(toTitle))]);
+        const [from, to] = await Promise.all([
+          resolveTitle(requireString(fromTitle, 'fromTitle')),
+          resolveTitle(requireString(toTitle, 'toTitle')),
+        ]);
         if (!from || !to) return { ok: false, message: 'Could not resolve one of those titles.' };
 
         try {
@@ -413,12 +531,21 @@ function registerDynamicTools(modelContext: ModelContext, queryClient: QueryClie
     async execute({ title }) {
       await ensureAuthenticated(queryClient);
       const state = await watchlistApi.fetchWatchlistState();
-      const item = findInBuckets([...state.watchlist, ...state.watchLater], String(title));
-      if (!item) return { ok: false, message: `Couldn't find "${title}" on the watchlist or watch-later list.` };
+      const { match, ambiguous } = matchTitle([...state.watchlist, ...state.watchLater], requireString(title, 'title'));
+      if (!match) return { ok: false, message: `Couldn't find "${title}" on the watchlist or watch-later list.` };
+      if (ambiguous.length > 1) {
+        // Marking the wrong film watched silently removes it from the list,
+        // so a tie is reported rather than resolved by list position.
+        return {
+          ok: false,
+          message: `"${title}" matches ${ambiguous.length} titles — say which one.`,
+          candidates: ambiguous.map((i) => i.title),
+        };
+      }
 
-      await watchlistApi.moveWatchlistItem(item.dbId, 'watched');
+      await watchlistApi.moveWatchlistItem(match.dbId, 'watched');
       await invalidateWatchlist(queryClient);
-      return { ok: true, markedWatched: item.title };
+      return { ok: true, markedWatched: match.title };
     },
   };
 
@@ -439,8 +566,16 @@ function registerDynamicTools(modelContext: ModelContext, queryClient: QueryClie
       const remaining = [...state.watchlist];
       const matched: WatchlistItemDTO[] = [];
 
-      for (const t of orderedTitles as string[]) {
-        const idx = remaining.findIndex((i) => i.title.toLowerCase().includes(String(t).toLowerCase()));
+      if (!Array.isArray(orderedTitles)) {
+        return { ok: false, message: '"orderedTitles" must be an array of title strings.' };
+      }
+      for (const t of orderedTitles) {
+        if (typeof t !== 'string' || !t.trim()) continue;
+        // Same ranking as mark_watched, so "Dune" can't claim "Dune: Part Two"
+        // out from under an explicit later mention of it.
+        const { match } = matchTitle(remaining, t);
+        if (!match) continue;
+        const idx = remaining.indexOf(match);
         if (idx !== -1) matched.push(...remaining.splice(idx, 1));
       }
 

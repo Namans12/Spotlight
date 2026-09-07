@@ -1,0 +1,151 @@
+{
+  "$schema": "See shared/collectionShapes.ts for the loader and the rules each field drives.",
+  "$doc": [
+    "Hand-verified shape of TMDB collections whose membership is NOT a narrative prerequisite chain.",
+    "",
+    "The default assumption — every release-adjacent pair in a collection is a 'you must watch this",
+    "first' edge — is right for a tight sequel series (Harry Potter, John Wick, Dune) and wrong for",
+    "three other kinds of collection that TMDB models identically:",
+    "",
+    "  episodic  An anthology or an episodic franchise. Entries share a brand, not a story. Chaining",
+    "            them produces the single worst output this feature can make: 'Part 24 of 27 —",
+    "            everything else comes first' on a film you can watch cold.",
+    "  arcs      Several independent stories in one collection object (separate trilogies, a reboot",
+    "            timeline, a prequel line). Chaining across the boundary invents a prerequisite.",
+    "  exclude   A spin-off, recap, or alternate cut that sits inside the collection but outside its",
+    "            story. It should not occupy a link in the chain.",
+    "",
+    "Deliberately a hand-verified list, not a heuristic — matching the reasoning already in",
+    "scripts/sync_relations_tmdb.py. Size is the tempting signal and it does not work: Harry Potter",
+    "has 8 parts and is a real chain, while Predator has 6 and is not. A size fallback still exists",
+    "(shared/collectionShapes.ts EPISODIC_PART_THRESHOLD) but only far above anything legitimate.",
+    "",
+    "'arcs' and 'story' hold TMDB movie ids. 'arcs' groups are the continuity chains; any part not",
+    "listed in one is treated as loose and gets 'same series, not required' Can Watch edges instead.",
+    "'story' is the full narrative order for the connections view's Story-order toggle, and is only",
+    "needed where it differs from release order.",
+    "",
+    "Run `python scripts/audit_collection_shapes.py` to list collections in the database that reach",
+    "the chain path without an entry here, ranked by how many titles they affect."
+  ],
+  "collections": {
+    "10": {
+      "name": "Star Wars Collection",
+      "note": "Two lines, not three. The sequel trilogy continues the original directly (The Force Awakens picks up Luke, Leia and Han thirty years on), so those six are one arc; the prequels stand apart and are required by neither. This matches what data/relations_seed.json already asserts by hand: 'The Force Awakens --before--> Return of the Jedi', and no edge between the prequels and anything else. The naive walk instead emits 'Return of the Jedi before The Phantom Menace'.",
+      "arcs": [
+        [11, 1891, 1892, 140607, 181808, 181812],
+        [1893, 1894, 1895]
+      ],
+      "story": [
+        1893, 1894, 4194, 1895, 105971, 348350, 92830, 60554, 83867, 330459,
+        11, 1891, 1892, 82856, 115036, 114461, 140607, 181808, 181812
+      ],
+      "storyNote": "In-universe chronology, and deliberately wider than the collection: `story` is read as a flat tmdb id -> rank map (shared/collectionShapes.ts storyRank), so it can place the films and series that sit inside this franchise's timeline without being members of TMDB collection 10 — The Clone Wars, Rebels, Andor, Rogue One, The Mandalorian, Ahsoka. Without them the toggle pushes every unranked title to the end of the line, which put Rogue One after The Rise of Skywalker when it belongs in the minutes before A New Hope. Tales of the Jedi and Tales of the Empire are left out on purpose: an anthology spanning several eras has no single position."
+    },
+    "645": {
+      "name": "James Bond Collection",
+      "note": "27 parts across six actors and two continuities. Only the Craig films have real continuity, and Never Say Never Again is not even an Eon film.",
+      "episodic": true
+    },
+    "1745820": {
+      "name": "Untold Collection",
+      "note": "Netflix sports-documentary anthology. Every entry is a self-contained film about a different subject.",
+      "episodic": true
+    },
+    "4246": {
+      "name": "Scary Movie Collection",
+      "note": "Parody anthology, plus a 2026 reboot that reuses the first film's title.",
+      "episodic": true
+    },
+    "91361": {
+      "name": "Halloween Collection",
+      "note": "Three mutually exclusive timelines, and Halloween III shares nothing with any of them.",
+      "episodic": true
+    },
+    "9735": {
+      "name": "Friday the 13th Collection",
+      "note": "Episodic slasher series; entries are watchable in any order.",
+      "episodic": true
+    },
+    "399": {
+      "name": "Predator Collection",
+      "note": "Predators, The Predator, Prey and Badlands are each standalone.",
+      "episodic": true
+    },
+    "142015": { "name": "Housefull Collection", "note": "Indian comedy anthology — recurring cast, unrelated stories.", "episodic": true },
+    "483464": { "name": "Golmaal Collection", "note": "Indian comedy anthology — recurring cast, unrelated stories.", "episodic": true },
+    "142021": { "name": "Dhamaal Collection", "note": "Indian comedy anthology — recurring cast, unrelated stories.", "episodic": true },
+    "90863": { "name": "Rush Hour Collection", "note": "Standalone buddy-cop cases; no entry assumes another.", "episodic": true },
+    "153948": { "name": "Best of the Best Collection", "note": "Largely unconnected martial-arts sequels.", "episodic": true },
+    "192492": { "name": "The Jack Ryan Collection", "note": "Recast across every film; each adapts a separate novel.", "episodic": true },
+    "261590": { "name": "Living Dead Collection", "note": "Romero's films share a premise, not a cast or a plot; each stands alone.", "episodic": true },
+
+    "748": {
+      "name": "X-Men Collection",
+      "note": "Original trilogy and the First Class prequel line are separate continuities that Days of Future Past deliberately splits apart.",
+      "arcs": [
+        [36657, 36658, 36668],
+        [49538, 127585, 246655, 320288]
+      ],
+      "story": [49538, 127585, 246655, 320288, 36657, 36658, 36668]
+    },
+    "528": {
+      "name": "The Terminator Collection",
+      "note": "Genisys and Dark Fate each reboot from Judgment Day and contradict the middle films, so neither continues the T1-Salvation line.",
+      "arcs": [[218, 280, 296, 534], [87101], [290859]]
+    },
+    "228446": {
+      "name": "Insidious Collection",
+      "note": "Chapter 3 and The Last Key are prequels; The Red Door continues Chapter 2 directly across them.",
+      "arcs": [
+        [49018, 91586, 614479, 1291595],
+        [280092, 406563]
+      ],
+      "story": [406563, 280092, 49018, 91586, 614479, 1291595]
+    },
+    "495527": {
+      "name": "Jumanji Collection",
+      "note": "The 1995 film is a separate story the Welcome to the Jungle line only nods to.",
+      "arcs": [[8844], [353486, 512200, 1260649]]
+    },
+    "328": {
+      "name": "Jurassic Park Collection",
+      "note": "The Jurassic World films restart with a new cast a generation later.",
+      "arcs": [
+        [329, 330, 331],
+        [135397, 351286, 507086, 1234821, 1714034]
+      ]
+    },
+    "9485": {
+      "name": "The Fast and the Furious Collection",
+      "note": "Tokyo Drift is set after Fast & Furious 6 despite releasing third; Hobbs & Shaw is a side story.",
+      "exclude": [384018],
+      "story": [9799, 584, 13804, 51497, 82992, 9615, 168259, 337339, 385128, 385687, 755679]
+    },
+    "230": {
+      "name": "The Godfather Collection",
+      "note": "Coda is a re-edit of Part III, not a fourth film.",
+      "exclude": [1674276]
+    },
+    "31562": {
+      "name": "The Bourne Collection",
+      "note": "The Bourne Legacy follows Aaron Cross and Bourne does not appear.",
+      "exclude": [49040]
+    },
+    "656": {
+      "name": "Saw Collection",
+      "note": "Spiral is a standalone spin-off with none of the series' characters.",
+      "exclude": [602734]
+    },
+    "8354": {
+      "name": "Ice Age Collection",
+      "note": "The Adventures of Buck Wild is a spin-off with a different lead.",
+      "exclude": [774825]
+    },
+    "383987": {
+      "name": "Attack on Titan Collection",
+      "note": "Chronicle is a recap compilation of the earlier films, not a new chapter.",
+      "exclude": [714194]
+    }
+  }
+}

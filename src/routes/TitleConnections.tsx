@@ -1,10 +1,13 @@
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { fetchTitleDetail } from '@/lib/tmdbDetail';
+import { fetchSeasons } from '@/lib/seasons';
 import { useAuth } from '@/hooks/useAuth';
 import { useRelations } from '@/hooks/useRelations';
 import { MAX_DEPTH, suppressRelation, type RelatedTitle } from '@/lib/relations';
+import { hasStoryOrder, storyRank } from '../../shared/collectionShapes';
+import { Segmented, type SegmentedOption } from '@/components/ui/segmented';
 import { TitleTimeline, type TimelineEntry } from '@/components/release/TitleTimeline';
 import { ArrowLeft, Loader2, ListOrdered, Popcorn } from 'lucide-react';
 
@@ -26,12 +29,39 @@ function toEntry(related: RelatedTitle, kind: 'must' | 'can'): TimelineEntry {
 /** Release date ascending, undated entries last — a can-watch edge doesn't
  * carry a before/after direction (see docs/relations-seed-prompt.md), so its
  * spot in the merged line is wherever it falls chronologically, the same as
- * everything else here. */
+ * everything else here.
+ *
+ * The both-undated case has to return 0. Returning 1 (as this once did) makes
+ * the comparator inconsistent — cmp(a,b) and cmp(b,a) both positive — and
+ * V8's sort is entitled to produce arbitrary order from that once the array
+ * is long enough to trigger a merge. Mirrors sortByReleaseDate in
+ * lib/relationsDb.ts, which already handled it. */
 function byReleaseDate(a: TimelineEntry, b: TimelineEntry): number {
+  if (!a.releaseDate && !b.releaseDate) return 0;
   if (!a.releaseDate) return 1;
   if (!b.releaseDate) return -1;
   return a.releaseDate.localeCompare(b.releaseDate);
 }
+
+/** Narrative order, for the franchises where it differs from release order —
+ * the Star Wars prequels, Tokyo Drift, the Insidious prequels. Titles with no
+ * curated rank keep their chronological position relative to each other, so a
+ * partially-curated chain degrades to release order rather than scrambling. */
+function byStoryOrder(a: TimelineEntry, b: TimelineEntry): number {
+  const rankA = storyRank(a.tmdbId);
+  const rankB = storyRank(b.tmdbId);
+  if (rankA !== undefined && rankB !== undefined) return rankA - rankB;
+  if (rankA !== undefined) return -1;
+  if (rankB !== undefined) return 1;
+  return byReleaseDate(a, b);
+}
+
+type OrderMode = 'release' | 'story';
+
+const ORDER_OPTIONS: SegmentedOption<OrderMode>[] = [
+  { id: 'release', label: 'Release order' },
+  { id: 'story', label: 'Story order' },
+];
 
 /** Where the viewed title sits in its chain, in words. */
 function standing(beforeCount: number, afterCount: number): string {
@@ -52,6 +82,7 @@ export default function TitleConnections() {
   const { type, id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const mediaType = type === 'tv' ? 'tv' : 'movie';
   const tmdbId = Number(id);
 
@@ -63,6 +94,16 @@ export default function TitleConnections() {
   });
 
   const relationsQuery = useRelations(mediaType, tmdbId, MAX_DEPTH);
+
+  // TV only, and only ever read to phrase the no-chain case (see
+  // standaloneCopy). Season counts are cached server-side in title_seasons, so
+  // this is a Postgres read for almost every show rather than a TMDB call.
+  const seasonsQuery = useQuery({
+    queryKey: ['seasons', 'single', tmdbId],
+    queryFn: () => fetchSeasons(tmdbId),
+    enabled: mediaType === 'tv' && Number.isFinite(tmdbId),
+    staleTime: 24 * 60 * 60_000,
+  });
   const relations = relationsQuery.data;
   const detail = detailQuery.data;
 
@@ -145,7 +186,6 @@ export default function TitleConnections() {
   // release date actually falls, same as everything else. TitleTimeline tells
   // the two kinds apart visually (a dashed rail segment and a muted node for
   // 'can'), rather than this splitting them into separate lists.
-  const mustCount = before.length + 1 + after.length;
   const currentEntry: TimelineEntry = {
     key: `current-${mediaType}-${tmdbId}`,
     title: originTitle ?? 'This title',
@@ -157,15 +197,59 @@ export default function TitleConnections() {
     kind: 'must',
     reason: null,
   };
-  const entries: TimelineEntry[] = [
+  const unsorted: TimelineEntry[] = [
     ...before.map((r) => toEntry(r, 'must')),
     currentEntry,
     ...after.map((r) => toEntry(r, 'must')),
     ...canWatch.map((r) => toEntry(r, 'can')),
-  ].sort(byReleaseDate);
+  ];
+
+  // The toggle is offered only when it would actually reorder something —
+  // most franchises are told in the order they were released, and a control
+  // that does nothing is worse than no control.
+  const storyOrderAvailable = hasStoryOrder(unsorted.map((e) => e.tmdbId));
+  const orderMode: OrderMode = storyOrderAvailable && searchParams.get('order') === 'story' ? 'story' : 'release';
+  const entries = [...unsorted].sort(orderMode === 'story' ? byStoryOrder : byReleaseDate);
+
+  const setOrderMode = (mode: OrderMode) => {
+    const next = new URLSearchParams(searchParams);
+    if (mode === 'release') next.delete('order');
+    else next.set('order', mode);
+    // Replace, not push: flipping the order is a view preference, not a
+    // destination, and stacking it in history would make Back mean "undo the
+    // toggle" instead of "leave this page".
+    setSearchParams(next, { replace: true });
+  };
 
   const hasMustChain = before.length > 0 || after.length > 0;
   const hasTimeline = hasMustChain || canWatch.length > 0;
+
+  // What to say when there is no chain at all.
+  //
+  // "It stands on its own" was said for every such title, and for a show it
+  // was usually not something we knew. TMDB has no collection concept for TV
+  // (see api/relations.ts warmFromCollection), so the only cross-title data
+  // for shows is the curated seed — and outside those few dozen entries the
+  // honest answer is "we have no connections for this", not a claim about the
+  // series. For a multi-season show there is also a real watch order to give,
+  // and it is the one people actually want: its own seasons, in order.
+  const seasons = seasonsQuery.data?.numberOfSeasons ?? null;
+  const standaloneCopy =
+    mediaType === 'tv'
+      ? seasons && seasons > 1
+        ? `No other series is required first — start at Season 1 and watch all ${seasons} seasons in order.`
+        : 'No connections recorded for this series. Spotlight only tracks cross-series order for franchises it has curated.'
+      : 'Nothing else is required to follow this one — it stands on its own.';
+
+  // Counted off the *rendered* order, not off before.length. Those disagree
+  // whenever the list is re-sorted — under Story order a prequel moves ahead
+  // of films it released after — and a "Part 2 of 4" label sitting next to a
+  // timeline whose highlighted node is third is worse than no label.
+  const mustEntries = entries.filter((e) => e.kind === 'must');
+  const mustCount = mustEntries.length;
+  const currentPosition = mustEntries.findIndex((e) => e.isCurrent) + 1;
+  const priorCount = Math.max(0, currentPosition - 1);
+  const laterCount = Math.max(0, mustCount - currentPosition);
 
   return (
     <div className="space-y-6">
@@ -189,19 +273,35 @@ export default function TitleConnections() {
             {hasMustChain ? (
               <>
                 <span className="font-semibold text-foreground">
-                  Part {before.length + 1} of {mustCount}
+                  Part {currentPosition} of {mustCount}
                 </span>{' '}
-                — {standing(before.length, after.length)}
+                — {standing(priorCount, laterCount)}
                 {canWatch.length > 0 && ' A few more, dashed below, are worth a look but not required.'}
               </>
             ) : canWatch.length > 0 ? (
               'Nothing else is required to follow this one, but a few titles below are worth a look.'
             ) : (
-              'Nothing else is required to follow this one — it stands on its own.'
+              standaloneCopy
             )}
           </p>
         </div>
       </div>
+
+      {storyOrderAvailable && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Segmented
+            options={ORDER_OPTIONS}
+            value={orderMode}
+            onChange={setOrderMode}
+            aria-label="Watch order"
+          />
+          <p className="text-xs text-muted-foreground">
+            {orderMode === 'story'
+              ? 'Sorted by when events happen in the story.'
+              : 'Sorted by when each title came out.'}
+          </p>
+        </div>
+      )}
 
       {hasTimeline && (
         <TitleTimeline

@@ -35,6 +35,15 @@ import { tmdbCollectionParts } from "../lib/tmdbProxy.js";
 
 const CACHE_CONTROL = "public, s-maxage=86400, stale-while-revalidate=604800";
 
+// A request-path warm makes two sequential TMDB calls and must finish well
+// inside vercel.json's 15s maxDuration, or the platform kills the function and
+// the caller gets an opaque error page instead of this file's degrade-to-empty
+// behaviour. Bounded by wall clock rather than attempt count, so a transient
+// connection reset (which TMDB produces often enough to matter) is still
+// retried — it just stops when the budget is gone.
+const WARM_TMDB_ATTEMPTS = 3;
+const WARM_TMDB_BUDGET_MS = 9_000;
+
 const EMPTY_RELATIONS = {
   mustWatch: { before: [], after: [] },
   canWatch: [],
@@ -78,6 +87,15 @@ async function handleSuppress(req: IncomingMessage, res: ServerResponse) {
   // before anything is read or parsed.
   const userId = requireUserId(req, res);
   if (userId === null) return;
+
+  // Unlike GET, this writes a row per call and nothing else bounds how many.
+  // A real person thumbs an edge down a handful of times; anything at request
+  // rate is a script filling user_relation_suppressions. 429 rather than a
+  // silent empty answer, because the caller needs to know the write did not
+  // land (see this file's header on why POST reports failure and GET doesn't).
+  if (isRateLimited(req)) {
+    return sendJson(res, 429, { error: "too many requests" }, "no-store");
+  }
 
   let body: Record<string, unknown>;
   try {
@@ -131,9 +149,12 @@ async function warmFromCollection(
   if (current.mustWatch.before.length > 0 || current.mustWatch.after.length > 0) return false;
   if (await hasFreshCollectionLookup(sql, key)) return false;
 
-  let parts;
+  let collection;
   try {
-    parts = await tmdbCollectionParts(key.tmdbId);
+    // Retries within a shared 9s budget (see the constants above). A warm is
+    // opportunistic anyway: if it doesn't land now, no tombstone is written
+    // and the next viewer retries it.
+    collection = await tmdbCollectionParts(key.tmdbId, WARM_TMDB_ATTEMPTS, WARM_TMDB_BUDGET_MS);
   } catch (err) {
     // Reached TMDB and it failed. Deliberately no tombstone: caching "we
     // learned nothing" as "there is nothing" would hide a real franchise for
@@ -142,10 +163,15 @@ async function warmFromCollection(
     return false;
   }
 
-  await recordCollectionLookup(sql, key, parts !== null);
-  if (parts === null) return false;
+  await recordCollectionLookup(sql, key, collection !== null);
+  if (collection === null) return false;
 
-  const written = await writeCollectionChain(sql, parts);
+  const { written, classification } = await writeCollectionChain(sql, collection.id, collection.parts);
+  if (written > 0) {
+    console.info(
+      `[relations] warmed collection ${collection.id} "${collection.name}" as ${classification} (${written} edges)`,
+    );
+  }
   return written > 0;
 }
 

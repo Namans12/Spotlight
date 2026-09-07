@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { resolveProviders, tmdbWatchProvidersBatch, providerCacheKey } from './tmdbProxy';
+import { resolveProviders, tmdbWatchProvidersBatch, providerCacheKey, tmdbCollectionParts } from './tmdbProxy';
 
 function watchProvidersPayload(region: string, buckets: Record<string, { provider_name: string }[]>) {
   return { 'watch/providers': { results: { [region]: buckets } } };
@@ -99,5 +99,72 @@ describe('tmdbWatchProvidersBatch', () => {
     );
 
     expect(fetch).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('tmdbCollectionParts retry budget', () => {
+  // Two sequential legs at 3 attempts each is ~50s worst case against a 15s
+  // maxDuration. The budget is what makes retrying safe on a request path, so
+  // it is asserted rather than assumed.
+  it('stops retrying once the wall-clock budget is spent', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(() => Promise.reject(new Error('ECONNRESET')));
+
+    const started = Date.now();
+    await expect(tmdbCollectionParts(603, 3, 300)).rejects.toThrow();
+    // Without the budget this would burn 3 attempts plus ~750ms of backoff.
+    expect(Date.now() - started).toBeLessThan(1_500);
+    // At least one attempt is always made, and fewer than the full three.
+    expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(1);
+    expect(fetchMock.mock.calls.length).toBeLessThan(3);
+  });
+
+  it('still retries a transient failure when there is budget for it', async () => {
+    const fetchMock = vi.mocked(fetch);
+    let calls = 0;
+    fetchMock.mockImplementation(() => {
+      calls += 1;
+      if (calls === 1) return Promise.reject(new Error('ECONNRESET'));
+      if (calls === 2) {
+        return Promise.resolve(jsonResponse(200, { belongs_to_collection: { id: 10 } }));
+      }
+      return Promise.resolve(
+        jsonResponse(200, {
+          name: 'Star Wars Collection',
+          parts: [
+            { id: 11, title: 'Star Wars', release_date: '1977-05-25' },
+            { id: 1891, title: 'The Empire Strikes Back', release_date: '1980-05-20' },
+          ],
+        }),
+      );
+    });
+
+    const collection = await tmdbCollectionParts(603, 3, 10_000);
+    expect(collection?.id).toBe(10);
+    expect(collection?.parts).toHaveLength(2);
+    expect(calls).toBe(3); // one failure, then both legs
+  });
+
+  it('returns the collection id so the caller can classify its shape', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, { belongs_to_collection: { id: 645 } }) as never)
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          name: 'James Bond Collection',
+          parts: [
+            { id: 646, title: 'Dr. No', release_date: '1962-10-07' },
+            { id: 657, title: 'From Russia with Love', release_date: '1963-10-10' },
+          ],
+        }) as never,
+      );
+
+    const collection = await tmdbCollectionParts(646);
+    expect(collection).toMatchObject({ id: 645, name: 'James Bond Collection' });
+  });
+
+  it('returns null for a title in no collection', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, { belongs_to_collection: null }) as never);
+    expect(await tmdbCollectionParts(603)).toBeNull();
   });
 });

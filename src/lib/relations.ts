@@ -2,8 +2,10 @@ import type { Movie } from '@/types/movie';
 import { fetchJson } from '@/lib/http';
 
 /** Mirrors MAX_DEPTH in lib/relationsDb.ts — the depth the connections view
- * requests, since a timeline's whole job is to show the complete chain. */
-export const MAX_DEPTH = 6;
+ * requests, since a timeline's whole job is to show the complete chain.
+ * Keep the two in step: the server clamps to its own value, so a larger
+ * number here is silently ignored and a smaller one truncates. */
+export const MAX_DEPTH = 12;
 
 export interface RelatedTitle {
   tmdbId: number;

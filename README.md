@@ -155,7 +155,7 @@ Using your own Gmail (or any account) as the sender needs an **app password**, n
 
 1. Create a free project at https://neon.tech (pick a region close to your Vercel deployment region).
 2. Copy the pooled connection string.
-3. Run the migrations once, in order: `0001_init.sql`, `0002_title_ratings.sql`, `0003_title_relations.sql`, `0004_title_relations_reverse_index.sql`, `0005_title_relation_lookups.sql`, `0006_calendar_entries_poster.sql`, `0007_multi_user_accounts.sql`, `0008_release_items_month_index.sql`, `0009_calendar_language_iso.sql`, `0010_calendar_origin_release.sql`, `0011_title_seasons.sql` — e.g. `psql "$DATABASE_URL" -f migrations/0001_init.sql` for each (or via a Python one-liner with `psycopg` if you don't have `psql` installed).
+3. Run the migrations once, in order: `0001_init.sql`, `0002_title_ratings.sql`, `0003_title_relations.sql`, `0004_title_relations_reverse_index.sql`, `0005_title_relation_lookups.sql`, `0006_calendar_entries_poster.sql`, `0007_multi_user_accounts.sql`, `0008_release_items_month_index.sql`, `0009_calendar_language_iso.sql`, `0010_calendar_origin_release.sql`, `0011_title_seasons.sql`, `0012_reset_tmdb_relations.sql` — e.g. `psql "$DATABASE_URL" -f migrations/0001_init.sql` for each (or via a Python one-liner with `psycopg` if you don't have `psql` installed).
 4. Link the seeded calendar rows to TMDB so they get posters and become clickable: `python scripts/backfill_calendar_tmdb.py` (safe to re-run; it only touches rows still missing a `tmdb_id`).
 5. Keep the calendar populated past the seeded window: `python scripts/sync_calendar_tmdb.py --months 6`. Pulls region-aware theatrical dates (`/discover/movie` with `region` + `with_release_type=2|3` + `release_date.gte/lte` — not `primary_release_date.*`, which ignores `region` entirely and returns global junk) and TV premieres, and only ever *enriches* existing rows — a curated editorial row keeps its own platform and details and merely gains a poster and a `tmdb_id`. Queries one calendar month at a time rather than the whole window at once — TMDB caps each `/discover` call at a fixed page limit regardless of true match count, so a single big-range query lets a handful of popular titles anywhere in it crowd out an entire other month's releases before the cap even applies (confirmed directly: a 6-month single-query window had 178 real matches behind a 60-result cap, silently dropping 118). TV premieres are additionally scoped by `--tv-countries` (default `IN,US,GB`) — TMDB is crowdsourced and global TV volume runs into the hundreds a month, almost all obscure local productions; this trades missing an occasional big non-English hit for not drowning the calendar in noise. Runs nightly (see below).
 4. Optionally seed the editorial calendar: `python scripts/seed_calendar_csv.py`.
@@ -221,6 +221,11 @@ And one repo **variable** (not secret) under the same page's "Variables" tab:
 | `NOTIFY_OWNER_EMAILS` | — | Required whenever a watchlist-drop alert would fire (not dry-run, at least one channel enabled). Comma-separated owner email(s) — see repo variables above and [Watchlist-drop alerts](#watchlist-drop-alerts) |
 | `OMDB_API_KEY` | — | OMDb key for IMDb/RT scores. Unset = no ratings anywhere, silently |
 | `RATINGS_MAX_CALLS` | `400` | OMDb requests one `scripts/backfill_ratings.py` run may spend |
+| `DEMO_GUEST` | unset | `1` enables the shared demo account (`POST /api/auth {guest:true}`). **Leave unset on any public deployment** — it is one `users` row that every visitor who takes it becomes, so they share a watchlist and can delete each other's items. Only the hackathon deployment sets it |
+| `VITE_DEMO_GUEST` | unset | Build-time twin of `DEMO_GUEST`. Set both, or neither: this one hides the guest button and the auto-session, `DEMO_GUEST` is what actually enforces it server-side |
+| `GITHUB_DISPATCH_OWNER` | `Namans12` | Repo owner whose workflow `/api/releases-refresh` triggers |
+| `GITHUB_DISPATCH_REPO` | `ms-trigger` | Repo name for the same |
+| `GITHUB_DISPATCH_WORKFLOW` | `ott-radar-nightly.yml` | Workflow file for the same |
 
 ## Accounts & Google Sign-In
 
@@ -345,7 +350,48 @@ buckets, stored as direct edges in `title_relations`
   title has no collection" — so a standalone film isn't re-checked on every
   view, and a network failure is deliberately never cached as "there is
   nothing". `scripts/sync_relations_tmdb.py` does the same thing in bulk,
-  offline, for warming ahead of time.
+  offline, and runs nightly.
+
+### Collection membership is not a watch order
+
+A TMDB collection groups titles by brand, not by story, and treating every
+release-adjacent pair as a prerequisite is wrong for three whole classes of
+franchise. Both write paths — the request-path warm and the offline generator
+— therefore classify a collection first, using the hand-verified table in
+[`data/collection-shapes.json`](data/collection-shapes.json):
+
+| Shape | What it means | Example |
+|---|---|---|
+| `chain` (default) | One story across N parts. Consecutive pairs become Must Watch. | Harry Potter (8 parts, all required) |
+| `arcs` | Several independent stories in one collection object. Chains within an arc, never across. | Star Wars: the prequels are their own line |
+| `episodic` | A brand, not a story. **No** Must Watch edges at all — only "same series, not required" Can Watch links. | James Bond (27 parts), the *Untold* documentary anthology (24) |
+| `exclude` | A spin-off, recap, or alternate cut sitting inside the collection but outside its story. | *The Godfather, Coda* (a re-edit of Part III) |
+
+Size is the tempting signal and it does not work: Harry Potter has 8 parts and
+is a real chain, while Predator has 6 and is not. So the list is curated, with
+a size fallback (`EPISODIC_PART_THRESHOLD`) set far above anything legitimate.
+[`scripts/audit_collection_shapes.py`](scripts/audit_collection_shapes.py)
+reports collections in the database that reach the chain path without an entry,
+so the list can be kept current as the catalog grows.
+
+The rules live in one place and are implemented twice — `shared/collectionShapes.ts`
+for the runtime, `scripts/lib_collection_shapes.py` for the generator — because
+the two must agree: `must` outranks `can` in the precedence ladder, so an edge
+written wrongly by one side cannot be corrected by the other.
+`tests/test_collection_shapes.py` asserts the same fixtures as
+`shared/collectionShapes.test.ts` to keep them in step.
+
+### Release order vs story order
+
+The Must Watch chain always encodes **release order** — that is the order the
+edges are written in, and it is the right default. Where a franchise is told
+out of order, the connections view offers a **Story order** toggle that
+re-sorts the timeline by the curated `story` list in the same JSON file
+(Star Wars, X-Men, Insidious, Fast & Furious today). The toggle only appears
+when a curated order exists for something on screen, the choice rides in the
+URL (`?order=story`) so the view is shareable, and the "Part N of M" label is
+counted off the rendered order so it can never contradict the timeline beside
+it.
 - **Can Watch** — enrichment (references, callbacks, shared-cast in-jokes).
   No structured source can produce these, so they come from an agent session
   run by hand: see [docs/relations-seed-prompt.md](docs/relations-seed-prompt.md)
@@ -385,6 +431,13 @@ node, including the title you're on, renders from denormalised columns on
 `title_relations`. The origin's own fields come back on the same response,
 recovered from the reciprocal edges pointing at it — so the timeline stays
 whole even when TMDB is unreachable.
+
+**Shows.** TMDB has no collection concept for TV, so a series gets a chain only
+from the curated seed (MCU, Star Wars, and the other franchises in
+`data/relations_seed.json`). Outside those, the page says so rather than
+claiming the series stands alone — and for a multi-season show it gives the
+watch order it actually has: start at Season 1, `N` seasons in order, read from
+the `title_seasons` cache.
 
 **Correcting a bad edge.** Signed in as the owner, each related title carries a
 thumbs-down; `POST /api/relations` sets `suppressed` and the edge is gone for

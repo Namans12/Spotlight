@@ -1,4 +1,5 @@
 import { normalizePlatforms, STREAMING_NETWORKS } from "../shared/platforms.js";
+import { sortByRelease, type CollectionPart } from "../shared/collectionShapes.js";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
@@ -202,28 +203,45 @@ const REQUEST_TIMEOUT_MS = 8_000;
  *  Vercel kill, plus a couple of retries on transient failures. Retries a
  *  network error, a timeout, or a 5xx; never retries a 404, which is a real
  *  answer. */
-async function fetchWithRetry(url: string, attempts = 3): Promise<Response> {
+async function fetchWithRetry(url: string, attempts = 3, deadline?: number): Promise<Response> {
   let lastError: unknown = new Error("no attempt made");
   for (let attempt = 0; attempt < attempts; attempt += 1) {
+    // A caller with a wall-clock budget (see `deadline`) stops retrying once
+    // it is spent, rather than at a fixed attempt count. Attempt counts and
+    // time budgets are not interchangeable: a call chain that makes several
+    // sequential requests can stay under its attempt cap and still blow far
+    // past the function's maxDuration.
+    const remaining = deadline === undefined ? REQUEST_TIMEOUT_MS : deadline - Date.now();
+    if (remaining <= 0) break;
+
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(Math.min(REQUEST_TIMEOUT_MS, remaining)) });
       if (res.status < 500) return res;
       lastError = new Error(`TMDB HTTP ${res.status}`);
     } catch (err) {
       lastError = err;
     }
+
     if (attempt < attempts - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
+      const backoff = 250 * 2 ** attempt;
+      if (deadline !== undefined && Date.now() + backoff >= deadline) break;
+      await new Promise((resolve) => setTimeout(resolve, backoff));
     }
   }
   throw lastError;
 }
 
-export interface CollectionPart {
+export type { CollectionPart } from "../shared/collectionShapes.js";
+
+export interface TmdbCollection {
+  /** Needed by the caller, not decorative: whether a collection's parts form
+   *  a real prerequisite chain is a fact about the *collection*, looked up by
+   *  id in data/collection-shapes.json. Returning only the parts (as this used
+   *  to) makes that lookup impossible, which is how the known-wrong Star Wars
+   *  trilogy-boundary edge reached production. */
   id: number;
-  title: string;
-  posterPath: string | null;
-  releaseDate: string | null;
+  name: string;
+  parts: CollectionPart[];
 }
 
 /** A movie's TMDB collection, with every part in release order.
@@ -232,19 +250,36 @@ export interface CollectionPart {
  *  caching as a tombstone. Throws when TMDB could not be reached, which the
  *  caller must NOT cache: "we learned nothing" is not "there is nothing".
  *
+ *  This makes *two* sequential calls, so a caller on a request path must cap
+ *  the total with `budgetMs` rather than trusting the attempt count: at the
+ *  default 3 attempts each the worst case is roughly 50s against
+ *  vercel.json's 15s maxDuration, and the platform would kill the function
+ *  and replace the caller's graceful degradation with an opaque error page.
+ *  With a budget, retries still happen — they just stop when the time is
+ *  gone, which keeps a transient reset recoverable without risking the kill.
+ *
  *  TV has no collection concept on TMDB, so this is movies only. */
-export async function tmdbCollectionParts(tmdbId: number): Promise<CollectionPart[] | null> {
+export async function tmdbCollectionParts(
+  tmdbId: number,
+  attempts = 3,
+  budgetMs?: number,
+): Promise<TmdbCollection | null> {
   const key = requireApiKey();
+  const deadline = budgetMs === undefined ? undefined : Date.now() + budgetMs;
 
-  const detailRes = await fetchWithRetry(`${TMDB_BASE_URL}/movie/${tmdbId}?api_key=${key}`);
+  const detailRes = await fetchWithRetry(`${TMDB_BASE_URL}/movie/${tmdbId}?api_key=${key}`, attempts, deadline);
   if (detailRes.status === 404) return null;
   if (!detailRes.ok) throw new Error(`TMDB detail failed: ${detailRes.status}`);
   const detail = await detailRes.json();
 
   const collectionId = detail?.belongs_to_collection?.id;
-  if (!collectionId) return null;
+  if (typeof collectionId !== "number") return null;
 
-  const collectionRes = await fetchWithRetry(`${TMDB_BASE_URL}/collection/${collectionId}?api_key=${key}`);
+  const collectionRes = await fetchWithRetry(
+    `${TMDB_BASE_URL}/collection/${collectionId}?api_key=${key}`,
+    attempts,
+    deadline,
+  );
   if (collectionRes.status === 404) return null;
   if (!collectionRes.ok) throw new Error(`TMDB collection failed: ${collectionRes.status}`);
   const collection = await collectionRes.json();
@@ -259,9 +294,12 @@ export async function tmdbCollectionParts(tmdbId: number): Promise<CollectionPar
     }));
 
   // Undated parts sort last so an unannounced entry never slots in ahead of a
-  // dated one and invents a prerequisite.
-  parts.sort((a, b) => (a.releaseDate ?? "9999-99-99").localeCompare(b.releaseDate ?? "9999-99-99"));
-  return parts.length >= 2 ? parts : null;
+  // dated one and invents a prerequisite. planCollection re-sorts defensively;
+  // this keeps the returned value meaningful on its own.
+  const ordered = sortByRelease(parts);
+  return ordered.length >= 2
+    ? { id: collectionId, name: collection?.name || String(collectionId), parts: ordered }
+    : null;
 }
 
 export interface CreditsResult {
