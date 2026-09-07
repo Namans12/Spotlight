@@ -8,6 +8,8 @@ import { ActionButton } from '@/components/watchlist/ActionButton';
 import { PosterRow } from '@/components/release/PosterRow';
 import { useRelations } from '@/hooks/useRelations';
 import { hasAnyRelations, hasChain } from '@/lib/relations';
+import { titleDetailMeta } from '../../shared/seo';
+import { useDocumentMeta, siteUrl } from '@/hooks/useDocumentMeta';
 import { getYouMayAlsoLike, type MediaType } from '@/lib/tmdb';
 import { RatingBadges } from '@/components/release/RatingBadges';
 import { useRating } from '@/hooks/useRatings';
@@ -70,6 +72,24 @@ export default function TitleDetail() {
   });
   const recommendations = recommendationsQuery.data ?? [];
   const ratingQuery = useRating(mediaType, tmdbId);
+
+  // Above the loading guard: hooks cannot be conditional. Null while the
+  // detail loads, which leaves any prerendered tags untouched.
+  useDocumentMeta(
+    data
+      ? titleDetailMeta(
+          {
+            title: data.title,
+            mediaType,
+            tmdbId,
+            releaseDate: data.releaseDate || null,
+            overview: data.overview,
+            posterUrl: data.posterUrl,
+          },
+          siteUrl(),
+        )
+      : null,
+  );
 
   if (isLoading) {
     return (

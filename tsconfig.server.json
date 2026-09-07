@@ -27,7 +27,7 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["node"]
   },
-  "include": ["api", "lib", "shared", "scripts/dev-api-server.mjs"],
+  "include": ["api", "lib", "shared", "scripts/prerender.ts", "scripts/dev-api-server.mjs"],
   // The vitest suites next to these files are checked by tsconfig.test.json
   // instead: they are resolved by Vite, not by Node, so they use extensionless
   // relative imports that NodeNext rejects. They are checked — just under the
