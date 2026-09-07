@@ -114,11 +114,23 @@ function rankFactor(index: number, size: number): number {
   return 1 - 0.6 * (index / (size - 1));
 }
 
-/** Same-language titles are the plausible peers for a regional film. This is a
- *  multiplier rather than a filter: Troy and The Odyssey are both English, but
- *  a Hindi viewer looking at a Hindi film should not have to scroll past
- *  English titles that merely share a genre. */
+/** Language affinity, applied in both directions.
+ *
+ *  Rewarding a match was not enough on its own. TMDB's behavioural data is
+ *  dominated by English-speaking audiences, so /recommendations for an Indian
+ *  series answers largely in English however good the show is: measured over a
+ *  held-out set, only 15% of The Family Man's results were Hindi, 45% of
+ *  Vikram's were Tamil, and 50% of Panchayat's were Hindi. Someone reading a
+ *  Hindi show's page is not well served by a list of English ones.
+ *
+ *  So a mismatch is discounted as well as a match rewarded. It stays a
+ *  multiplier, never a filter — a cross-language title carried by a strong
+ *  signal (the same director's English-language film, say) still outranks a
+ *  same-language title with nothing behind it, which is the correct outcome.
+ *  For an English title in an English catalogue neither factor changes the
+ *  order at all, since it applies uniformly. */
 const SAME_LANGUAGE_BONUS = 1.35;
+const CROSS_LANGUAGE_PENALTY = 0.6;
 
 /** Genre overlap breaks ties and nothing more — see the header on YJHD. */
 const GENRE_POINTS_EACH = 6;
@@ -193,8 +205,8 @@ export function scoreCandidates(buckets: CandidateBucket[], opts: ScoreOptions):
 
     let score = acc.score;
 
-    if (originLanguage && movie.originalLanguage === originLanguage) {
-      score *= SAME_LANGUAGE_BONUS;
+    if (originLanguage && movie.originalLanguage) {
+      score *= movie.originalLanguage === originLanguage ? SAME_LANGUAGE_BONUS : CROSS_LANGUAGE_PENALTY;
     }
 
     const candidateGenres = (movie as TmdbMovieResult & { genreIds?: number[] }).genreIds ?? [];

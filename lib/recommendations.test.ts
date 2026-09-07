@@ -82,6 +82,51 @@ describe('scoreCandidates', () => {
     expect(ranked[0].id).toBe(20);
   });
 
+  it('discounts a cross-language title, without excluding it', () => {
+    // TMDB's behavioural data skews English, so a Hindi show's own
+    // /recommendations answers largely in English. Demoting a mismatch (not
+    // just rewarding a match) is what moved The Family Man's top results from
+    // English to Farzi and Guns & Gulaabs.
+    const foreign = movie(70, { originalLanguage: 'en' });
+    const local = movie(71, { originalLanguage: 'hi' });
+    // One bucket each, so both sit at rank 0 and language is the only
+    // difference between them.
+    const ranked = scoreCandidates(
+      [
+        { kind: 'keyword', label: 'Similar themes', results: [foreign] },
+        { kind: 'keyword', label: 'Similar themes', results: [local] },
+      ],
+      { originId: 1, originLanguage: 'hi' },
+    );
+    expect(ranked.map((r) => r.id)).toEqual([71, 70]);
+    // Discounted, never filtered.
+    expect(ranked).toHaveLength(2);
+  });
+
+  it('still ranks a cross-language title first when a strong signal carries it', () => {
+    // The same director's English-language film is a better answer than a
+    // same-language title with nothing behind it.
+    const foreignButStrong = movie(80, { originalLanguage: 'en' });
+    const localButWeak = movie(81, { originalLanguage: 'hi' });
+    const ranked = scoreCandidates(
+      [
+        { kind: 'director', label: 'Also directed by X', results: [foreignButStrong] },
+        { kind: 'similar', results: [localButWeak] },
+      ],
+      { originId: 1, originLanguage: 'hi' },
+    );
+    expect(ranked[0].id).toBe(80);
+  });
+
+  it('leaves ordering untouched when everything shares the origin language', () => {
+    // An English catalogue for an English title: the factor applies uniformly
+    // and must not reshuffle anything.
+    const results = [movie(90), movie(91), movie(92)];
+    const withLang = scoreCandidates([{ kind: 'recommendation', results }], { originId: 1, originLanguage: 'en' });
+    const withoutLang = scoreCandidates([{ kind: 'recommendation', results }], { originId: 1 });
+    expect(withLang.map((r) => r.id)).toEqual(withoutLang.map((r) => r.id));
+  });
+
   it('does not let genre overlap outweigh a shared cast and director', () => {
     // Brahmastra shares Yeh Jawaani Hai Deewani's lead, director and studio,
     // and shares no genre with it at all. Genre must never be a gate.
