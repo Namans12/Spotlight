@@ -1,0 +1,26 @@
+{
+  // The vitest suites that live beside the server code (lib/, shared/).
+  //
+  // They cannot go in tsconfig.server.json: that uses NodeNext resolution,
+  // which requires explicit .js extensions on relative imports, and these are
+  // resolved by Vite, which does not. They cannot go in tsconfig.app.json
+  // either, since that includes only `src`. Without a config of their own they
+  // were checked by nothing at all — which is how a misspelt variable in a
+  // test reached a test run instead of failing the type check.
+  //
+  // `src`'s own suites are already covered by tsconfig.app.json.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["lib/**/*.test.ts", "shared/**/*.test.ts"]
+}

@@ -1,4 +1,4 @@
-import { Movie } from '@/types/movie';
+import { Movie, Recommendation } from '@/types/movie';
 
 export const IMG_BASE = 'https://image.tmdb.org/t/p/w342';
 export const IMG_LARGE = 'https://image.tmdb.org/t/p/w500';
@@ -88,46 +88,25 @@ export async function discover(
   return fetchProxy(`/api/tmdb/discover?${qs.toString()}`);
 }
 
-/** "You may also like": recommendations first, topped up from /similar when
- * TMDB returns a thin recommendation set (common for new or niche titles).
+/** "You may also like".
  *
- * /similar is a materially weaker signal than /recommendations — TMDB builds
- * it from genre/keyword overlap rather than behavioural data, and for a title
- * with thin metadata (a new, small regional release) that overlap can match
- * almost anything. Confirmed in production: for a 2026 Hindi action-drama
- * sequel, /similar's top results included a 1941 English bullfighting drama
- * and two WWE pay-per-view specials — genre-adjacent by TMDB's own tagging,
- * completely irrelevant to an actual viewer.
+ * One request. The ranking — and the seven or eight TMDB calls behind it —
+ * happens server-side in api/tmdb/[...path].ts, so the browser makes a single
+ * edge-cached round trip and the TMDB key stays on the server. See
+ * lib/recommendations.ts for how candidates are gathered and scored.
  *
- * `originalLanguage`, when the caller has it, restricts /similar's
- * contribution to same-language titles — the plausible peers for a niche
- * regional film are other films in that language, not whatever TMDB's
- * keyword graph loosely connects it to worldwide. /recommendations is left
- * unfiltered since it's the trustworthy signal already. */
-export async function getYouMayAlsoLike(
-  type: MediaType,
-  id: number,
-  originalLanguage?: string,
-): Promise<Movie[]> {
-  const [recs, similar] = await Promise.all([
-    getRecommendations(type, id).catch(() => [] as Movie[]),
-    getSimilar(type, id).catch(() => [] as Movie[]),
-  ]);
-
-  const seen = new Set<number>([id]);
-  const out: Movie[] = [];
-
-  for (const movie of recs) {
-    if (seen.has(movie.id)) continue;
-    seen.add(movie.id);
-    out.push(movie);
-  }
-  for (const movie of similar) {
-    if (seen.has(movie.id)) continue;
-    if (originalLanguage && movie.originalLanguage !== originalLanguage) continue;
-    seen.add(movie.id);
-    out.push(movie);
-  }
-
-  return out.slice(0, 20);
+ * `originalLanguage` is no longer a parameter: language is one of the signals
+ * the ranker weighs, and it reads it from the title's own TMDB record rather
+ * than needing the caller to have fetched it first. */
+export async function getYouMayAlsoLike(type: MediaType, id: number): Promise<Recommendation[]> {
+  const res = await fetch(`/api/tmdb/you-may-also-like?type=${type}&id=${id}`);
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+  const data: (ProxyResult & { reasons?: string[]; score?: number })[] = await res.json();
+  // Not fetchProxy: toMovie normalises to exactly the Movie fields, which
+  // would drop the reasons this endpoint exists to carry.
+  return data.map((r) => ({
+    ...toMovie(r),
+    reasons: Array.isArray(r.reasons) ? r.reasons : [],
+    score: typeof r.score === "number" ? r.score : 0,
+  }));
 }

@@ -28,8 +28,9 @@
     "types": ["node"]
   },
   "include": ["api", "lib", "shared", "scripts/dev-api-server.mjs"],
-  // The vitest suites under lib/ and shared/ are checked by the app config's
-  // own run via the test files' imports; including them here would demand
-  // vitest's globals in a Node-resolution context for no benefit.
+  // The vitest suites next to these files are checked by tsconfig.test.json
+  // instead: they are resolved by Vite, not by Node, so they use extensionless
+  // relative imports that NodeNext rejects. They are checked — just under the
+  // resolution mode they actually run in.
   "exclude": ["**/*.test.ts"]
 }
