@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMediaScope, type MediaScope } from '@/hooks/useMediaScope';
 import { useSidebar } from './SidebarContext';
 import { cn } from '@/lib/utils';
-import { Film, Tv, LayoutGrid, List, Eye, RefreshCw, LogOut } from 'lucide-react';
+import { Film, Tv, LayoutGrid, List, Eye, RefreshCw, LogOut, Bell } from 'lucide-react';
 
 const SCOPE_OPTIONS: { id: MediaScope; label: string; icon: React.ReactNode }[] = [
   { id: 'all', label: 'All', icon: <LayoutGrid size={13} /> },
@@ -28,7 +28,7 @@ function useScopeApplies(): boolean {
 }
 
 function UserMenu() {
-  const { user, logout } = useAuth();
+  const { user, logout, setNotifyWatchlistDrops } = useAuth();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -42,6 +42,9 @@ function UserMenu() {
   }, [open]);
 
   if (!user) return null;
+  // The shared demo account (lib/usersDb.ts upsertGuestUser) has one address
+  // that everyone using it would be emailing.
+  const isGuest = user.email === 'guest@spotlight.demo';
   const initial = user.displayName.trim().charAt(0).toUpperCase() || '?';
 
   return (
@@ -64,6 +67,31 @@ function UserMenu() {
             <p className="truncate text-xs font-semibold text-foreground">{user.displayName}</p>
             <p className="truncate text-[11px] text-muted-foreground">{user.email}</p>
           </div>
+          {/* The one setting worth putting behind the avatar rather than on a
+              page of its own: it is the only thing here that makes Spotlight
+              reach out to you, so it belongs next to the account it applies
+              to. Guest accounts are excluded — the demo account is shared, so
+              "email me" would mean emailing a shared inbox. */}
+          {!isGuest && (
+            <label className="flex cursor-pointer items-start gap-2.5 border-b border-border px-3 py-2.5">
+              <input
+                type="checkbox"
+                checked={user.notifyWatchlistDrops}
+                disabled={setNotifyWatchlistDrops.isPending}
+                onChange={(e) => setNotifyWatchlistDrops.mutate(e.target.checked)}
+                className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-accent disabled:opacity-50"
+              />
+              <span className="min-w-0">
+                <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                  <Bell size={12} className="shrink-0 text-accent" /> Email me on drops
+                </span>
+                <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+                  When something on your watchlist starts streaming.
+                </span>
+              </span>
+            </label>
+          )}
+
           <button
             onClick={() => {
               setOpen(false);

@@ -1402,6 +1402,141 @@ def find_watchlist_matches(
     return matches
 
 
+def find_watchlist_matches_by_user(digest: dict[str, Any], conn: Any) -> list[dict[str, Any]]:
+    """The same cross-reference as find_watchlist_matches, once per account
+    that has opted in.
+
+    Returns one entry per user who has at least one match:
+    {"user_id", "email", "display_name", "matches": [...]}.
+
+    Only accounts with users.notify_watchlist_drops = true are considered, so
+    an account that never asked to hear from us never does. One query for the
+    whole set rather than one per user: this runs inside a scheduled job whose
+    other steps are already network-bound, and a per-user round trip would
+    scale badly for no reason.
+    """
+    all_out_now_items = [item for items in digest["out_now"]["sections"].values() for item in items]
+    if not all_out_now_items:
+        return []
+
+    # Keyed by (tmdb_id, media_type) so the join below is a lookup, not a scan.
+    out_now_by_key = {(item.tmdb_id, item.media_type): item for item in all_out_now_items}
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT u.id, u.email, u.display_name, wi.tmdb_id, wi.media_type
+            FROM watchlist_items wi
+            JOIN users u ON u.id = wi.user_id
+            WHERE wi.bucket IN ('watchlist','watchLater')
+              AND u.notify_watchlist_drops = true
+            ORDER BY u.id
+            """
+        )
+        rows = cur.fetchall()
+
+    by_user: dict[int, dict[str, Any]] = {}
+    for user_id, email, display_name, tmdb_id, media_type in rows:
+        item = out_now_by_key.get((tmdb_id, media_type))
+        if item is None:
+            continue
+        entry = by_user.setdefault(
+            user_id,
+            {"user_id": user_id, "email": email, "display_name": display_name, "matches": []},
+        )
+        entry["matches"].append(
+            {
+                "tmdb_id": item.tmdb_id,
+                "media_type": item.media_type,
+                "title": item.title,
+                "providers": list(item.providers),
+            }
+        )
+    return list(by_user.values())
+
+
+def send_user_watchlist_alerts(
+    users_with_matches: list[dict[str, Any]],
+    conn: Any,
+    email_sender: Any,
+) -> tuple[int, int]:
+    """Emails each opted-in account about the titles from *their* watchlist
+    that just landed.
+
+    `email_sender` is a callable taking (to_address, subject, text). One
+    message per account per run rather than one per title: four separate
+    emails because four saved films dropped on the same Wednesday is how a
+    useful alert becomes an unsubscribe.
+
+    Deduped per (user, title, channel) against sent_notifications, so a title
+    that was already announced to this account in an earlier run is not
+    repeated — and, thanks to migration 0013, one account being told does not
+    consume the only slot for everyone else.
+
+    Returns (accounts_emailed, titles_announced).
+    """
+    accounts = 0
+    titles = 0
+
+    with conn.cursor() as cur:
+        for entry in users_with_matches:
+            user_id = entry["user_id"]
+            fresh = []
+            for match in entry["matches"]:
+                cur.execute(
+                    """
+                    SELECT 1 FROM sent_notifications
+                    WHERE tmdb_id=%s AND media_type=%s
+                      AND notification_kind='watchlist_drop' AND channel='email'
+                      AND user_id=%s
+                    """,
+                    (match["tmdb_id"], match["media_type"], user_id),
+                )
+                if cur.fetchone() is None:
+                    fresh.append(match)
+
+            if not fresh:
+                continue
+
+            lines_out = [
+                f"- {m['title']} — now on {', '.join(m['providers']) or 'a streaming platform'}"
+                for m in fresh
+            ]
+            subject = (
+                f"🎯 {fresh[0]['title']} is out"
+                if len(fresh) == 1
+                else f"🎯 {len(fresh)} titles from your watchlist are out"
+            )
+            body = (
+                f"Hi {entry['display_name'].split(' ')[0] or 'there'},\n\n"
+                "These landed on streaming this week, from your Spotlight watchlist:\n\n"
+                + "\n".join(lines_out)
+                + "\n\nYou can turn these off any time from the account menu on Spotlight.\n"
+            )
+
+            try:
+                email_sender(entry["email"], subject, body)
+            except Exception as exc:  # pragma: no cover - depends on live SMTP
+                # One bad address must not stop the rest of the run, and
+                # nothing is recorded as sent, so the next run retries it.
+                print(f"  alert to user {user_id} failed: {exc}", file=sys.stderr)
+                continue
+
+            accounts += 1
+            titles += len(fresh)
+            for match in fresh:
+                cur.execute(
+                    """
+                    INSERT INTO sent_notifications
+                        (tmdb_id, media_type, notification_kind, channel, user_id)
+                    VALUES (%s,%s,'watchlist_drop','email',%s)
+                    """,
+                    (match["tmdb_id"], match["media_type"], user_id),
+                )
+    conn.commit()
+    return accounts, titles
+
+
 def send_watchlist_alerts(
     matches: list[dict[str, Any]],
     conn: Any,
@@ -1653,6 +1788,45 @@ def main() -> int:
                     print(f"Watchlist check: 0 matches for {len(owner_emails)} owner email(s)")
             except Exception as exc:  # pragma: no cover
                 print(f"Watchlist-alert step failed (non-fatal): {exc}", file=sys.stderr)
+
+    # Per-account alerts. Separate from the owner block above on purpose: that
+    # one is env-configured and fires through whichever channels the
+    # deployment has switched on, while this one is opt-in per account and
+    # emails each person at their own verified Google address.
+    #
+    # Gated on SMTP rather than on EMAIL_ENABLED, which controls the broadcast
+    # digest — a deployment can perfectly well want per-user alerts and no
+    # broadcast, and that is in fact this deployment's configuration.
+    if db_conn is not None and not dry_run and os.getenv("SMTP_HOST"):
+        try:
+            per_user = find_watchlist_matches_by_user(digest, db_conn)
+            if per_user:
+
+                def _send_user_email(to_address: str, subject: str, text: str) -> None:
+                    send_email_message(
+                        smtp_host=env_required("SMTP_HOST"),
+                        smtp_port=int(os.getenv("SMTP_PORT", "587")),
+                        smtp_username=env_required("SMTP_USERNAME"),
+                        smtp_password=env_required("SMTP_PASSWORD"),
+                        email_from=os.getenv("EMAIL_FROM", os.getenv("SMTP_USERNAME", "")),
+                        email_to=to_address,
+                        subject=subject,
+                        text_body=text,
+                        html_body="".join(f"<p>{escape_html(line)}</p>" for line in text.splitlines() if line.strip()),
+                    )
+
+                accounts, titles = send_user_watchlist_alerts(per_user, db_conn, _send_user_email)
+                print(
+                    f"Per-user watchlist alerts: {len(per_user)} account(s) with matches, "
+                    f"emailed {accounts} about {titles} title(s)"
+                )
+            else:
+                print("Per-user watchlist alerts: no opted-in account had a match")
+        except Exception as exc:  # pragma: no cover
+            # Non-fatal for the same reason the owner block is: the digest and
+            # the database refresh are the job's real output, and a mail
+            # failure must not fail the run or block the next one.
+            print(f"Per-user watchlist alerts failed (non-fatal): {exc}", file=sys.stderr)
 
     if db_conn is not None:
         db_conn.close()
