@@ -7,6 +7,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRelations } from '@/hooks/useRelations';
 import { MAX_DEPTH, suppressRelation, type RelatedTitle } from '@/lib/relations';
 import { hasStoryOrder, storyRank } from '../../shared/collectionShapes';
+import { watchOrderMeta, type ChainEntry } from '../../shared/seo';
+import { useDocumentMeta, siteUrl } from '@/hooks/useDocumentMeta';
 import { Segmented, type SegmentedOption } from '@/components/ui/segmented';
 import { TitleTimeline, type TimelineEntry } from '@/components/release/TitleTimeline';
 import { ArrowLeft, Loader2, ListOrdered, Popcorn } from 'lucide-react';
@@ -106,6 +108,42 @@ export default function TitleConnections() {
   });
   const relations = relationsQuery.data;
   const detail = detailQuery.data;
+
+  // Built before the loading/error guards below, because a hook cannot sit
+  // behind an early return. Null until the chain is known, which leaves the
+  // prerendered tags in place rather than replacing them with a worse guess.
+  const originTitleForMeta = relations?.origin?.title ?? detail?.title ?? null;
+  const metaChain: ChainEntry[] | null =
+    relations && originTitleForMeta
+      ? [
+          ...relations.mustWatch.before.map((r) => ({
+            title: r.title, releaseDate: r.releaseDate, mediaType: r.mediaType, tmdbId: r.tmdbId,
+          })),
+          {
+            title: originTitleForMeta,
+            releaseDate: relations.origin?.releaseDate ?? detail?.releaseDate?.slice(0, 10) ?? null,
+            mediaType,
+            tmdbId,
+          },
+          ...relations.mustWatch.after.map((r) => ({
+            title: r.title, releaseDate: r.releaseDate, mediaType: r.mediaType, tmdbId: r.tmdbId,
+          })),
+        ]
+      : null;
+  useDocumentMeta(
+    metaChain && originTitleForMeta
+      ? watchOrderMeta(
+          {
+            title: originTitleForMeta,
+            mediaType,
+            tmdbId,
+            posterUrl: relations?.origin?.posterUrl ?? detail?.posterUrl ?? null,
+          },
+          metaChain,
+          siteUrl(),
+        )
+      : null,
+  );
 
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
