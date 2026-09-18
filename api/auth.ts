@@ -1,7 +1,13 @@
 import type { IncomingMessage, ServerResponse } from "http";
 import { createSessionCookie, clearSessionCookie, getSessionUserId, verifyGoogleIdToken } from "../lib/auth.js";
 import { getDb } from "../lib/db.js";
-import { upsertUserFromGoogle, upsertGuestUser, getUserById, guestSessionsEnabled } from "../lib/usersDb.js";
+import {
+  upsertUserFromGoogle,
+  upsertGuestUser,
+  getUserById,
+  guestSessionsEnabled,
+  setNotifyWatchlistDrops,
+} from "../lib/usersDb.js";
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -101,6 +107,52 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       console.error("[auth] sign-in failed", err);
       res.statusCode = 500;
       res.end(JSON.stringify({ error: "could not complete sign-in" }));
+    }
+    return;
+  }
+
+  // Account preferences. Folded into this function rather than given its own
+  // route because Vercel Hobby caps a deployment at 12 serverless functions
+  // and this one is already at the cap — see api/ratings.ts for the same
+  // reasoning applied to a two-mode read.
+  if (req.method === "PATCH") {
+    const userId = getSessionUserId(req);
+    if (userId === null) {
+      res.statusCode = 401;
+      res.end(JSON.stringify({ error: "unauthorized" }));
+      return;
+    }
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse((await readBody(req)) || "{}");
+    } catch {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: "body must be JSON" }));
+      return;
+    }
+
+    // Strictly boolean. Accepting anything truthy would let a stray "false"
+    // string switch email alerts *on* for a real address.
+    if (typeof parsed.notifyWatchlistDrops !== "boolean") {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: "notifyWatchlistDrops must be true or false" }));
+      return;
+    }
+
+    try {
+      const user = await setNotifyWatchlistDrops(getDb(), userId, parsed.notifyWatchlistDrops);
+      if (!user) {
+        res.statusCode = 404;
+        res.end(JSON.stringify({ error: "account not found" }));
+        return;
+      }
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true, user }));
+    } catch (err) {
+      console.error("[auth] preference update failed", err);
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: "could not save that preference" }));
     }
     return;
   }

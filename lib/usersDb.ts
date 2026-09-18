@@ -1,5 +1,10 @@
 import type postgres from "postgres";
 
+// postgres.js is generic over its own row type and the library's own examples
+// use `any`. Named once so the signatures below don't each restate it.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Db = postgres.Sql<any>;
+
 // Read/write layer for `users` (migrations/0007_multi_user_accounts.sql).
 // One row per Google account; every other per-user table (watchlist_items,
 // custom_lists, user_relation_suppressions, refresh_dispatches) hangs off
@@ -10,6 +15,10 @@ export interface UserDTO {
   email: string;
   displayName: string;
   avatarUrl: string | null;
+  /** Opt-in, off by default. When true, releasebot.py emails this account at
+   *  `email` when a title on its watchlist reaches streaming. Nobody is
+   *  enrolled by a migration — see migrations/0013. */
+  notifyWatchlistDrops: boolean;
 }
 
 function toUserDTO(row: any): UserDTO {
@@ -18,6 +27,7 @@ function toUserDTO(row: any): UserDTO {
     email: row.email,
     displayName: row.display_name,
     avatarUrl: row.avatar_url ?? null,
+    notifyWatchlistDrops: Boolean(row.notify_watchlist_drops),
   };
 }
 
@@ -31,7 +41,7 @@ export interface GoogleProfile {
 /** Creates the user on first sign-in, or refreshes their profile fields on
  *  every subsequent one — a changed Google display name or photo reaches this
  *  row without a separate sync job, since sign-in already happens constantly. */
-export async function upsertUserFromGoogle(sql: postgres.Sql<any>, profile: GoogleProfile): Promise<UserDTO> {
+export async function upsertUserFromGoogle(sql: Db, profile: GoogleProfile): Promise<UserDTO> {
   const [row] = await sql`
     INSERT INTO users (google_id, email, display_name, avatar_url)
     VALUES (${profile.googleId}, ${profile.email}, ${profile.name}, ${profile.picture})
@@ -40,15 +50,34 @@ export async function upsertUserFromGoogle(sql: postgres.Sql<any>, profile: Goog
       display_name = EXCLUDED.display_name,
       avatar_url   = EXCLUDED.avatar_url,
       updated_at   = now()
-    RETURNING id, email, display_name, avatar_url
+    RETURNING id, email, display_name, avatar_url, notify_watchlist_drops
   `;
   return toUserDTO(row);
 }
 
 /** Looks up the user a session cookie names. Null if the account was deleted
  *  out from under a still-valid cookie signature. */
-export async function getUserById(sql: postgres.Sql<any>, id: number): Promise<UserDTO | null> {
-  const [row] = await sql`SELECT id, email, display_name, avatar_url FROM users WHERE id = ${id}`;
+export async function getUserById(sql: Db, id: number): Promise<UserDTO | null> {
+  const [row] = await sql`
+    SELECT id, email, display_name, avatar_url, notify_watchlist_drops
+    FROM users WHERE id = ${id}
+  `;
+  return row ? toUserDTO(row) : null;
+}
+
+/** Flips the watchlist-drop opt-in for one account. Returns the updated row,
+ *  or null if the session named an account that no longer exists. */
+export async function setNotifyWatchlistDrops(
+  sql: Db,
+  id: number,
+  enabled: boolean,
+): Promise<UserDTO | null> {
+  const [row] = await sql`
+    UPDATE users
+    SET notify_watchlist_drops = ${enabled}, updated_at = now()
+    WHERE id = ${id}
+    RETURNING id, email, display_name, avatar_url, notify_watchlist_drops
+  `;
   return row ? toUserDTO(row) : null;
 }
 
@@ -74,7 +103,7 @@ export function guestSessionsEnabled(): boolean {
   return process.env.DEMO_GUEST === "1";
 }
 
-export async function upsertGuestUser(sql: postgres.Sql<any>): Promise<UserDTO> {
+export async function upsertGuestUser(sql: Db): Promise<UserDTO> {
   return upsertUserFromGoogle(sql, {
     googleId: GUEST_GOOGLE_ID,
     email: "guest@spotlight.demo",

@@ -155,7 +155,7 @@ Using your own Gmail (or any account) as the sender needs an **app password**, n
 
 1. Create a free project at https://neon.tech (pick a region close to your Vercel deployment region).
 2. Copy the pooled connection string.
-3. Run the migrations once, in order: `0001_init.sql`, `0002_title_ratings.sql`, `0003_title_relations.sql`, `0004_title_relations_reverse_index.sql`, `0005_title_relation_lookups.sql`, `0006_calendar_entries_poster.sql`, `0007_multi_user_accounts.sql`, `0008_release_items_month_index.sql`, `0009_calendar_language_iso.sql`, `0010_calendar_origin_release.sql`, `0011_title_seasons.sql`, `0012_reset_tmdb_relations.sql` — e.g. `psql "$DATABASE_URL" -f migrations/0001_init.sql` for each (or via a Python one-liner with `psycopg` if you don't have `psql` installed).
+3. Run the migrations once, in order: `0001_init.sql`, `0002_title_ratings.sql`, `0003_title_relations.sql`, `0004_title_relations_reverse_index.sql`, `0005_title_relation_lookups.sql`, `0006_calendar_entries_poster.sql`, `0007_multi_user_accounts.sql`, `0008_release_items_month_index.sql`, `0009_calendar_language_iso.sql`, `0010_calendar_origin_release.sql`, `0011_title_seasons.sql`, `0012_reset_tmdb_relations.sql`, `0013_per_user_watchlist_alerts.sql` — e.g. `psql "$DATABASE_URL" -f migrations/0001_init.sql` for each (or via a Python one-liner with `psycopg` if you don't have `psql` installed).
 4. Link the seeded calendar rows to TMDB so they get posters and become clickable: `python scripts/backfill_calendar_tmdb.py` (safe to re-run; it only touches rows still missing a `tmdb_id`).
 5. Keep the calendar populated past the seeded window: `python scripts/sync_calendar_tmdb.py --months 6`. Pulls region-aware theatrical dates (`/discover/movie` with `region` + `with_release_type=2|3` + `release_date.gte/lte` — not `primary_release_date.*`, which ignores `region` entirely and returns global junk) and TV premieres, and only ever *enriches* existing rows — a curated editorial row keeps its own platform and details and merely gains a poster and a `tmdb_id`. Queries one calendar month at a time rather than the whole window at once — TMDB caps each `/discover` call at a fixed page limit regardless of true match count, so a single big-range query lets a handful of popular titles anywhere in it crowd out an entire other month's releases before the cap even applies (confirmed directly: a 6-month single-query window had 178 real matches behind a 60-result cap, silently dropping 118). TV premieres are additionally scoped by `--tv-countries` (default `IN,US,GB`) — TMDB is crowdsourced and global TV volume runs into the hundreds a month, almost all obscure local productions; this trades missing an occasional big non-English hit for not drowning the calendar in noise. Runs nightly (see below).
 4. Optionally seed the editorial calendar: `python scripts/seed_calendar_csv.py`.
@@ -268,6 +268,34 @@ otherwise let one signed-in user edit another's rows just by guessing an id
 quota, so one person can't monopolise the shared cooldown slots.
 
 ## Watchlist-drop alerts
+
+Two paths, deliberately separate.
+
+**Per-account (opt-in).** Any signed-in account can switch on *Email me on
+drops* from the avatar menu. On the Wed/Fri run, `releasebot.py` cross-
+references that week's Out Now list against every opted-in account's own
+watchlist and emails each person, at their verified Google address, about the
+titles from *their* list that just landed — one message per account per run,
+not one per title. Off by default: nobody is enrolled by a migration, because
+this sends mail to a real address.
+
+Deduped per `(account, title, channel)` in `sent_notifications`. That table's
+unique key used to be per *title* only, which meant the first account alerted
+about a film consumed the only row that would ever exist for it and every
+other account was silently skipped forever — see
+`migrations/0013_per_user_watchlist_alerts.sql`, which re-keys it. The demo
+guest account is excluded from the toggle: it is shared, so "email me" would
+mean emailing a shared inbox.
+
+**Owner broadcast (env-configured).** The original path, unchanged: scoped by
+`NOTIFY_OWNER_EMAILS` and delivered through whichever of Telegram/email the
+deployment has switched on.
+
+Telegram is owner-only for now. Per-account Telegram needs a bot-linking flow
+(a deep-link token and a webhook to receive `/start`), and there is no room for
+a webhook function — the deployment is at Vercel Hobby's 12-function cap.
+
+
 
 The Wed/Fri run also cross-references that day's **Out Now** items against
 the watchlists of the accounts in `NOTIFY_OWNER_EMAILS`
