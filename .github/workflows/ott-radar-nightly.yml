@@ -163,3 +163,39 @@ jobs:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/reconcile_calendar_duplicates.py
+
+      # Rebuild the site so the night's new relations become findable.
+      #
+      # scripts/prerender.ts bakes watch-order pages and the sitemap at BUILD
+      # time, reading whatever is in Postgres then. The steps above add new
+      # franchises every night, but Vercel only rebuilds on a push — so
+      # without this, a franchise discovered tonight has no page until the
+      # next code change, and the sitemap slowly goes stale while the data
+      # behind it keeps growing.
+      #
+      # A no-op until VERCEL_DEPLOY_HOOK is set (Vercel → Project → Settings →
+      # Git → Deploy Hooks), so a fork or a clone of this repo does not fail
+      # here. Deliberately last: it should redeploy against the finished
+      # state of the database, not a half-refreshed one.
+      #
+      # The "is it configured" check is inside the script rather than in an
+      # `if:` on the step. A step-level `if` is evaluated BEFORE that step's
+      # own `env:` block is applied, so `env.VERCEL_DEPLOY_HOOK` there is
+      # always empty and the step would silently never run.
+      - name: Redeploy so new watch-order pages get prerendered
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$VERCEL_DEPLOY_HOOK" ]; then
+            echo "VERCEL_DEPLOY_HOOK is not set — skipping redeploy."
+            exit 0
+          fi
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$VERCEL_DEPLOY_HOOK")
+          if [ "$code" = "200" ] || [ "$code" = "201" ]; then
+            echo "Deploy hook accepted (HTTP $code) — a rebuild is queued."
+          else
+            # Not a build failure: the data refresh above already succeeded and
+            # is what this job exists for. The site simply keeps yesterday's
+            # prerendered pages until the next successful deploy.
+            echo "::warning::Deploy hook returned HTTP $code — new pages will not be prerendered until the next deploy."
+          fi
