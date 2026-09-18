@@ -18,6 +18,7 @@ export default function WatchLater() {
         <span className="text-xs text-muted-foreground">{wl.watchLater.length} saved</span>
       </div>
       <WatchlistView
+        showWatchNow
         items={wl.watchLater}
         onReorder={wl.reorderWatchLater}
         onMarkWatched={wl.markWatched}

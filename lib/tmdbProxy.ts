@@ -443,8 +443,18 @@ export function providerCacheKey(key: ProviderKey): string {
 // invocation and one upstream burst, not to ration sequential latency.
 const MAX_PROVIDER_BATCH_KEYS = 100;
 
+/** Minutes for one sitting: a film's runtime, or a series' typical episode
+ *  length. Episode length is the right number for a series — "I have 40
+ *  minutes" is answered by one episode of a drama, never by the whole show. */
+export type RuntimeMap = Record<string, number>;
+
 export interface ProviderBatchResult {
   providers: Record<string, string[]>;
+  /** Free: this batch already fetches each title's full detail payload to read
+   *  its providers and discards the rest, and the runtime is in there. A
+   *  separate lookup would double the request count to learn a number TMDB
+   *  already sent. Absent for a title TMDB has no runtime for. */
+  runtimes: RuntimeMap;
   /** True if any key failed to resolve (network error, TMDB 5xx, a 429 from
    *  hitting TMDB's own limit with this many concurrent legs). The caller
    *  (api/tmdb/[...path].ts) must not stamp its usual long cache lifetime on a
@@ -487,16 +497,23 @@ export async function tmdbWatchProvidersBatch(
       const url = `${TMDB_BASE_URL}/${path}/${id}?api_key=${key}&append_to_response=watch/providers`;
       const res = await fetchWithRetry(url, 1);
       if (!res.ok) throw new Error(`TMDB detail failed: ${res.status}`);
-      return resolveProviders(await res.json(), region);
+      const detail = await res.json();
+      // episode_run_time is an array and can be empty or carry several
+      // lengths; the first is TMDB's typical episode.
+      const raw = mediaType === "movie" ? detail?.runtime : detail?.episode_run_time?.[0];
+      const runtime = typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? Math.round(raw) : null;
+      return { providers: resolveProviders(detail, region), runtime };
     }),
   );
 
   const providers: Record<string, string[]> = {};
+  const runtimes: RuntimeMap = {};
   let hadFailures = false;
   trimmed.forEach((k, i) => {
     const result = results[i];
     if (result.status === "fulfilled") {
-      providers[providerCacheKey(k)] = result.value;
+      providers[providerCacheKey(k)] = result.value.providers;
+      if (result.value.runtime !== null) runtimes[providerCacheKey(k)] = result.value.runtime;
     } else {
       hadFailures = true;
     }
@@ -509,7 +526,7 @@ export async function tmdbWatchProvidersBatch(
       `[tmdb] providers-batch truncated ${keys.length - trimmed.length} of ${keys.length} requested keys`,
     );
   }
-  return { providers, hadFailures };
+  return { providers, runtimes, hadFailures };
 }
 
 // ---------------------------------------------------------------------------

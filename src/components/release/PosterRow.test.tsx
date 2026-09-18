@@ -46,7 +46,7 @@ beforeEach(() => {
 
 describe('PosterRow providers', () => {
   it('fetches its own providers batch when no shared lookup is passed (a lone row)', async () => {
-    vi.mocked(fetchProvidersBatch).mockResolvedValue({ 'movie:1': ['Netflix'] });
+    vi.mocked(fetchProvidersBatch).mockResolvedValue({ providers: { 'movie:1': ['Netflix'] }, runtimes: {} });
 
     renderRow({ items: [movie({ id: 1 })] });
 
