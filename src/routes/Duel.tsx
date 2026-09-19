@@ -281,7 +281,7 @@ function PosterChoice({ candidate, onChoose }: { candidate: DuelCandidate; onCho
       onClick={onChoose}
       className="group text-left rounded-2xl overflow-hidden bg-secondary ring-1 ring-border hover:ring-accent focus-visible:ring-accent focus-visible:ring-2 active:scale-[0.98] transition-all"
     >
-      <div className="relative aspect-[2/3] bg-secondary">
+      <div className="relative aspect-[2/3] bg-secondary overflow-hidden">
         {poster && (
           <img
             src={poster.src}
