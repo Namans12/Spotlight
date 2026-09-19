@@ -11,12 +11,15 @@ import { useRelations } from '@/hooks/useRelations';
 import { hasAnyRelations, hasChain } from '@/lib/relations';
 import { titleDetailMeta } from '../../shared/seo';
 import { useDocumentMeta, siteUrl } from '@/hooks/useDocumentMeta';
-import { getYouMayAlsoLike, type MediaType } from '@/lib/tmdb';
+import { getYouMayAlsoLike, getCredits, type MediaType } from '@/lib/tmdb';
 import { withoutWatched } from '@/lib/watched';
 import { RatingBadges } from '@/components/release/RatingBadges';
 import { useRating } from '@/hooks/useRatings';
 import { hasAnyScore } from '@/lib/ratings';
 import { tmdbBackdrop, tmdbPoster } from '@/lib/tmdbImage';
+import { formatRuntime, formatRuntimeLong } from '@/lib/format';
+import { CastRow } from '@/components/title/CastRow';
+import { FactsPanel } from '@/components/title/FactsPanel';
 import {
   ArrowLeft,
   Star,
@@ -80,6 +83,19 @@ export default function TitleDetail() {
   const recommendations = withoutWatched(recommendationsQuery.data ?? [], wl.watchedKeys);
   const ratingQuery = useRating(mediaType, tmdbId);
 
+  // Its own request rather than folded into /detail: credits are a separate
+  // TMDB call either way, and keeping them separate means the page paints its
+  // hero from the detail response without waiting on a cast list nobody has
+  // scrolled to yet. Cached for a day — a released film's billing does not
+  // change.
+  const creditsQuery = useQuery({
+    queryKey: ['tmdb', 'credits', mediaType, tmdbId],
+    queryFn: () => getCredits(mediaType as MediaType, tmdbId),
+    enabled: Number.isFinite(tmdbId),
+    staleTime: 24 * 60 * 60_000,
+  });
+  const credits = creditsQuery.data;
+
   // Above the loading guard: hooks cannot be conditional. Null while the
   // detail loads, which leaves any prerendered tags untouched.
   useDocumentMeta(
@@ -127,6 +143,10 @@ export default function TitleDetail() {
   // 1x bucket on w780 rather than the previous flat w1280.
   const backdrop = tmdbBackdrop(data.backdropUrl, 700);
   const poster = tmdbPoster(data.posterUrl, 112); // sm:w-28 = 112px
+  // "1 hr 33 min", not "93m". A runtime is a claim on someone's evening, and
+  // minutes-only makes them do the division themselves. One helper, so the
+  // hero line and the facts panel can never disagree.
+  const runtimeLabel = formatRuntime(data.runtime);
 
   return (
     <div className="space-y-5 -mt-6">
@@ -170,29 +190,43 @@ export default function TitleDetail() {
           <div className="flex items-center gap-2.5 mt-1.5 text-xs text-muted-foreground flex-wrap">
             {year && <span>{year}</span>}
             <span className="uppercase font-semibold text-accent">{data.mediaType === 'tv' ? 'TV' : 'Film'}</span>
-            {/* IMDb/RT when known; the TMDB score is the fallback so the line
-                is never empty while the ratings cache is still filling. */}
-            {hasAnyScore(ratingQuery.data) ? (
-              <RatingBadges rating={ratingQuery.data} size="md" />
-            ) : (
-              data.rating != null && (
-                <span className="inline-flex items-center gap-1 text-gold">
-                  <Star size={11} fill="currentColor" /> {data.rating.toFixed(1)}
-                </span>
-              )
+            {data.certification && (
+              <span
+                className="rounded border border-border px-1.5 py-px text-[10px] font-semibold uppercase"
+                title={`Rated ${data.certification.value} (${data.certification.region})`}
+              >
+                {data.certification.value}
+              </span>
             )}
             {data.mediaType === 'tv' && data.numberOfSeasons && (
               <span className="inline-flex items-center gap-1">
                 <Layers size={11} /> {data.numberOfSeasons} {data.numberOfSeasons === 1 ? 'Season' : 'Seasons'}
               </span>
             )}
-            {data.runtime && (
-              <span className="inline-flex items-center gap-1">
-                <Clock size={11} /> {data.runtime}m
+            {runtimeLabel && (
+              <span className="inline-flex items-center gap-1" title={formatRuntimeLong(data.runtime) ?? undefined}>
+                <Clock size={11} /> {runtimeLabel}
               </span>
             )}
           </div>
         </div>
+      </div>
+
+      {/* Its own row rather than crammed into the meta line above: these are
+          the numbers people came to check, and at 11px between a year and a
+          runtime they read as trivia. The TMDB score is the fallback so the
+          row is never empty while the ratings cache is still filling. */}
+      <div className="px-1">
+        {hasAnyScore(ratingQuery.data) ? (
+          <RatingBadges rating={ratingQuery.data} size="lg" />
+        ) : (
+          data.rating != null && (
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gold" title="TMDB user score">
+              <Star size={16} fill="currentColor" /> {data.rating.toFixed(1)}
+              <span className="text-[11px] font-normal text-muted-foreground">TMDB</span>
+            </span>
+          )
+        )}
       </div>
 
       {data.genres.length > 0 && (
@@ -215,6 +249,10 @@ export default function TitleDetail() {
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Where to watch</p>
           <p className="text-sm text-accent font-medium">{data.providers.join(', ')}</p>
         </div>
+      )}
+
+      {data.tagline && (
+        <p className="px-1 text-sm italic text-muted-foreground">&ldquo;{data.tagline}&rdquo;</p>
       )}
 
       {data.overview && <p className="px-1 text-sm text-foreground/90 leading-relaxed">{data.overview}</p>}
@@ -292,6 +330,10 @@ export default function TitleDetail() {
           )}
         </div>
       )}
+
+      <FactsPanel detail={data} />
+
+      {credits && <CastRow cast={credits.cast} director={credits.directors[0] ?? null} />}
 
       {showRecommendations && recommendations.length > 0 && (
         <div className="px-1">

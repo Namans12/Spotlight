@@ -169,6 +169,44 @@ export function titleDetailMeta(
   };
 }
 
+/**
+ * A cast or crew member's page.
+ *
+ * Not prerendered — there are hundreds of thousands of them and no evergreen
+ * query behind most — so this exists purely for the client-side title and for
+ * the card someone gets when they paste the link into a chat. `Person` schema
+ * with a `knowsAbout`-free shape: naming the work would mean asserting a
+ * relationship TMDB models loosely (a one-episode guest credit and a lead are
+ * the same row), and a wrong structured claim is worse than none.
+ */
+export function personMeta(
+  person: { id: number; name: string; knownFor?: string | null; profilePath?: string | null; credits?: { title: string }[] },
+  siteUrl: string,
+): PageMeta {
+  const path = `/person/${person.id}`;
+  const known = (person.credits ?? []).slice(0, 3).map((c) => c.title);
+  const role = person.knownFor ? person.knownFor.toLowerCase() : null;
+
+  return {
+    title: `${person.name} — films and series | Spotlight`,
+    description: clampDescription(
+      known.length > 0
+        ? `Everything ${person.name} has ${role === 'acting' ? 'appeared in' : 'worked on'}, including ${sentenceList(known)} — with where to stream each one in India.`
+        : `Films and series featuring ${person.name}, and where to stream them in India.`,
+    ),
+    canonical: absoluteUrl(siteUrl, path),
+    ogType: "website",
+    image: person.profilePath ? `https://image.tmdb.org/t/p/w500${person.profilePath}` : null,
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "Person",
+      name: person.name,
+      url: absoluteUrl(siteUrl, path),
+      ...(person.knownFor ? { jobTitle: person.knownFor } : {}),
+    },
+  };
+}
+
 /** The handful of fixed routes. Keyed by path so both consumers agree on
  *  which pages exist and what each one claims to be. */
 export const STATIC_ROUTE_META: Record<string, { title: string; description: string }> = {
