@@ -18,11 +18,12 @@ import { buildTaste, rerankByTaste } from '@/lib/taste';
 import { RatingBadges } from '@/components/release/RatingBadges';
 import { useRating } from '@/hooks/useRatings';
 import { hasAnyScore } from '@/lib/ratings';
-import { tmdbBackdrop, tmdbPoster } from '@/lib/tmdbImage';
+import { tmdbBackdrop, tmdbPoster, tmdbLogo } from '@/lib/tmdbImage';
 import { formatRuntime, formatRuntimeLong } from '@/lib/format';
 import { CastRow } from '@/components/title/CastRow';
 import { FactsPanel } from '@/components/title/FactsPanel';
 import { SeasonProgress } from '@/components/title/SeasonProgress';
+import { TrailerCard } from '@/components/title/TrailerCard';
 import {
   ArrowLeft,
   Star,
@@ -155,6 +156,10 @@ export default function TitleDetail() {
   // 1x bucket on w780 rather than the previous flat w1280.
   const backdrop = tmdbBackdrop(data.backdropUrl, 700);
   const poster = tmdbPoster(data.posterUrl, 112); // sm:w-28 = 112px
+  // Present for a minority of titles — mostly wide studio releases — so this
+  // is deliberately additive rather than a redesign of the hero: when it's
+  // null the page looks exactly as it did before.
+  const logo = tmdbLogo(data.logoPath, 220);
   // "1 hr 33 min", not "93m". A runtime is a claim on someone's evening, and
   // minutes-only makes them do the division themselves. One helper, so the
   // hero line and the facts panel can never disagree.
@@ -183,6 +188,34 @@ export default function TitleDetail() {
         >
           <ArrowLeft size={16} />
         </button>
+        {/* The title's own logo art, where TMDB has one, in place of a
+            plain-text heading over the backdrop — the single change that
+            makes this look like the studio's own poster rather than a
+            listing page. drop-shadow rather than a background plate: the
+            gradient behind it already darkens the backdrop enough to read
+            most marks, and a plate would fight logos that already carry
+            their own background treatment.
+
+            bottom-20/sm:bottom-24 rather than a small offset from the edge:
+            the poster+title row right below this backdrop is pulled UP over
+            it by -mt-16/-mt-20 (see that row's own className) so it can
+            overlap the backdrop's bottom edge — that's deliberate there, but
+            it means the last 64px (mobile) / 80px (sm) of this backdrop is
+            actually covered by the poster once it paints. A logo positioned
+            close to the bottom edge, as this originally was, rendered mostly
+            hidden behind the poster with only a sliver peeking out above
+            it — caught by checking the element's actual rendered rect against
+            the poster row's computed position, not by eye; at a glance it
+            looked like rendering garbage rather than an overlap. */}
+        {logo && (
+          <img
+            src={logo.src}
+            srcSet={logo.srcSet}
+            alt=""
+            decoding="async"
+            className="absolute bottom-20 sm:bottom-24 left-4 max-w-[65%] max-h-14 sm:max-h-20 object-contain object-left-bottom drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]"
+          />
+        )}
       </div>
 
       <div className="px-1 -mt-16 sm:-mt-20 relative flex gap-4 items-end">
@@ -198,7 +231,21 @@ export default function TitleDetail() {
           )}
         </div>
         <div className="min-w-0 pb-1">
-          <h1 className="font-display text-xl sm:text-2xl font-bold text-foreground leading-tight">{data.title}</h1>
+          {/* Visually replaced by the logo art over the backdrop when one
+              exists — sr-only rather than removed, so the real title text
+              stays in the DOM for screen readers and for a crawler reading
+              this page (this component isn't what a search engine indexes;
+              scripts/prerender.ts's static HTML is — but keeping the two
+              paths saying the same thing is the whole point of that file). */}
+          <h1
+            className={
+              logo
+                ? 'sr-only'
+                : 'font-display text-xl sm:text-2xl font-bold text-foreground leading-tight'
+            }
+          >
+            {data.title}
+          </h1>
           <div className="flex items-center gap-2.5 mt-1.5 text-xs text-muted-foreground flex-wrap">
             {year && <span>{year}</span>}
             <span className="uppercase font-semibold text-accent">{data.mediaType === 'tv' ? 'TV' : 'Film'}</span>
@@ -364,6 +411,8 @@ export default function TitleDetail() {
       )}
 
       <FactsPanel detail={data} />
+
+      {data.trailer && <TrailerCard trailer={data.trailer} />}
 
       {credits && <CastRow cast={credits.cast} director={credits.directors[0] ?? null} />}
 

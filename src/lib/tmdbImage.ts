@@ -21,6 +21,12 @@ const BACKDROP_WIDTHS = [300, 780, 1280] as const;
  *  too small even for a 48px avatar at 2x, so a cast row lands on w185 either
  *  way. Listed rather than assumed so the srcSet logic stays honest about it. */
 const PROFILE_WIDTHS = [45, 185] as const;
+/** TMDB's logo buckets. Some logo assets are SVG rather than raster — TMDB
+ *  serves the same full vector at every bucket URL regardless of the width
+ *  requested, at a 200, so sizing one is harmless even though it does
+ *  nothing; the code stays uniform rather than needing to know which titles
+ *  happen to have vector art. */
+const LOGO_WIDTHS = [45, 92, 154, 185, 300, 500] as const;
 
 /** Captures the origin+prefix and the trailing path around the size segment, so
  *  the size can be swapped without caring what it currently is. */
@@ -91,6 +97,20 @@ export function tmdbProfile(path: string | null | undefined, cssWidth: number): 
   const clean = path.startsWith('/') ? path : `/${path}`;
   const at1x = smallestCovering(PROFILE_WIDTHS, cssWidth);
   const at2x = smallestCovering(PROFILE_WIDTHS, cssWidth * 2);
+  const base = 'https://image.tmdb.org/t/p/';
+  return {
+    src: `${base}w${at1x}${clean}`,
+    srcSet: at2x === at1x ? undefined : `${base}w${at1x}${clean} 1x, ${base}w${at2x}${clean} 2x`,
+  };
+}
+
+/** A title's own logo/wordmark artwork, sized for the hero. Takes a bare
+ *  TMDB path, same as tmdbProfile — there is no stored URL to rewrite. */
+export function tmdbLogo(path: string | null | undefined, cssWidth: number): SizedImage | undefined {
+  if (!path) return undefined;
+  const clean = path.startsWith('/') ? path : `/${path}`;
+  const at1x = smallestCovering(LOGO_WIDTHS, cssWidth);
+  const at2x = smallestCovering(LOGO_WIDTHS, cssWidth * 2);
   const base = 'https://image.tmdb.org/t/p/';
   return {
     src: `${base}w${at1x}${clean}`,
