@@ -670,6 +670,7 @@ const MAX_PROVIDER_BATCH_KEYS = 100;
  *  length. Episode length is the right number for a series — "I have 40
  *  minutes" is answered by one episode of a drama, never by the whole show. */
 export type RuntimeMap = Record<string, number>;
+export type GenreMap = Record<string, string[]>;
 
 export interface ProviderBatchResult {
   providers: Record<string, string[]>;
@@ -678,6 +679,11 @@ export interface ProviderBatchResult {
    *  separate lookup would double the request count to learn a number TMDB
    *  already sent. Absent for a title TMDB has no runtime for. */
   runtimes: RuntimeMap;
+  /** Free for the same reason runtimes are — the detail payload this batch
+   *  already fetches carries the genre list. Read by the year-in-review page,
+   *  which needs a genre for every saved title and would otherwise make one
+   *  detail request per title to learn something TMDB has already sent. */
+  genres: GenreMap;
   /** True if any key failed to resolve (network error, TMDB 5xx, a 429 from
    *  hitting TMDB's own limit with this many concurrent legs). The caller
    *  (api/tmdb/[...path].ts) must not stamp its usual long cache lifetime on a
@@ -725,18 +731,23 @@ export async function tmdbWatchProvidersBatch(
       // lengths; the first is TMDB's typical episode.
       const raw = mediaType === "movie" ? detail?.runtime : detail?.episode_run_time?.[0];
       const runtime = typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? Math.round(raw) : null;
-      return { providers: resolveProviders(detail, region), runtime };
+      const genres = (detail?.genres ?? [])
+        .map((g: TmdbRow) => g?.name)
+        .filter((name: unknown): name is string => typeof name === "string" && name.length > 0);
+      return { providers: resolveProviders(detail, region), runtime, genres };
     }),
   );
 
   const providers: Record<string, string[]> = {};
   const runtimes: RuntimeMap = {};
+  const genres: GenreMap = {};
   let hadFailures = false;
   trimmed.forEach((k, i) => {
     const result = results[i];
     if (result.status === "fulfilled") {
       providers[providerCacheKey(k)] = result.value.providers;
       if (result.value.runtime !== null) runtimes[providerCacheKey(k)] = result.value.runtime;
+      if (result.value.genres.length > 0) genres[providerCacheKey(k)] = result.value.genres;
     } else {
       hadFailures = true;
     }
@@ -749,7 +760,7 @@ export async function tmdbWatchProvidersBatch(
       `[tmdb] providers-batch truncated ${keys.length - trimmed.length} of ${keys.length} requested keys`,
     );
   }
-  return { providers, runtimes, hadFailures };
+  return { providers, runtimes, genres, hadFailures };
 }
 
 // ---------------------------------------------------------------------------

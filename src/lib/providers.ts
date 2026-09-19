@@ -22,10 +22,14 @@ export interface ProviderBatch {
   /** Minutes for one sitting — a film's runtime, or a series' typical episode
    * length. Absent for a title TMDB has no runtime for. */
   runtimes: Record<string, number>;
+  /** Genre names, free from the same detail payload. Read by the year in
+   * review, which needs a genre per saved title. Absent for a title TMDB
+   * lists no genres for. */
+  genres: Record<string, string[]>;
 }
 
 export async function fetchProvidersBatch(keys: ProviderSubject[]): Promise<ProviderBatch> {
-  if (keys.length === 0) return { providers: {}, runtimes: {} };
+  if (keys.length === 0) return { providers: {}, runtimes: {}, genres: {} };
   const ids = [...new Set(keys.map((k) => providerKey(k.mediaType, k.id)))].join(",");
   const data = await fetchJson<unknown>(`/api/tmdb/providers-batch?ids=${encodeURIComponent(ids)}`);
 
@@ -37,7 +41,10 @@ export async function fetchProvidersBatch(keys: ProviderSubject[]): Promise<Prov
   // every card on the page.
   if (data && typeof data === "object" && "providers" in data) {
     const batch = data as Partial<ProviderBatch>;
-    return { providers: batch.providers ?? {}, runtimes: batch.runtimes ?? {} };
+    // Each field defaulted independently, for the same reason: `genres` is the
+    // newest of the three, so for an hour after a deploy the edge can still be
+    // serving a `{ providers, runtimes }` response to a client that expects it.
+    return { providers: batch.providers ?? {}, runtimes: batch.runtimes ?? {}, genres: batch.genres ?? {} };
   }
-  return { providers: (data as Record<string, string[]>) ?? {}, runtimes: {} };
+  return { providers: (data as Record<string, string[]>) ?? {}, runtimes: {}, genres: {} };
 }

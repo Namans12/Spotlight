@@ -224,11 +224,32 @@ export const STATIC_ROUTE_META: Record<string, { title: string; description: str
     description:
       "Upcoming theatrical and streaming releases in India, month by month, with platforms and dates.",
   },
+  // Personal and behind a login, so the prerendered version carries meta only
+  // and never any numbers — see scripts/prerender.ts.
+  "/wrapped": {
+    title: "Your year in film and TV | Spotlight",
+    description:
+      "What you saved, what you watched, and how long it took — your year on Spotlight, counted from your own watchlist.",
+  },
   "/search": {
     title: "Search films and series | Spotlight",
     description: "Search any film or series to find where to stream it in India, its ratings, and its watch order.",
   },
 };
+
+/**
+ * Routes that have a title and a description but no business being indexed.
+ *
+ * They are real pages with real metadata — the tab title and the card someone
+ * gets when they paste the link still matter — but what is on them is one
+ * account's own data behind a login. A crawler following them finds a sign-in
+ * wall, which is a soft-404 in everything but name.
+ *
+ * Kept here, beside STATIC_ROUTE_META, so the sitemap and robots.txt cannot
+ * disagree: listing a URL in the sitemap while disallowing it in robots.txt is
+ * a contradiction Search Console reports as an error against the whole site.
+ */
+export const PRIVATE_ROUTES = new Set(["/wrapped"]);
 
 export function staticRouteMeta(path: string, siteUrl: string): PageMeta | null {
   const entry = STATIC_ROUTE_META[path];

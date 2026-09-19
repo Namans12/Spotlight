@@ -35,6 +35,7 @@ import {
   titleDetailMeta,
   watchOrderMeta,
   STATIC_ROUTE_META,
+  PRIVATE_ROUTES,
   type ChainEntry,
   type PageMeta,
 } from "../shared/seo.js";
@@ -195,7 +196,12 @@ async function main(): Promise<number> {
     // have no static content worth indexing anyway: what is on them is the
     // live release data, which is fetched.
     await writePage(routePath, renderPage(template, meta, ""));
-    sitemap.push({ loc: meta.canonical, priority: routePath === "/" ? 1.0 : 0.7 });
+    // A per-account page still gets its tags written — a link shared into a
+    // chat should not render a blank card — but it stays out of the sitemap,
+    // because inviting a crawler to a sign-in wall is a soft-404.
+    if (!PRIVATE_ROUTES.has(routePath)) {
+      sitemap.push({ loc: meta.canonical, priority: routePath === "/" ? 1.0 : 0.7 });
+    }
   }
   console.log(`[prerender] ${Object.keys(STATIC_ROUTE_META).length} static routes`);
 
@@ -316,7 +322,20 @@ async function main(): Promise<number> {
   await fs.writeFile(path.join(DIST, "sitemap.xml"), sitemapXml(sitemap), "utf8");
   await fs.writeFile(
     path.join(DIST, "robots.txt"),
-    `User-agent: *\nAllow: /\n\n# Private, per-account, and useless to index.\nDisallow: /list\nDisallow: /login\n\nSitemap: ${absoluteUrl(SITE_URL, "/sitemap.xml")}\n`,
+    [
+      "User-agent: *",
+      "Allow: /",
+      "",
+      "# Private, per-account, and useless to index.",
+      "Disallow: /list",
+      "Disallow: /login",
+      // Built from the same set the sitemap skips, so the two files cannot
+      // drift into contradicting each other.
+      ...[...PRIVATE_ROUTES].map((route) => `Disallow: ${route}`),
+      "",
+      `Sitemap: ${absoluteUrl(SITE_URL, "/sitemap.xml")}`,
+      "",
+    ].join("\n"),
     "utf8",
   );
 

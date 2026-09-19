@@ -67,6 +67,7 @@ beforeEach(() => {
   vi.mocked(fetchProvidersBatch).mockResolvedValue({
     providers: { 'movie:1': ['Netflix'], 'movie:2': ['JioHotstar'], 'tv:3': ['Netflix'] },
     runtimes: { 'movie:1': 22, 'movie:2': 150, 'tv:3': 30 },
+    genres: {},
   });
 });
 
@@ -133,7 +134,7 @@ describe('what can I watch right now', () => {
   });
 
   it('shows no bar at all on a list with nothing to narrow', async () => {
-    vi.mocked(fetchProvidersBatch).mockResolvedValue({ providers: {}, runtimes: {} });
+    vi.mocked(fetchProvidersBatch).mockResolvedValue({ providers: {}, runtimes: {}, genres: {} });
     renderView();
     await waitFor(() => expect(fetchProvidersBatch).toHaveBeenCalled());
     // A filter bar with no usable filters is furniture.

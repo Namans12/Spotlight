@@ -17,6 +17,7 @@ import {
   Clock,
   Eye,
   FolderOpen,
+  Sparkles,
   Radio,
   LogIn,
 } from 'lucide-react';
@@ -52,6 +53,9 @@ function useNavGroups(): { heading: string; items: NavItem[] }[] {
         { to: '/list/later', label: 'Watch Later', icon: <Clock size={18} />, count: wl.watchLater.length },
         { to: '/list/watched', label: 'Watched', icon: <Eye size={18} />, count: wl.watched.length },
         { to: '/list/lists', label: 'Lists', icon: <FolderOpen size={18} />, count: wl.customLists.length },
+        // No count: a year in review is one page, and a badge reading "0"
+        // beside it would be the first thing it said about your year.
+        { to: '/wrapped', label: 'Your year', icon: <Sparkles size={18} /> },
       ],
     },
   ];
