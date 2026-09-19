@@ -250,7 +250,12 @@
     ]
   },
   {
-    "from": { "media_type": "tv", "tmdb_id": 85271, "title": "WandaVision", "year": 2021 },
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 85271,
+      "title": "WandaVision",
+      "year": 2021
+    },
     "must": [
       {
         "title": "Avengers: Endgame",
@@ -272,7 +277,12 @@
     ]
   },
   {
-    "from": { "media_type": "tv", "tmdb_id": 84958, "title": "Loki", "year": 2021 },
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 84958,
+      "title": "Loki",
+      "year": 2021
+    },
     "must": [
       {
         "title": "Avengers: Endgame",
@@ -286,7 +296,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "tv", "tmdb_id": 88329, "title": "Hawkeye", "year": 2021 },
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 88329,
+      "title": "Hawkeye",
+      "year": 2021
+    },
     "must": [
       {
         "title": "Avengers: Endgame",
@@ -308,7 +323,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "tv", "tmdb_id": 114472, "title": "Secret Invasion", "year": 2023 },
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 114472,
+      "title": "Secret Invasion",
+      "year": 2023
+    },
     "must": [
       {
         "title": "Captain Marvel",
@@ -330,7 +350,12 @@
     ]
   },
   {
-    "from": { "media_type": "tv", "tmdb_id": 92783, "title": "She-Hulk: Attorney at Law", "year": 2022 },
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 92783,
+      "title": "She-Hulk: Attorney at Law",
+      "year": 2022
+    },
     "must": [],
     "can": [
       {
@@ -350,7 +375,12 @@
     ]
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 609681, "title": "The Marvels", "year": 2023 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 609681,
+      "title": "The Marvels",
+      "year": 2023
+    },
     "must": [
       {
         "title": "Captain Marvel",
@@ -380,7 +410,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 11, "title": "Star Wars", "year": 1977 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 11,
+      "title": "Star Wars",
+      "year": 1977
+    },
     "must": [
       {
         "title": "Rogue One: A Star Wars Story",
@@ -394,7 +429,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 1891, "title": "The Empire Strikes Back", "year": 1980 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 1891,
+      "title": "The Empire Strikes Back",
+      "year": 1980
+    },
     "must": [
       {
         "title": "Star Wars",
@@ -408,7 +448,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 1892, "title": "Return of the Jedi", "year": 1983 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 1892,
+      "title": "Return of the Jedi",
+      "year": 1983
+    },
     "must": [
       {
         "title": "The Empire Strikes Back",
@@ -422,7 +467,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 1894, "title": "Star Wars: Episode II - Attack of the Clones", "year": 2002 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 1894,
+      "title": "Star Wars: Episode II - Attack of the Clones",
+      "year": 2002
+    },
     "must": [
       {
         "title": "Star Wars: Episode I - The Phantom Menace",
@@ -451,7 +501,12 @@
     ]
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 1895, "title": "Star Wars: Episode III - Revenge of the Sith", "year": 2005 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 1895,
+      "title": "Star Wars: Episode III - Revenge of the Sith",
+      "year": 2005
+    },
     "must": [
       {
         "title": "Star Wars: Episode II - Attack of the Clones",
@@ -480,7 +535,12 @@
     ]
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 140607, "title": "Star Wars: The Force Awakens", "year": 2015 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 140607,
+      "title": "Star Wars: The Force Awakens",
+      "year": 2015
+    },
     "must": [
       {
         "title": "Return of the Jedi",
@@ -494,7 +554,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 181808, "title": "Star Wars: The Last Jedi", "year": 2017 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 181808,
+      "title": "Star Wars: The Last Jedi",
+      "year": 2017
+    },
     "must": [
       {
         "title": "Star Wars: The Force Awakens",
@@ -508,7 +573,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 181812, "title": "Star Wars: The Rise of Skywalker", "year": 2019 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 181812,
+      "title": "Star Wars: The Rise of Skywalker",
+      "year": 2019
+    },
     "must": [
       {
         "title": "Star Wars: The Last Jedi",
@@ -522,7 +592,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "tv", "tmdb_id": 92830, "title": "Obi-Wan Kenobi", "year": 2022 },
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 92830,
+      "title": "Obi-Wan Kenobi",
+      "year": 2022
+    },
     "must": [
       {
         "title": "Star Wars: Episode III - Revenge of the Sith",
@@ -536,7 +611,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 330459, "title": "Rogue One: A Star Wars Story", "year": 2016 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 330459,
+      "title": "Rogue One: A Star Wars Story",
+      "year": 2016
+    },
     "must": [
       {
         "title": "Andor",
@@ -565,7 +645,12 @@
     ]
   },
   {
-    "from": { "media_type": "tv", "tmdb_id": 114461, "title": "Ahsoka", "year": 2023 },
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 114461,
+      "title": "Ahsoka",
+      "year": 2023
+    },
     "must": [
       {
         "title": "Star Wars Rebels",
@@ -601,7 +686,12 @@
     ]
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 209112, "title": "Batman v Superman: Dawn of Justice", "year": 2016 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 209112,
+      "title": "Batman v Superman: Dawn of Justice",
+      "year": 2016
+    },
     "must": [
       {
         "title": "Man of Steel",
@@ -615,7 +705,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 141052, "title": "Justice League", "year": 2017 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 141052,
+      "title": "Justice League",
+      "year": 2017
+    },
     "must": [
       {
         "title": "Batman v Superman: Dawn of Justice",
@@ -629,7 +724,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 791373, "title": "Zack Snyder's Justice League", "year": 2021 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 791373,
+      "title": "Zack Snyder's Justice League",
+      "year": 2021
+    },
     "must": [
       {
         "title": "Batman v Superman: Dawn of Justice",
@@ -643,7 +743,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 127585, "title": "X-Men: Days of Future Past", "year": 2014 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 127585,
+      "title": "X-Men: Days of Future Past",
+      "year": 2014
+    },
     "must": [
       {
         "title": "X-Men: The Last Stand",
@@ -665,7 +770,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 246655, "title": "X-Men: Apocalypse", "year": 2016 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 246655,
+      "title": "X-Men: Apocalypse",
+      "year": 2016
+    },
     "must": [
       {
         "title": "X-Men: Days of Future Past",
@@ -679,7 +789,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 320288, "title": "Dark Phoenix", "year": 2019 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 320288,
+      "title": "Dark Phoenix",
+      "year": 2019
+    },
     "must": [
       {
         "title": "X-Men: Apocalypse",
@@ -693,7 +808,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 533535, "title": "Deadpool & Wolverine", "year": 2024 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 533535,
+      "title": "Deadpool & Wolverine",
+      "year": 2024
+    },
     "must": [
       {
         "title": "Logan",
@@ -723,7 +843,12 @@
     ]
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 373571, "title": "Godzilla: King of the Monsters", "year": 2019 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 373571,
+      "title": "Godzilla: King of the Monsters",
+      "year": 2019
+    },
     "must": [
       {
         "title": "Godzilla",
@@ -737,7 +862,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 399566, "title": "Godzilla vs. Kong", "year": 2021 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 399566,
+      "title": "Godzilla vs. Kong",
+      "year": 2021
+    },
     "must": [
       {
         "title": "Godzilla: King of the Monsters",
@@ -759,7 +889,12 @@
     "can": []
   },
   {
-    "from": { "media_type": "movie", "tmdb_id": 823464, "title": "Godzilla x Kong: The New Empire", "year": 2024 },
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 823464,
+      "title": "Godzilla x Kong: The New Empire",
+      "year": 2024
+    },
     "must": [
       {
         "title": "Godzilla vs. Kong",
@@ -772,710 +907,855 @@
     ],
     "can": []
   },
-{
-  "from": {
-    "media_type": "movie",
-    "tmdb_id": 363088,
-    "title": "Ant-Man and the Wasp",
-    "year": 2018
-  },
-  "must": [
-    {
-      "title": "Captain America: Civil War",
-      "year": 2016,
-      "direction": "before",
-      "confidence": 0.8,
-      "reason": "Scott Lang's house arrest and estranged status with the Avengers \u2014 the personal risk he's taking by helping Hope and Hank \u2014 stem directly from joining Cap's side in the airport battle here."
-    }
-  ],
-  "can": []
-},
-{
-  "from": {
-    "media_type": "movie",
-    "tmdb_id": 271110,
-    "title": "Captain America: Civil War",
-    "year": 2016
-  },
-  "must": [
-    {
-      "title": "Avengers: Age of Ultron",
-      "year": 2015,
-      "direction": "before",
-      "confidence": 0.85,
-      "reason": "The Sokovia Accords that split the Avengers and drive this film's entire conflict exist because of the civilian casualties Ultron causes in Sokovia here."
-    }
-  ],
-  "can": [
-    {
-      "title": "Ant-Man",
-      "year": 2015,
-      "confidence": 0.6,
-      "reason": "Scott Lang's surprise 'Giant-Man' growth in the airport battle pays off the untested Pym Particle rules established in this film."
-    }
-  ]
-},
-{
-  "from": {
-    "media_type": "movie",
-    "tmdb_id": 497698,
-    "title": "Black Widow",
-    "year": 2021
-  },
-  "must": [
-    {
-      "title": "Captain America: Civil War",
-      "year": 2016,
-      "direction": "before",
-      "confidence": 0.75,
-      "reason": "Natasha is a fugitive on the run from the government here specifically because she sided with Cap during the Accords split in that film."
-    }
-  ],
-  "can": []
-},
-{
-  "from": {
-    "media_type": "movie",
-    "tmdb_id": 566525,
-    "title": "Shang-Chi and the Legend of the Ten Rings",
-    "year": 2021
-  },
-  "must": [],
-  "can": [
-    {
-      "title": "Iron Man 3",
-      "year": 2013,
-      "confidence": 0.65,
-      "reason": "The mid-credits scene explicitly contrasts Xu Wenwu's real Ten Rings organization with the fake 'Mandarin' hoax exposed in this film."
-    }
-  ]
-},
-{
-  "from": {
-    "media_type": "movie",
-    "tmdb_id": 986056,
-    "title": "Thunderbolts*",
-    "year": 2025
-  },
-  "must": [
-    {
-      "title": "Black Widow",
-      "year": 2021,
-      "direction": "before",
-      "confidence": 0.8,
-      "reason": "Yelena Belova and Alexei/Red Guardian, two of the team's core members, are introduced here with the found-family history and grief over Natasha that drives them."
-    },
-    {
-      "title": "The Falcon and the Winter Soldier",
-      "year": 2021,
-      "media_type": "tv",
-      "direction": "before",
-      "confidence": 0.8,
-      "reason": "John Walker's fall from grace as Captain America and his replacement as the government-sanctioned US Agent \u2014 the reason he's on this team at all \u2014 plays out across this show."
-    },
-    {
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 363088,
       "title": "Ant-Man and the Wasp",
-      "year": 2018,
-      "direction": "before",
-      "confidence": 0.7,
-      "reason": "Ava Starr/Ghost's unstable molecular condition and tragic backstory, which the team is trying to help her survive, are established in this film."
-    }
-  ],
-  "can": []
-},
-{
-  "from": {
-    "media_type": "movie",
-    "tmdb_id": 822119,
-    "title": "Captain America: Brave New World",
-    "year": 2025
-  },
-  "must": [
-    {
-      "title": "The Incredible Hulk",
-      "year": 2008,
-      "direction": "before",
-      "confidence": 0.75,
-      "reason": "Samuel Sterns' transformation into the Leader, and his history with General Ross's gamma experiments, is set up in this film and pays off as the villain here."
+      "year": 2018
     },
-    {
-      "title": "The Falcon and the Winter Soldier",
-      "year": 2021,
-      "media_type": "tv",
-      "direction": "before",
-      "confidence": 0.85,
-      "reason": "Sam Wilson's arc into becoming the new Captain America, and his relationship with a wronged Isaiah Bradley, is the show this film directly continues."
-    }
-  ],
-  "can": []
-},
-{
-  "from": {
-    "media_type": "tv",
-    "tmdb_id": 88396,
-    "title": "The Falcon and the Winter Soldier",
-    "year": 2021
+    "must": [
+      {
+        "title": "Captain America: Civil War",
+        "year": 2016,
+        "direction": "before",
+        "confidence": 0.8,
+        "reason": "Scott Lang's house arrest and estranged status with the Avengers — the personal risk he's taking by helping Hope and Hank — stem directly from joining Cap's side in the airport battle here."
+      }
+    ],
+    "can": []
   },
-  "must": [
-    {
-      "title": "Avengers: Endgame",
-      "year": 2019,
+  {
+    "from": {
       "media_type": "movie",
-      "direction": "before",
-      "confidence": 0.85,
-      "reason": "Opens directly from Steve Rogers handing Sam the shield at the end of this film, and deals with the fallout of the five-year Blip it depicts."
-    },
-    {
+      "tmdb_id": 271110,
       "title": "Captain America: Civil War",
-      "year": 2016,
-      "media_type": "movie",
-      "direction": "before",
-      "confidence": 0.75,
-      "reason": "Zemo, imprisoned since orchestrating the Avengers' breakup here, returns as the season's main antagonist, and his family's death in Ultron's Sokovia disaster (revealed in this film) is the root of his vendetta."
-    }
-  ],
-  "can": []
-},
-{
-  "from": {
-    "media_type": "tv",
-    "tmdb_id": 122226,
-    "title": "Echo",
-    "year": 2024
-  },
-  "must": [
-    {
-      "title": "Hawkeye",
-      "year": 2021,
-      "media_type": "tv",
-      "direction": "before",
-      "confidence": 0.8,
-      "reason": "Maya Lopez shoots Kingpin and breaks from Kazi and the Tracksuit Mafia in that show's finale \u2014 the exact fallout this series picks up as she flees home to Oklahoma."
-    }
-  ],
-  "can": [
-    {
-      "title": "Marvel's Daredevil",
-      "year": 2015,
-      "media_type": "tv",
-      "confidence": 0.6,
-      "reason": "Wilson Fisk's history as Kingpin and his complicated bond with Matt Murdock, referenced throughout, comes from this earlier series."
-    }
-  ]
-},
-{
-  "from": {
-    "media_type": "tv",
-    "tmdb_id": 138501,
-    "title": "Agatha All Along",
-    "year": 2024
-  },
-  "must": [
-    {
-      "title": "WandaVision",
-      "year": 2021,
-      "media_type": "tv",
-      "direction": "before",
-      "confidence": 0.8,
-      "reason": "Agatha's true identity, her imprisonment inside the 'Agnes' persona, and the coven backstory this show unpacks are all direct continuations of her defeat here."
-    }
-  ],
-  "can": []
-},
-{
-  "from": {
-    "media_type": "tv",
-    "tmdb_id": 114471,
-    "title": "Ironheart",
-    "year": 2025
-  },
-  "must": [
-    {
-      "title": "Black Panther: Wakanda Forever",
-      "year": 2022,
-      "media_type": "movie",
-      "direction": "before",
-      "confidence": 0.8,
-      "reason": "Riri Williams and her genius-built, Iron Man-style armor are introduced in this film, which this show directly spins out of."
-    }
-  ],
-  "can": []
-},
-{
-  "from": {
-    "media_type": "tv",
-    "tmdb_id": 202555,
-    "title": "Daredevil: Born Again",
-    "year": 2025
-  },
-  "must": [
-    {
-      "title": "Marvel's Daredevil",
-      "year": 2015,
-      "media_type": "tv",
-      "direction": "before",
-      "confidence": 0.8,
-      "reason": "Direct continuation of Matt Murdock and Wilson Fisk's rivalry from this series, now folded into the mainline MCU timeline."
-    }
-  ],
-  "can": [
-    {
-      "title": "Hawkeye",
-      "year": 2021,
-      "media_type": "tv",
-      "confidence": 0.6,
-      "reason": "Kingpin's reintroduction into the mainline MCU, confirming he survived and rebuilt his power base after the Netflix series, happens in this show."
-    }
-  ]
-},
-{
-  "from": {
-    "media_type": "tv",
-    "tmdb_id": 138505,
-    "title": "Marvel Zombies",
-    "year": 2025
-  },
-  "must": [],
-  "can": [
-    {
-      "title": "What If...?",
-      "year": 2021,
-      "media_type": "tv",
-      "confidence": 0.6,
-      "reason": "Expands directly on the zombie-outbreak alternate timeline first depicted in one of this anthology's episodes."
-    }
-  ]
-},
-{
-  "from": {
-    "media_type": "movie",
-    "tmdb_id": 447365,
-    "title": "Guardians of the Galaxy Vol. 3",
-    "year": 2023
-  },
-  "must": [
-    {
-      "title": "Avengers: Endgame",
-      "year": 2019,
-      "direction": "before",
-      "confidence": 0.75,
-      "reason": "This film's Gamora is the 2014 variant pulled forward during Endgame's time heist \u2014 a version who never fell for Peter Quill and barely knows the team, which is why she's a stranger to them here."
-    }
-  ],
-  "can": []
-},
-{
-  "from": {
-    "media_type": "movie",
-    "tmdb_id": 640146,
-    "title": "Ant-Man and the Wasp: Quantumania",
-    "year": 2023
-  },
-  "must": [],
-  "can": [
-    {
-      "title": "Loki",
-      "year": 2021,
-      "media_type": "tv",
-      "confidence": 0.6,
-      "reason": "Kang the Conqueror is a new incarnation of the being first introduced as 'He Who Remains' in this show's first-season finale, which lays out the multiversal stakes this film pays off."
-    }
-  ]
-},
-{
-  "from": {
-    "media_type": "movie",
-    "tmdb_id": 348350,
-    "title": "Solo: A Star Wars Story",
-    "year": 2018
-  },
-  "must": [],
-  "can": [
-    {
-      "title": "Star Wars: The Clone Wars",
-      "year": 2008,
-      "media_type": "tv",
-      "confidence": 0.6,
-      "reason": "Darth Maul's survival after his apparent death and his fall into organized crime \u2014 the identity behind the film's hologram cameo \u2014 begins here."
+      "year": 2016
     },
-    {
-      "title": "Star Wars Rebels",
-      "year": 2014,
-      "media_type": "tv",
-      "confidence": 0.65,
-      "reason": "Continues and concludes Maul's arc as the crime lord Crimson Dawn, giving the film's final cameo its full context and stakes."
-    }
-  ]
-},
-{
-  "from": {
-    "media_type": "tv",
-    "tmdb_id": 105971,
-    "title": "Star Wars: The Bad Batch",
-    "year": 2021
+    "must": [
+      {
+        "title": "Avengers: Age of Ultron",
+        "year": 2015,
+        "direction": "before",
+        "confidence": 0.85,
+        "reason": "The Sokovia Accords that split the Avengers and drive this film's entire conflict exist because of the civilian casualties Ultron causes in Sokovia here."
+      }
+    ],
+    "can": [
+      {
+        "title": "Ant-Man",
+        "year": 2015,
+        "confidence": 0.6,
+        "reason": "Scott Lang's surprise 'Giant-Man' growth in the airport battle pays off the untested Pym Particle rules established in this film."
+      }
+    ]
   },
-  "must": [
-    {
-      "title": "Star Wars: The Clone Wars",
-      "year": 2008,
-      "media_type": "tv",
-      "direction": "before",
-      "confidence": 0.75,
-      "reason": "Clone Force 99 is introduced during that series' final arc, and this show picks up in the immediate aftermath of the Order 66 sequence depicted in its finale."
-    }
-  ],
-  "can": []
-},
-{
-  "from": {
-    "media_type": "tv",
-    "tmdb_id": 115036,
-    "title": "The Book of Boba Fett",
-    "year": 2021
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 497698,
+      "title": "Black Widow",
+      "year": 2021
+    },
+    "must": [
+      {
+        "title": "Captain America: Civil War",
+        "year": 2016,
+        "direction": "before",
+        "confidence": 0.75,
+        "reason": "Natasha is a fugitive on the run from the government here specifically because she sided with Cap during the Accords split in that film."
+      }
+    ],
+    "can": []
   },
-  "must": [
-    {
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 566525,
+      "title": "Shang-Chi and the Legend of the Ten Rings",
+      "year": 2021
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Iron Man 3",
+        "year": 2013,
+        "confidence": 0.65,
+        "reason": "The mid-credits scene explicitly contrasts Xu Wenwu's real Ten Rings organization with the fake 'Mandarin' hoax exposed in this film."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 986056,
+      "title": "Thunderbolts*",
+      "year": 2025
+    },
+    "must": [
+      {
+        "title": "Black Widow",
+        "year": 2021,
+        "direction": "before",
+        "confidence": 0.8,
+        "reason": "Yelena Belova and Alexei/Red Guardian, two of the team's core members, are introduced here with the found-family history and grief over Natasha that drives them."
+      },
+      {
+        "title": "The Falcon and the Winter Soldier",
+        "year": 2021,
+        "media_type": "tv",
+        "direction": "before",
+        "confidence": 0.8,
+        "reason": "John Walker's fall from grace as Captain America and his replacement as the government-sanctioned US Agent — the reason he's on this team at all — plays out across this show."
+      },
+      {
+        "title": "Ant-Man and the Wasp",
+        "year": 2018,
+        "direction": "before",
+        "confidence": 0.7,
+        "reason": "Ava Starr/Ghost's unstable molecular condition and tragic backstory, which the team is trying to help her survive, are established in this film."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 822119,
+      "title": "Captain America: Brave New World",
+      "year": 2025
+    },
+    "must": [
+      {
+        "title": "The Incredible Hulk",
+        "year": 2008,
+        "direction": "before",
+        "confidence": 0.75,
+        "reason": "Samuel Sterns' transformation into the Leader, and his history with General Ross's gamma experiments, is set up in this film and pays off as the villain here."
+      },
+      {
+        "title": "The Falcon and the Winter Soldier",
+        "year": 2021,
+        "media_type": "tv",
+        "direction": "before",
+        "confidence": 0.85,
+        "reason": "Sam Wilson's arc into becoming the new Captain America, and his relationship with a wronged Isaiah Bradley, is the show this film directly continues."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 88396,
+      "title": "The Falcon and the Winter Soldier",
+      "year": 2021
+    },
+    "must": [
+      {
+        "title": "Avengers: Endgame",
+        "year": 2019,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.85,
+        "reason": "Opens directly from Steve Rogers handing Sam the shield at the end of this film, and deals with the fallout of the five-year Blip it depicts."
+      },
+      {
+        "title": "Captain America: Civil War",
+        "year": 2016,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.75,
+        "reason": "Zemo, imprisoned since orchestrating the Avengers' breakup here, returns as the season's main antagonist, and his family's death in Ultron's Sokovia disaster (revealed in this film) is the root of his vendetta."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 122226,
+      "title": "Echo",
+      "year": 2024
+    },
+    "must": [
+      {
+        "title": "Hawkeye",
+        "year": 2021,
+        "media_type": "tv",
+        "direction": "before",
+        "confidence": 0.8,
+        "reason": "Maya Lopez shoots Kingpin and breaks from Kazi and the Tracksuit Mafia in that show's finale — the exact fallout this series picks up as she flees home to Oklahoma."
+      }
+    ],
+    "can": [
+      {
+        "title": "Marvel's Daredevil",
+        "year": 2015,
+        "media_type": "tv",
+        "confidence": 0.6,
+        "reason": "Wilson Fisk's history as Kingpin and his complicated bond with Matt Murdock, referenced throughout, comes from this earlier series."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 138501,
+      "title": "Agatha All Along",
+      "year": 2024
+    },
+    "must": [
+      {
+        "title": "WandaVision",
+        "year": 2021,
+        "media_type": "tv",
+        "direction": "before",
+        "confidence": 0.8,
+        "reason": "Agatha's true identity, her imprisonment inside the 'Agnes' persona, and the coven backstory this show unpacks are all direct continuations of her defeat here."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 114471,
+      "title": "Ironheart",
+      "year": 2025
+    },
+    "must": [
+      {
+        "title": "Black Panther: Wakanda Forever",
+        "year": 2022,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.8,
+        "reason": "Riri Williams and her genius-built, Iron Man-style armor are introduced in this film, which this show directly spins out of."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 202555,
+      "title": "Daredevil: Born Again",
+      "year": 2025
+    },
+    "must": [
+      {
+        "title": "Marvel's Daredevil",
+        "year": 2015,
+        "media_type": "tv",
+        "direction": "before",
+        "confidence": 0.8,
+        "reason": "Direct continuation of Matt Murdock and Wilson Fisk's rivalry from this series, now folded into the mainline MCU timeline."
+      }
+    ],
+    "can": [
+      {
+        "title": "Hawkeye",
+        "year": 2021,
+        "media_type": "tv",
+        "confidence": 0.6,
+        "reason": "Kingpin's reintroduction into the mainline MCU, confirming he survived and rebuilt his power base after the Netflix series, happens in this show."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 138505,
+      "title": "Marvel Zombies",
+      "year": 2025
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "What If...?",
+        "year": 2021,
+        "media_type": "tv",
+        "confidence": 0.6,
+        "reason": "Expands directly on the zombie-outbreak alternate timeline first depicted in one of this anthology's episodes."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 447365,
+      "title": "Guardians of the Galaxy Vol. 3",
+      "year": 2023
+    },
+    "must": [
+      {
+        "title": "Avengers: Endgame",
+        "year": 2019,
+        "direction": "before",
+        "confidence": 0.75,
+        "reason": "This film's Gamora is the 2014 variant pulled forward during Endgame's time heist — a version who never fell for Peter Quill and barely knows the team, which is why she's a stranger to them here."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 640146,
+      "title": "Ant-Man and the Wasp: Quantumania",
+      "year": 2023
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Loki",
+        "year": 2021,
+        "media_type": "tv",
+        "confidence": 0.6,
+        "reason": "Kang the Conqueror is a new incarnation of the being first introduced as 'He Who Remains' in this show's first-season finale, which lays out the multiversal stakes this film pays off."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 348350,
+      "title": "Solo: A Star Wars Story",
+      "year": 2018
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Star Wars: The Clone Wars",
+        "year": 2008,
+        "media_type": "tv",
+        "confidence": 0.6,
+        "reason": "Darth Maul's survival after his apparent death and his fall into organized crime — the identity behind the film's hologram cameo — begins here."
+      },
+      {
+        "title": "Star Wars Rebels",
+        "year": 2014,
+        "media_type": "tv",
+        "confidence": 0.65,
+        "reason": "Continues and concludes Maul's arc as the crime lord Crimson Dawn, giving the film's final cameo its full context and stakes."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 105971,
+      "title": "Star Wars: The Bad Batch",
+      "year": 2021
+    },
+    "must": [
+      {
+        "title": "Star Wars: The Clone Wars",
+        "year": 2008,
+        "media_type": "tv",
+        "direction": "before",
+        "confidence": 0.75,
+        "reason": "Clone Force 99 is introduced during that series' final arc, and this show picks up in the immediate aftermath of the Order 66 sequence depicted in its finale."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 115036,
+      "title": "The Book of Boba Fett",
+      "year": 2021
+    },
+    "must": [
+      {
+        "title": "The Mandalorian",
+        "year": 2019,
+        "media_type": "tv",
+        "direction": "before",
+        "confidence": 0.8,
+        "reason": "Boba Fett reclaims his armor and allies with Din Djarin across that show's second season, directly setting up his bid to take Jabba's throne here."
+      }
+    ],
+    "can": [
+      {
+        "title": "Return of the Jedi",
+        "year": 1983,
+        "media_type": "movie",
+        "confidence": 0.6,
+        "reason": "The show's opening flashbacks directly address how Boba Fett survived the Sarlacc pit he was presumed to die in at the end of this film."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 251091,
+      "title": "Star Wars: Tales of the Empire",
+      "year": 2024
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Ahsoka",
+        "year": 2023,
+        "media_type": "tv",
+        "confidence": 0.6,
+        "reason": "Morgan Elsbeth's backstory as a Separatist-purge survivor and her path to becoming Thrawn's ally directly precedes her role as the antagonist of that series."
+      },
+      {
+        "title": "Star Wars: The Clone Wars",
+        "year": 2008,
+        "media_type": "tv",
+        "confidence": 0.55,
+        "reason": "Barriss Offee's betrayal of the Jedi Order, dramatized in one of this show's shorts, is originally depicted across that series."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 79093,
+      "title": "Star Wars Resistance",
+      "year": 2018
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Star Wars: The Force Awakens",
+        "year": 2015,
+        "media_type": "movie",
+        "confidence": 0.55,
+        "reason": "Its final episodes run concurrently with this film, showing the First Order's attack on the Colossus platform from Kaz's side of the same timeline."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 82856,
       "title": "The Mandalorian",
-      "year": 2019,
-      "media_type": "tv",
-      "direction": "before",
-      "confidence": 0.8,
-      "reason": "Boba Fett reclaims his armor and allies with Din Djarin across that show's second season, directly setting up his bid to take Jabba's throne here."
-    }
-  ],
-  "can": [
-    {
-      "title": "Return of the Jedi",
-      "year": 1983,
-      "media_type": "movie",
-      "confidence": 0.6,
-      "reason": "The show's opening flashbacks directly address how Boba Fett survived the Sarlacc pit he was presumed to die in at the end of this film."
-    }
-  ]
-},
-{
-  "from": {
-    "media_type": "tv",
-    "tmdb_id": 251091,
-    "title": "Star Wars: Tales of the Empire",
-    "year": 2024
-  },
-  "must": [],
-  "can": [
-    {
-      "title": "Ahsoka",
-      "year": 2023,
-      "media_type": "tv",
-      "confidence": 0.6,
-      "reason": "Morgan Elsbeth's backstory as a Separatist-purge survivor and her path to becoming Thrawn's ally directly precedes her role as the antagonist of that series."
+      "year": 2019
     },
-    {
+    "must": [],
+    "can": [
+      {
+        "title": "Star Wars Rebels",
+        "year": 2014,
+        "media_type": "tv",
+        "confidence": 0.55,
+        "reason": "Ahsoka Tano's live-action debut in this show's second season draws directly on her history with Anakin/Vader and her search for Ezra Bridger chronicled in that series."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 4194,
       "title": "Star Wars: The Clone Wars",
-      "year": 2008,
+      "year": 2008
+    },
+    "must": [
+      {
+        "title": "Star Wars: Episode II - Attack of the Clones",
+        "year": 2002,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.78,
+        "reason": "Picks up immediately after this film's ending — the outbreak of the Clone Wars, Anakin and Padmé's secret marriage, and Ahsoka's assignment to Anakin all follow directly from it."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
       "media_type": "tv",
-      "confidence": 0.55,
-      "reason": "Barriss Offee's betrayal of the Jedi Order, dramatized in one of this show's shorts, is originally depicted across that series."
-    }
-  ]
-},
-{
-  "from": {
-    "media_type": "tv",
-    "tmdb_id": 79093,
-    "title": "Star Wars Resistance",
-    "year": 2018
-  },
-  "must": [],
-  "can": [
-    {
-      "title": "Star Wars: The Force Awakens",
-      "year": 2015,
-      "media_type": "movie",
-      "confidence": 0.55,
-      "reason": "Its final episodes run concurrently with this film, showing the First Order's attack on the Colossus platform from Kaz's side of the same timeline."
-    }
-  ]
-},
-{
-  "from": {
-    "media_type": "tv",
-    "tmdb_id": 82856,
-    "title": "The Mandalorian",
-    "year": 2019
-  },
-  "must": [],
-  "can": [
-    {
+      "tmdb_id": 60554,
       "title": "Star Wars Rebels",
-      "year": 2014,
-      "media_type": "tv",
-      "confidence": 0.55,
-      "reason": "Ahsoka Tano's live-action debut in this show's second season draws directly on her history with Anakin/Vader and her search for Ezra Bridger chronicled in that series."
-    }
-  ]
-},
-{
-  "from": {
-    "media_type": "tv",
-    "tmdb_id": 4194,
-    "title": "Star Wars: The Clone Wars",
-    "year": 2008
-  },
-  "must": [
-    {
-      "title": "Star Wars: Episode II - Attack of the Clones",
-      "year": 2002,
-      "media_type": "movie",
-      "direction": "before",
-      "confidence": 0.78,
-      "reason": "Picks up immediately after this film's ending \u2014 the outbreak of the Clone Wars, Anakin and Padm\u00e9's secret marriage, and Ahsoka's assignment to Anakin all follow directly from it."
-    }
-  ],
-  "can": []
-},
-{
-  "from": {
-    "media_type": "tv",
-    "tmdb_id": 60554,
-    "title": "Star Wars Rebels",
-    "year": 2014
-  },
-  "must": [],
-  "can": [
-    {
-      "title": "Star Wars: Episode III - Revenge of the Sith",
-      "year": 2005,
-      "media_type": "movie",
-      "confidence": 0.55,
-      "reason": "Set in the Empire's early years after Order 66 and Anakin's fall into Darth Vader, both depicted here, which color Kanan's trauma as a hunted Jedi survivor."
-    }
-  ]
-},
-{
-  "from": { "media_type": "tv", "tmdb_id": 60059, "title": "Better Call Saul", "year": 2015 },
-  "must": [
-    {
-      "title": "Breaking Bad",
-      "year": 2008,
-      "media_type": "tv",
-      "direction": "before",
-      "confidence": 0.8,
-      "reason": "The final season's black-and-white \"Gene\" timeline picks up in the aftermath of Breaking Bad's finale, and the last stretch of episodes leans directly on Walter White, Jesse Pinkman, and the collapse of the Heisenberg empire."
-    }
-  ],
-  "can": []
-},
-{
-  "from": { "media_type": "movie", "tmdb_id": 559969, "title": "El Camino: A Breaking Bad Movie", "year": 2019 },
-  "must": [
-    {
-      "title": "Breaking Bad",
-      "year": 2008,
-      "media_type": "tv",
-      "direction": "before",
-      "confidence": 1.0,
-      "reason": "Picks up in the minutes after the series finale, following Jesse Pinkman's escape and the immediate fallout of Walter White's death."
-    }
-  ],
-  "can": []
-},
-{
-  "from": { "media_type": "tv", "tmdb_id": 94997, "title": "House of the Dragon", "year": 2022 },
-  "must": [],
-  "can": [
-    {
-      "title": "Game of Thrones",
-      "year": 2011,
-      "media_type": "tv",
-      "confidence": 0.7,
-      "reason": "Knowing how House Targaryen's dynasty and its dragons ultimately collapse two centuries later gives the succession war and family infighting shown here a heavy layer of dramatic irony."
-    }
-  ]
-},
-{
-  "from": { "media_type": "tv", "tmdb_id": 224372, "title": "A Knight of the Seven Kingdoms", "year": 2026 },
-  "must": [],
-  "can": [
-    {
-      "title": "Game of Thrones",
-      "year": 2011,
-      "media_type": "tv",
-      "confidence": 0.65,
-      "reason": "The young squire Egg is revealed to be the future King Aegon V, an ancestor whose eventual reign and the Targaryen line's fate only carry weight once you know where that lineage ends up."
+      "year": 2014
     },
-    {
+    "must": [],
+    "can": [
+      {
+        "title": "Star Wars: Episode III - Revenge of the Sith",
+        "year": 2005,
+        "media_type": "movie",
+        "confidence": 0.55,
+        "reason": "Set in the Empire's early years after Order 66 and Anakin's fall into Darth Vader, both depicted here, which color Kanan's trauma as a hunted Jedi survivor."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 60059,
+      "title": "Better Call Saul",
+      "year": 2015
+    },
+    "must": [
+      {
+        "title": "Breaking Bad",
+        "year": 2008,
+        "media_type": "tv",
+        "direction": "before",
+        "confidence": 0.8,
+        "reason": "The final season's black-and-white \"Gene\" timeline picks up in the aftermath of Breaking Bad's finale, and the last stretch of episodes leans directly on Walter White, Jesse Pinkman, and the collapse of the Heisenberg empire."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 559969,
+      "title": "El Camino: A Breaking Bad Movie",
+      "year": 2019
+    },
+    "must": [
+      {
+        "title": "Breaking Bad",
+        "year": 2008,
+        "media_type": "tv",
+        "direction": "before",
+        "confidence": 1.0,
+        "reason": "Picks up in the minutes after the series finale, following Jesse Pinkman's escape and the immediate fallout of Walter White's death."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 94997,
       "title": "House of the Dragon",
-      "year": 2022,
-      "media_type": "tv",
-      "confidence": 0.55,
-      "reason": "Set about a century after the Dance of the Dragons civil war shown there, and Dunk and Egg's world of scattered, diminished dragons only lands with that history in mind."
-    }
-  ]
-},
-{
-  "from": { "media_type": "tv", "tmdb_id": 299167, "title": "Dutton Ranch", "year": 2026 },
-  "must": [
-    {
-      "title": "Yellowstone",
-      "year": 2018,
-      "media_type": "tv",
-      "direction": "before",
-      "confidence": 0.9,
-      "reason": "Picks up with Rip and Beth Dutton fleeing to South Texas to escape \"the ghosts of Yellowstone\" — their relationship, and what they're running from, is the whole story of that series."
-    }
-  ],
-  "can": []
-},
-{
-  "from": { "media_type": "tv", "tmdb_id": 171802, "title": "Blade Runner 2099", "year": 2026 },
-  "must": [
-    {
-      "title": "Blade Runner 2049",
-      "year": 2017,
-      "media_type": "movie",
-      "direction": "before",
-      "confidence": 0.9,
-      "reason": "Set fifty years after that film's events, in the Los Angeles it left behind, and builds directly on its unresolved questions about replicants and what became of them."
-    }
-  ],
-  "can": []
-},
-{
-  "from": { "media_type": "tv", "tmdb_id": 213562, "title": "Crystal Lake", "year": 2026 },
-  "must": [],
-  "can": [
-    {
-      "title": "Friday the 13th",
-      "year": 1980,
-      "media_type": "movie",
-      "confidence": 0.7,
-      "reason": "A prequel centered on Pam Voorhees before she becomes the killer at Camp Crystal Lake in the original film — knowing what she does there is most of this show's dramatic irony."
-    }
-  ]
-},
-{
-  "from": { "media_type": "tv", "tmdb_id": 273207, "title": "Neagley", "year": 2026 },
-  "must": [],
-  "can": [
-    {
-      "title": "Reacher",
-      "year": 2022,
-      "media_type": "tv",
-      "confidence": 0.7,
-      "reason": "Frances Neagley draws directly on everything she learned from Jack Reacher and her time in the 110th Special Investigators, introduced in that series."
-    }
-  ]
-},
-{
-  "from": { "media_type": "tv", "tmdb_id": 124394, "title": "Power Book III: Raising Kanan", "year": 2021 },
-  "must": [],
-  "can": [
-    {
-      "title": "Power",
-      "year": 2014,
-      "media_type": "tv",
-      "confidence": 0.7,
-      "reason": "A prequel to Power following Kanan Stark's coming of age — knowing the ruthless man he eventually becomes there gives this origin story its weight."
-    }
-  ]
-},
-{
-  "from": { "media_type": "tv", "tmdb_id": 220102, "title": "Spider-Noir", "year": 2026 },
-  "must": [],
-  "can": [
-    {
-      "title": "Spider-Man: Into the Spider-Verse",
-      "year": 2018,
-      "media_type": "movie",
-      "confidence": 0.6,
-      "reason": "Built around the Spider-Man Noir persona that film introduced — an aging, hard-boiled 1930s version of Spider-Man now living as a washed-up private eye."
-    }
-  ]
-},
-{
-  "from": { "media_type": "tv", "tmdb_id": 103516, "title": "Star Trek: Strange New Worlds", "year": 2022 },
-  "must": [],
-  "can": [
-    {
-      "title": "Star Trek: Discovery",
-      "year": 2017,
-      "media_type": "tv",
-      "confidence": 0.55,
-      "reason": "Pike, Spock, and Number One were introduced as this era's Enterprise crew during that series' second season before spinning off into their own show here."
-    }
-  ]
-},
-{
-  "from": { "media_type": "tv", "tmdb_id": 284833, "title": "Avatar: Seven Havens", "year": 2026 },
-  "must": [],
-  "can": [
-    {
-      "title": "The Legend of Korra",
-      "year": 2012,
-      "media_type": "tv",
-      "confidence": 0.75,
-      "reason": "Set as the direct successor to Korra as Avatar — the new Avatar's fraught reception as \"humanity's destroyer\" only makes sense against how Korra's era and legacy ended."
+      "year": 2022
     },
-    {
-      "title": "Avatar: The Last Airbender",
-      "year": 2005,
+    "must": [],
+    "can": [
+      {
+        "title": "Game of Thrones",
+        "year": 2011,
+        "media_type": "tv",
+        "confidence": 0.7,
+        "reason": "Knowing how House Targaryen's dynasty and its dragons ultimately collapse two centuries later gives the succession war and family infighting shown here a heavy layer of dramatic irony."
+      }
+    ]
+  },
+  {
+    "from": {
       "media_type": "tv",
-      "confidence": 0.5,
-      "reason": "Establishes the Avatar cycle, bending, and the spirit world this story's entire premise is built on."
-    }
-  ]
-},
-{
-  "from": { "media_type": "tv", "tmdb_id": 84773, "title": "The Lord of the Rings: The Rings of Power", "year": 2022 },
-  "must": [],
-  "can": [
-    {
-      "title": "The Lord of the Rings: The Fellowship of the Ring",
-      "year": 2001,
-      "media_type": "movie",
-      "confidence": 0.6,
-      "reason": "Set thousands of years earlier, so knowing how Sauron, the One Ring, and the fates of Elrond and Galadriel eventually play out gives this show's forging of the Rings real dramatic irony."
-    }
-  ]
-},
-{
-  "from": { "media_type": "tv", "tmdb_id": 219760, "title": "The Terminal List: Dark Wolf", "year": 2025 },
-  "must": [],
-  "can": [
-    {
-      "title": "The Terminal List",
-      "year": 2022,
+      "tmdb_id": 224372,
+      "title": "A Knight of the Seven Kingdoms",
+      "year": 2026
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Game of Thrones",
+        "year": 2011,
+        "media_type": "tv",
+        "confidence": 0.65,
+        "reason": "The young squire Egg is revealed to be the future King Aegon V, an ancestor whose eventual reign and the Targaryen line's fate only carry weight once you know where that lineage ends up."
+      },
+      {
+        "title": "House of the Dragon",
+        "year": 2022,
+        "media_type": "tv",
+        "confidence": 0.55,
+        "reason": "Set about a century after the Dance of the Dragons civil war shown there, and Dunk and Egg's world of scattered, diminished dragons only lands with that history in mind."
+      }
+    ]
+  },
+  {
+    "from": {
       "media_type": "tv",
-      "confidence": 0.65,
-      "reason": "A prequel following Ben Edwards' descent into CIA black ops — seeing where that path leaves him recontextualizes his role alongside James Reece in the original series."
-    }
-  ]
-},
-{
-  "from": { "media_type": "tv", "tmdb_id": 194583, "title": "The Walking Dead: Dead City", "year": 2023 },
-  "must": [
-    {
-      "title": "The Walking Dead",
-      "year": 2010,
+      "tmdb_id": 299167,
+      "title": "Dutton Ranch",
+      "year": 2026
+    },
+    "must": [
+      {
+        "title": "Yellowstone",
+        "year": 2018,
+        "media_type": "tv",
+        "direction": "before",
+        "confidence": 0.9,
+        "reason": "Picks up with Rip and Beth Dutton fleeing to South Texas to escape \"the ghosts of Yellowstone\" — their relationship, and what they're running from, is the whole story of that series."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
       "media_type": "tv",
-      "direction": "before",
-      "confidence": 0.85,
-      "reason": "Maggie and Negan are forced together despite Negan murdering Maggie's husband Glenn — that history, and the fragile truce built after it, is the entire tension driving this series."
-    }
-  ],
-  "can": []
-},
-{
-  "from": { "media_type": "tv", "tmdb_id": 304842, "title": "The Drop: A Snowfall Saga", "year": 2026 },
-  "must": [],
-  "can": [
-    {
-      "title": "Snowfall",
-      "year": 2017,
+      "tmdb_id": 171802,
+      "title": "Blade Runner 2099",
+      "year": 2026
+    },
+    "must": [
+      {
+        "title": "Blade Runner 2049",
+        "year": 2017,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.9,
+        "reason": "Set fifty years after that film's events, in the Los Angeles it left behind, and builds directly on its unresolved questions about replicants and what became of them."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
       "media_type": "tv",
-      "confidence": 0.55,
-      "reason": "A follow-on saga in the same Los Angeles street-economy world Snowfall built around the 1980s crack epidemic, now moving into the exploitation of the 1990s rap industry."
-    }
-  ]
-}
+      "tmdb_id": 213562,
+      "title": "Crystal Lake",
+      "year": 2026
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Friday the 13th",
+        "year": 1980,
+        "media_type": "movie",
+        "confidence": 0.7,
+        "reason": "A prequel centered on Pam Voorhees before she becomes the killer at Camp Crystal Lake in the original film — knowing what she does there is most of this show's dramatic irony."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 273207,
+      "title": "Neagley",
+      "year": 2026
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Reacher",
+        "year": 2022,
+        "media_type": "tv",
+        "confidence": 0.7,
+        "reason": "Frances Neagley draws directly on everything she learned from Jack Reacher and her time in the 110th Special Investigators, introduced in that series."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 124394,
+      "title": "Power Book III: Raising Kanan",
+      "year": 2021
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Power",
+        "year": 2014,
+        "media_type": "tv",
+        "confidence": 0.7,
+        "reason": "A prequel to Power following Kanan Stark's coming of age — knowing the ruthless man he eventually becomes there gives this origin story its weight."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 220102,
+      "title": "Spider-Noir",
+      "year": 2026
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Spider-Man: Into the Spider-Verse",
+        "year": 2018,
+        "media_type": "movie",
+        "confidence": 0.6,
+        "reason": "Built around the Spider-Man Noir persona that film introduced — an aging, hard-boiled 1930s version of Spider-Man now living as a washed-up private eye."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 103516,
+      "title": "Star Trek: Strange New Worlds",
+      "year": 2022
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Star Trek: Discovery",
+        "year": 2017,
+        "media_type": "tv",
+        "confidence": 0.55,
+        "reason": "Pike, Spock, and Number One were introduced as this era's Enterprise crew during that series' second season before spinning off into their own show here."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 284833,
+      "title": "Avatar: Seven Havens",
+      "year": 2026
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "The Legend of Korra",
+        "year": 2012,
+        "media_type": "tv",
+        "confidence": 0.75,
+        "reason": "Set as the direct successor to Korra as Avatar — the new Avatar's fraught reception as \"humanity's destroyer\" only makes sense against how Korra's era and legacy ended."
+      },
+      {
+        "title": "Avatar: The Last Airbender",
+        "year": 2005,
+        "media_type": "tv",
+        "confidence": 0.5,
+        "reason": "Establishes the Avatar cycle, bending, and the spirit world this story's entire premise is built on."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 84773,
+      "title": "The Lord of the Rings: The Rings of Power",
+      "year": 2022
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "The Lord of the Rings: The Fellowship of the Ring",
+        "year": 2001,
+        "media_type": "movie",
+        "confidence": 0.6,
+        "reason": "Set thousands of years earlier, so knowing how Sauron, the One Ring, and the fates of Elrond and Galadriel eventually play out gives this show's forging of the Rings real dramatic irony."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 219760,
+      "title": "The Terminal List: Dark Wolf",
+      "year": 2025
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "The Terminal List",
+        "year": 2022,
+        "media_type": "tv",
+        "confidence": 0.65,
+        "reason": "A prequel following Ben Edwards' descent into CIA black ops — seeing where that path leaves him recontextualizes his role alongside James Reece in the original series."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 194583,
+      "title": "The Walking Dead: Dead City",
+      "year": 2023
+    },
+    "must": [
+      {
+        "title": "The Walking Dead",
+        "year": 2010,
+        "media_type": "tv",
+        "direction": "before",
+        "confidence": 0.85,
+        "reason": "Maggie and Negan are forced together despite Negan murdering Maggie's husband Glenn — that history, and the fragile truce built after it, is the entire tension driving this series."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 304842,
+      "title": "The Drop: A Snowfall Saga",
+      "year": 2026
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Snowfall",
+        "year": 2017,
+        "media_type": "tv",
+        "confidence": 0.55,
+        "reason": "A follow-on saga in the same Los Angeles street-economy world Snowfall built around the 1980s crack epidemic, now moving into the exploitation of the 1990s rap industry."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 110492,
+      "title": "Peacemaker",
+      "year": 2022
+    },
+    "must": [
+      {
+        "title": "The Suicide Squad",
+        "year": 2021,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.9,
+        "reason": "Peacemaker survives the climactic battle here and the series picks up shortly after, with Task Force X, Amanda Waller, and the fallout of the mission all carried straight over."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "tv",
+      "tmdb_id": 1429,
+      "title": "Attack on Titan",
+      "year": 2013
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Attack on Titan: Crimson Bow and Arrow",
+        "year": 2014,
+        "media_type": "movie",
+        "confidence": 0.9,
+        "reason": "A theatrical recap of the TV series' first story arc, re-edited from the same episodes -- nothing here that watching Season 1 doesn't already cover."
+      },
+      {
+        "title": "Attack on Titan II: End of the World",
+        "year": 2015,
+        "media_type": "movie",
+        "confidence": 0.9,
+        "reason": "The second half of the two-part theatrical recap that began with Crimson Bow and Arrow, covering the rest of Season 1 from the same footage."
+      },
+      {
+        "title": "Attack on Titan: Wings of Freedom",
+        "year": 2015,
+        "media_type": "movie",
+        "confidence": 0.85,
+        "reason": "A later recut combining Crimson Bow and Arrow and End of the World into a single film -- the same Season 1 story again, not new content."
+      },
+      {
+        "title": "Attack on Titan: Chronicle",
+        "year": 2020,
+        "media_type": "movie",
+        "confidence": 0.9,
+        "reason": "TMDB's own summary calls this the series' fourth recap movie, retelling episodes 1-59 -- the first three seasons compiled, not continued."
+      },
+      {
+        "title": "Attack on Titan: THE LAST ATTACK",
+        "year": 2024,
+        "media_type": "movie",
+        "confidence": 0.85,
+        "reason": "A theatrical omnibus of the final two TV episodes, released as the franchise's last theatrical cut -- the same ending the show already aired."
+      }
+    ]
+  }
 ]
