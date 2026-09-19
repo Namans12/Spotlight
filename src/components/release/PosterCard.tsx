@@ -58,7 +58,12 @@ export function PosterCard({
   const posterImg = tmdbPosterFluid(item.posterUrl);
 
   const poster = (
-    <div className={`group relative ${className}`}>
+    // flex-col + h-full so a card with no provider/reason line doesn't leave
+    // its action row sitting higher than a neighbour's in the same grid row —
+    // both PosterRow and ReleaseGrid stretch every card to the row's tallest,
+    // and mt-auto below pins the actions to that shared bottom edge instead
+    // of wherever the optional text above happens to end.
+    <div className={`group relative flex flex-col h-full ${className}`}>
       <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-secondary">
         {posterImg ? (
           <img
@@ -142,7 +147,7 @@ export function PosterCard({
           completely unreachable on touch devices and undiscoverable on desktop,
           which read as "there's no way to add anything". */}
       {hasActions && (
-        <div className="flex items-center gap-1.5 mt-2">
+        <div className="flex items-center gap-1.5 pt-2 mt-auto">
           {onAddToWatchlist && (
             <ActionButton
               onClick={onAddToWatchlist}
