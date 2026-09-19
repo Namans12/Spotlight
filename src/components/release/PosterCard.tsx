@@ -110,11 +110,14 @@ export function PosterCard({
         {watched && <WatchedBadge />}
       </div>
 
-      {/* min-h reserves 2 lines regardless of actual title length — without it,
-          a one-line title's metadata row and Add button sit higher than a
-          neighbouring two-line title's in the same grid row, since each card's
-          height was otherwise driven by its own content. */}
-      <h4 className="mt-2 min-h-[2.25rem] text-xs font-medium text-foreground line-clamp-2 leading-tight">
+      {/* h-9 (fixed, not min-h) reserves exactly 2 lines regardless of actual
+          title length — without it, a one-line title's metadata row and Add
+          button sit higher than a neighbouring two-line title's in the same
+          grid row. It's a hard cap rather than a floor so a long, hard-to-wrap
+          title can never push a partial third line past the box and into the
+          metadata row below; break-words guards the same edge for a single
+          overlong word. */}
+      <h4 className="mt-2 h-9 text-xs font-medium text-foreground line-clamp-2 leading-tight break-words">
         {item.title}
       </h4>
       <div className="flex items-center gap-1.5 mt-0.5 leading-none">
