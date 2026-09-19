@@ -54,3 +54,24 @@ export function useRuntimes(items: ProviderSubject[]): RuntimeLookup {
   const map = query.data?.runtimes;
   return (mediaType: string, tmdbId: number): number | undefined => map?.[providerKey(mediaType, tmdbId)];
 }
+
+/** Genre names, from that same one batch. Used by the year in review, which
+ *  needs a genre for every saved title and would otherwise make one detail
+ *  request per title to learn something the batch already fetched. */
+export type GenresLookup = (mediaType: string, tmdbId: number) => string[] | undefined;
+
+export function useGenres(items: ProviderSubject[]): GenresLookup {
+  const keys = items.map((i) => ({ mediaType: i.mediaType, id: i.id }));
+  const cacheKey = keys.map((k) => providerKey(k.mediaType, k.id)).sort().join(',');
+
+  // Same queryKey again — three hooks over the same items, one request.
+  const query = useQuery({
+    queryKey: ['providers', cacheKey],
+    queryFn: () => fetchProvidersBatch(keys),
+    enabled: keys.length > 0,
+    staleTime: 6 * 60 * 60_000,
+  });
+
+  const map = query.data?.genres;
+  return (mediaType: string, tmdbId: number): string[] | undefined => map?.[providerKey(mediaType, tmdbId)];
+}

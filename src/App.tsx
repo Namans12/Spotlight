@@ -22,6 +22,7 @@ const TitleDetail = lazy(() => import('./routes/TitleDetail'));
 const TitleConnections = lazy(() => import('./routes/TitleConnections'));
 const PersonDetail = lazy(() => import('./routes/PersonDetail'));
 const Login = lazy(() => import('./routes/Login'));
+const Wrapped = lazy(() => import('./routes/Wrapped'));
 const ListLayout = lazy(() => import('./routes/list/ListLayout'));
 const Watchlist = lazy(() => import('./routes/list/Watchlist'));
 const WatchLater = lazy(() => import('./routes/list/WatchLater'));
@@ -57,6 +58,14 @@ const App = () => (
                     <Route path="/title/:type/:id/connections" element={<TitleConnections />} />
                     <Route path="/person/:id" element={<PersonDetail />} />
                     <Route path="/login" element={<Login />} />
+                    <Route
+                      path="/wrapped"
+                      element={
+                        <RequireAuth>
+                          <Wrapped />
+                        </RequireAuth>
+                      }
+                    />
                     <Route
                       path="/list"
                       element={
