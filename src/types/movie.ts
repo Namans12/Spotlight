@@ -41,4 +41,6 @@ export interface WatchlistState {
   customListItems: Record<number, WatchlistItem[]>;
   /** Series progress, keyed "tv:1396". Arrives with the list. */
   progress: Record<string, { season: number; episode: number }>;
+  /** Thumbs, keyed "movie:920". Absent means no opinion, not indifference. */
+  opinions: Record<string, boolean>;
 }

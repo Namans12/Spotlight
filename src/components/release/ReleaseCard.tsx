@@ -11,6 +11,9 @@ interface ReleaseCardProps {
   onMarkWatched?: () => void;
   onRemove?: () => void;
   onAddToList?: () => void;
+  /** Rendered at the end of the action row. Used by the Watched list for
+   * the thumbs, which only make sense once a title has been seen. */
+  extraActions?: React.ReactNode;
   compact?: boolean;
   showActions?: boolean;
   dragHandle?: React.ReactNode;
@@ -29,6 +32,7 @@ interface ReleaseCardProps {
 export function ReleaseCard({
   item, onAddToWatchlist, onAddToWatchLater, onMarkWatched,
   onRemove, onAddToList, compact, showActions = true, dragHandle, index, linkTo, seasons, providers,
+  extraActions,
 }: ReleaseCardProps) {
   const year = item.releaseDate?.slice(0, 4);
   const providerLabel = (providers ?? item.providers ?? []).slice(0, 3).join(", ");
@@ -120,6 +124,7 @@ export function ReleaseCard({
                 successClassName="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg bg-watched/20 text-watched text-[11px] font-semibold leading-none"
               />
             )}
+            {extraActions}
             {onAddToList && (
               <button
                 onClick={onAddToList}

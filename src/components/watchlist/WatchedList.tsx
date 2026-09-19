@@ -3,6 +3,8 @@ import { ReleaseCard } from '@/components/release/ReleaseCard';
 import { fromMovie } from '@/types/digest';
 import { useSeasons } from '@/hooks/useSeasons';
 import { useProviders } from '@/hooks/useProviders';
+import { TasteThumbs } from '@/components/watchlist/TasteThumbs';
+import { useWatchlistContext } from '@/contexts/WatchlistContext';
 import { Trophy } from 'lucide-react';
 
 interface WatchedListProps {
@@ -16,6 +18,10 @@ interface WatchedListProps {
 export function WatchedList({ items, onRemove, onMoveBack, onAddToWatchLater, onAddToList }: WatchedListProps) {
   const seasonsFor = useSeasons(items);
   const providersFor = useProviders(items);
+  // This is the one screen where every row is, by definition, something the
+  // reader has finished — so it is the only place a thumb can be offered in
+  // bulk without asking about things nobody has seen.
+  const wl = useWatchlistContext();
 
   if (items.length === 0) {
     return (
@@ -40,6 +46,13 @@ export function WatchedList({ items, onRemove, onMoveBack, onAddToWatchLater, on
           onAddToWatchlist={() => onMoveBack(item.dbId)}
           onAddToWatchLater={() => onAddToWatchLater(item.dbId)}
           onAddToList={onAddToList ? () => onAddToList(item.dbId) : undefined}
+          extraActions={
+            <TasteThumbs
+              size="sm"
+              opinion={wl.opinionFor(item.mediaType, item.id)}
+              onSet={(liked) => wl.setOpinion(item.mediaType, item.id, liked)}
+            />
+          }
         />
       ))}
     </div>

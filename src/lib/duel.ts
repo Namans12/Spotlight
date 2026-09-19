@@ -1,5 +1,7 @@
-import type { Movie } from '@/types/movie';
 import { RUNTIME_BANDS } from '@/lib/watchNow';
+import { attributeKeys, type Attributed } from '@/lib/titleAttributes';
+
+export { attributeKeys };
 
 /**
  * "I don't know what to watch."
@@ -21,12 +23,9 @@ import { RUNTIME_BANDS } from '@/lib/watchNow';
  * round three.
  */
 
-export interface DuelCandidate extends Movie {
-  /** From the providers batch, which already carries both. Absent is fine —
-   *  an attribute nobody knows simply casts no vote. */
-  genres?: string[];
-  runtime?: number;
-}
+/** A title plus the two fields the providers batch carries for free. Absent
+ *  is fine — an attribute nobody knows simply casts no vote. */
+export type DuelCandidate = Attributed;
 
 /** Accumulated evidence, keyed "genre:Thriller", "lang:hi", "decade:2010s". */
 export type Weights = Record<string, number>;
@@ -40,41 +39,6 @@ export interface DuelPick {
  *  binary choices distinguish 32 outcomes, which is far more resolution than
  *  a pool of two dozen needs. */
 export const DUEL_ROUNDS = 5;
-
-function decadeOf(releaseDate: string | undefined): string | null {
-  if (!releaseDate || releaseDate.length < 4) return null;
-  const year = Number(releaseDate.slice(0, 4));
-  if (!Number.isFinite(year)) return null;
-  return `${Math.floor(year / 10) * 10}s`;
-}
-
-function runtimeBandOf(runtime: number | undefined): string | null {
-  if (!runtime) return null;
-  return RUNTIME_BANDS.find((band) => runtime >= band.min && runtime < band.max)?.id ?? null;
-}
-
-/**
- * The things about a title that a preference could be *about*.
- *
- * Deliberately coarse. "Thriller" and "2010s" are things someone can have a
- * taste in; a vote average or a TMDB id is not, and including finer attributes
- * would let the scoring latch onto coincidences — with five picks there is not
- * enough signal to support more than a handful of dimensions.
- */
-export function attributeKeys(candidate: DuelCandidate): string[] {
-  const keys: string[] = [];
-  for (const genre of candidate.genres ?? []) keys.push(`genre:${genre}`);
-  if (candidate.originalLanguage) keys.push(`lang:${candidate.originalLanguage}`);
-  keys.push(`type:${candidate.mediaType}`);
-
-  const decade = decadeOf(candidate.releaseDate);
-  if (decade) keys.push(`decade:${decade}`);
-
-  const band = runtimeBandOf(candidate.runtime);
-  if (band) keys.push(`runtime:${band}`);
-
-  return keys;
-}
 
 /**
  * Updates the evidence from one choice.

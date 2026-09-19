@@ -35,6 +35,10 @@ export interface ProgressDTO {
 /** Keyed "tv:1396", the same shape the ratings and providers caches use. */
 export type ProgressMap = Record<string, { season: number; episode: number }>;
 
+/** Keyed "movie:920"; true for liked, false for disliked. A title nobody has
+ *  an opinion about is absent, which is not the same as indifferent. */
+export type OpinionMap = Record<string, boolean>;
+
 export interface WatchlistStateDTO {
   watchlist: WatchlistItemDTO[];
   watchLater: WatchlistItemDTO[];
@@ -44,6 +48,9 @@ export interface WatchlistStateDTO {
   /** Series progress, delivered with the list rather than as a second request:
    *  it is read on exactly the same screens and is a handful of rows. */
   progress: ProgressMap;
+  /** Thumbs, same reasoning — and the taste profile needs all of them at once
+   *  rather than one at a time. */
+  opinions: OpinionMap;
 }
 
 export interface AddWatchlistItemBody {

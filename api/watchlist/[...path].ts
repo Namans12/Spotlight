@@ -3,6 +3,7 @@ import { getDb } from "../../lib/db.js";
 import { requireUserId } from "../../lib/auth.js";
 import { getWatchlistState, addWatchlistItem, reorderBucket, createCustomList } from "../../lib/watchlistDb.js";
 import { setProgress, clearProgress } from "../../lib/progressDb.js";
+import { setOpinion, clearOpinion } from "../../lib/opinionsDb.js";
 import type { AddWatchlistItemBody, Bucket } from "../../shared/types/watchlist.js";
 
 // Catch-all for the FLAT /api/watchlist/* routes (state, items, reorder,
@@ -102,6 +103,37 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       }
 
       await setProgress(sql, userId, { tmdbId, mediaType, season, episode });
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // /api/watchlist/opinion — did this account like it?
+    //
+    // Here rather than in its own file for the same reason progress is: the
+    // deployment sits at Vercel Hobby's 12-function cap, and the read already
+    // arrives with GET /state.
+    //
+    // `liked: null` withdraws the opinion rather than storing a third state.
+    // "I have not said" is the absence of evidence; a stored neutral would be
+    // a data point the taste profile has to weigh, and nobody means it.
+    if (segments.length === 1 && segments[0] === "opinion") {
+      if (req.method !== "POST") return sendJson(res, 405, { error: "method not allowed" });
+      const body = JSON.parse(await readBody(req));
+      const tmdbId = Number(body?.tmdbId);
+      const mediaType = body?.mediaType;
+
+      if (!Number.isFinite(tmdbId) || tmdbId <= 0 || (mediaType !== "movie" && mediaType !== "tv")) {
+        return sendJson(res, 400, { error: "tmdbId and mediaType (movie|tv) are required" });
+      }
+
+      if (body.liked === null) {
+        await clearOpinion(sql, userId, tmdbId, mediaType);
+        return sendJson(res, 200, { ok: true });
+      }
+      if (typeof body.liked !== "boolean") {
+        return sendJson(res, 400, { error: "liked must be true, false, or null to clear" });
+      }
+
+      await setOpinion(sql, userId, tmdbId, mediaType, body.liked);
       return sendJson(res, 200, { ok: true });
     }
 

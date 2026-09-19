@@ -51,6 +51,11 @@ export const watchlistStub = {
   progress: {} as Record<string, { season: number; episode: number }>,
   progressFor: vi.fn((_tmdbId: number) => null as { season: number; episode: number } | null),
   setProgress: vi.fn(),
+  advanceProgress: vi.fn(),
+
+  opinions: {} as Record<string, boolean>,
+  opinionFor: vi.fn((_mediaType: string, _tmdbId: number) => null as boolean | null),
+  setOpinion: vi.fn(),
 };
 
 /** Call from `beforeEach`. Resets call history and the "nothing is seen"
@@ -63,6 +68,8 @@ export function resetWatchlistStub() {
   }
   watchlistStub.isWatched.mockReturnValue(false);
   watchlistStub.progressFor.mockReturnValue(null);
+  watchlistStub.opinionFor.mockReturnValue(null);
+  watchlistStub.opinions = {};
   watchlistStub.watched = [];
   watchlistStub.watchedKeys = new Set<string>();
   watchlistStub.progress = {};
