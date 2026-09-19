@@ -1777,18 +1777,11 @@
         "reason": "A theatrical recap of the TV series' first story arc, re-edited from the same episodes -- nothing here that watching Season 1 doesn't already cover."
       },
       {
-        "title": "Attack on Titan II: End of the World",
-        "year": 2015,
-        "media_type": "movie",
-        "confidence": 0.9,
-        "reason": "The second half of the two-part theatrical recap that began with Crimson Bow and Arrow, covering the rest of Season 1 from the same footage."
-      },
-      {
         "title": "Attack on Titan: Wings of Freedom",
         "year": 2015,
         "media_type": "movie",
         "confidence": 0.85,
-        "reason": "A later recut combining Crimson Bow and Arrow and End of the World into a single film -- the same Season 1 story again, not new content."
+        "reason": "The second half of the same two-part theatrical release Crimson Bow and Arrow began -- its own Japanese title translates to \"Part 2\" -- covering the rest of Season 1 from the same footage, not new content."
       },
       {
         "title": "Attack on Titan: Chronicle",
@@ -1803,6 +1796,13 @@
         "media_type": "movie",
         "confidence": 0.85,
         "reason": "A theatrical omnibus of the final two TV episodes, released as the franchise's last theatrical cut -- the same ending the show already aired."
+      },
+      {
+        "title": "Attack on Titan: The Roar of Awakening",
+        "year": 2018,
+        "media_type": "movie",
+        "confidence": 0.85,
+        "reason": "A theatrical recap covering the Wall Rose invasion arc -- early Season 2 material, not a continuation beyond it."
       }
     ]
   },
