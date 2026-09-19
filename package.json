@@ -10,7 +10,7 @@
     "build": "vite build && tsx scripts/prerender.ts",
     "preview": "vite preview",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.deploy.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -64,5 +64,9 @@
     "vite": "^5.4.19",
     "vite-plugin-pwa": "^0.21.1",
     "vitest": "^2.1.9"
+  },
+  "allowScripts": {
+    "@swc/core": true,
+    "esbuild": true
   }
 }
