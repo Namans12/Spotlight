@@ -174,6 +174,8 @@ export default function Search() {
             providers={providersFor(movie.mediaType, movie.id)}
             onAddToWatchlist={() => wl.addToWatchlist(movie)}
             onAddToWatchLater={() => wl.addToWatchLater(movie)}
+            onToggleWatched={() => wl.toggleWatched(movie)}
+            watched={wl.isWatched(movie.mediaType, movie.id)}
           />
         ))}
       </div>

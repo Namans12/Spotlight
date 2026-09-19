@@ -30,6 +30,8 @@ export function ReleaseGrid({ items, linkBase, ratingFor }: ReleaseGridProps) {
           // main page offered no way to save anything.
           onAddToWatchlist={() => wl.addToWatchlist(toMovie(item))}
           onAddToWatchLater={() => wl.addToWatchLater(toMovie(item))}
+          onToggleWatched={() => wl.toggleWatched(toMovie(item))}
+          watched={wl.isWatched(item.mediaType, item.id)}
         />
       ))}
     </div>

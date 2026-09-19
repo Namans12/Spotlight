@@ -225,6 +225,8 @@ export default function Browse() {
                 className="flex-shrink-0 w-[130px] sm:w-[150px]"
                 onAddToWatchlist={() => wl.addToWatchlist(movie)}
                 onAddToWatchLater={() => wl.addToWatchLater(movie)}
+                onToggleWatched={() => wl.toggleWatched(movie)}
+                watched={wl.isWatched(movie.mediaType, movie.id)}
               />
             ))}
           </div>
@@ -248,6 +250,8 @@ export default function Browse() {
                 className="flex-shrink-0 w-[130px] sm:w-[150px]"
                 onAddToWatchlist={() => wl.addToWatchlist(movie)}
                 onAddToWatchLater={() => wl.addToWatchLater(movie)}
+                onToggleWatched={() => wl.toggleWatched(movie)}
+                watched={wl.isWatched(movie.mediaType, movie.id)}
               />
             ))}
           </div>
@@ -277,6 +281,8 @@ export default function Browse() {
                 className="flex-shrink-0 w-[130px] sm:w-[150px]"
                 onAddToWatchlist={() => wl.addToWatchlist(movie)}
                 onAddToWatchLater={() => wl.addToWatchLater(movie)}
+                onToggleWatched={() => wl.toggleWatched(movie)}
+                watched={wl.isWatched(movie.mediaType, movie.id)}
               />
             ))}
           </div>
