@@ -231,6 +231,11 @@ export const STATIC_ROUTE_META: Record<string, { title: string; description: str
     description:
       "What you saved, what you watched, and how long it took — your year on Spotlight, counted from your own watchlist.",
   },
+  "/duel": {
+    title: "Can't decide what to watch? Pick one | Spotlight",
+    description:
+      "Two posters, five rounds, one answer. No questionnaires and no fixed list — the choices come from what's streaming now and what you've saved.",
+  },
   "/search": {
     title: "Search films and series | Spotlight",
     description: "Search any film or series to find where to stream it in India, its ratings, and its watch order.",
