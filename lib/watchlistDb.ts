@@ -6,6 +6,7 @@ import type {
   AddWatchlistItemBody,
   Bucket,
 } from "../shared/types/watchlist.js";
+import { getProgressForUser } from "./progressDb.js";
 
 // Every query here is scoped to one signed-in user's rows. That scoping is
 // deliberately on every write, not just the reads: dbId (BIGSERIAL) is a
@@ -41,6 +42,10 @@ function toListDTO(row: any): CustomListDTO {
 export async function getWatchlistState(sql: postgres.Sql<any>, userId: number): Promise<WatchlistStateDTO> {
   const rows = await sql`SELECT * FROM watchlist_items WHERE user_id = ${userId} ORDER BY sort_order ASC`;
   const listRows = await sql`SELECT * FROM custom_lists WHERE user_id = ${userId} ORDER BY created_at ASC`;
+  // Part of the same state, fetched with it. A separate request would load on
+  // exactly the same screens a moment later and make every TV card pop from
+  // "not started" to "S2 E4" after the list had already painted.
+  const progress = await getProgressForUser(sql, userId);
 
   const state: WatchlistStateDTO = {
     watchlist: [],
@@ -48,6 +53,7 @@ export async function getWatchlistState(sql: postgres.Sql<any>, userId: number):
     watched: [],
     customLists: listRows.map(toListDTO),
     customListItems: {},
+    progress,
   };
 
   for (const row of rows) {

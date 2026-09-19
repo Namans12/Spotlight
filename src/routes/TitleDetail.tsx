@@ -20,6 +20,7 @@ import { tmdbBackdrop, tmdbPoster } from '@/lib/tmdbImage';
 import { formatRuntime, formatRuntimeLong } from '@/lib/format';
 import { CastRow } from '@/components/title/CastRow';
 import { FactsPanel } from '@/components/title/FactsPanel';
+import { SeasonProgress } from '@/components/title/SeasonProgress';
 import {
   ArrowLeft,
   Star,
@@ -329,6 +330,17 @@ export default function TitleDetail() {
             </button>
           )}
         </div>
+      )}
+
+      {/* Series only, and only for someone signed in: progress is a personal
+          fact with nowhere to live otherwise. */}
+      {data.mediaType === 'tv' && isAuthenticated && (
+        <SeasonProgress
+          seasons={data.seasons}
+          progress={wl.progressFor(tmdbId)}
+          onSet={(season, episode) => wl.setProgress(tmdbId, season, episode)}
+          onAdvance={() => wl.advanceProgress(tmdbId, data.seasons)}
+        />
       )}
 
       <FactsPanel detail={data} />

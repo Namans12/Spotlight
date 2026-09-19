@@ -1,3 +1,5 @@
+import type { SeasonSummary } from '@/lib/progress';
+
 export interface TitleDetail {
   id: number;
   mediaType: 'movie' | 'tv';
@@ -18,6 +20,9 @@ export interface TitleDetail {
   numberOfSeasons: number | null;
   /** TV only. */
   numberOfEpisodes: number | null;
+  /** TV only. Season 0 ("Specials") is included as TMDB sends it; the
+   *  exclusion happens in src/lib/progress.ts. */
+  seasons: SeasonSummary[];
   tagline: string | null;
   status: string | null;
   /** Age rating plus the country whose board issued it. */

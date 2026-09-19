@@ -47,6 +47,10 @@ export const watchlistStub = {
 
   isWatched: vi.fn((_mediaType: string, _tmdbId: number) => false),
   watchedKeys: new Set<string>(),
+
+  progress: {} as Record<string, { season: number; episode: number }>,
+  progressFor: vi.fn((_tmdbId: number) => null as { season: number; episode: number } | null),
+  setProgress: vi.fn(),
 };
 
 /** Call from `beforeEach`. Resets call history and the "nothing is seen"
@@ -58,6 +62,8 @@ export function resetWatchlistStub() {
     }
   }
   watchlistStub.isWatched.mockReturnValue(false);
+  watchlistStub.progressFor.mockReturnValue(null);
   watchlistStub.watched = [];
   watchlistStub.watchedKeys = new Set<string>();
+  watchlistStub.progress = {};
 }
