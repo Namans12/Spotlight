@@ -51,3 +51,20 @@ export function renameCustomList(id: number, name: string): Promise<CustomListDT
 export function deleteCustomList(id: number) {
   return req(`/api/watchlist/lists/${id}`, { method: "DELETE" });
 }
+
+/**
+ * Records where you are in a series, or forgets the show entirely.
+ *
+ * `season: null` clears rather than writing a zero — "not started" is the
+ * absence of a pointer, so there is no value to set it to.
+ */
+export function setTitleProgress(
+  tmdbId: number,
+  season: number | null,
+  episode?: number,
+) {
+  return req("/api/watchlist/progress", {
+    method: "POST",
+    body: JSON.stringify({ tmdbId, mediaType: "tv", season, episode }),
+  });
+}

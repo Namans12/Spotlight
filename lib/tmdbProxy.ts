@@ -522,6 +522,13 @@ export async function tmdbDiscover({ mediaType, genres, cast, crew }: DiscoverPa
   return tmdbList(`/discover/${mediaType}?${qs.toString()}`, mediaType);
 }
 
+export interface TitleSeasonSummary {
+  seasonNumber: number;
+  episodeCount: number;
+  airDate: string | null;
+  name: string;
+}
+
 export interface TitleDetailResult {
   id: number;
   mediaType: "movie" | "tv";
@@ -546,6 +553,12 @@ export interface TitleDetailResult {
   numberOfSeasons: number | null;
   /** TV only. */
   numberOfEpisodes: number | null;
+  /** TV only, and free: the /tv/{id} payload this already fetches carries the
+   *  full season list. Needed to know how long each season is, which is what
+   *  turns "where am I up to" into "what do I put on next". Season 0 is TMDB's
+   *  "Specials" and is passed through as-is — src/lib/progress.ts is where it
+   *  gets excluded, because that is where the meaning of "a season" lives. */
+  seasons: TitleSeasonSummary[];
   /** The marketing one-liner. Often absent, often better than the synopsis. */
   tagline: string | null;
   /** "Released", "Post Production", "Returning Series", "Ended", ... */
@@ -639,6 +652,17 @@ export async function tmdbDetail(mediaType: "movie" | "tv", id: number, region =
         ? r.number_of_seasons
         : null,
     numberOfEpisodes: mediaType === "tv" ? positiveOrNull(r.number_of_episodes) : null,
+    seasons:
+      mediaType === "tv"
+        ? (r.seasons ?? [])
+            .filter((s: TmdbRow) => typeof s?.season_number === "number")
+            .map((s: TmdbRow) => ({
+              seasonNumber: s.season_number,
+              episodeCount: typeof s.episode_count === "number" && s.episode_count > 0 ? s.episode_count : 0,
+              airDate: nonEmptyString(s.air_date),
+              name: nonEmptyString(s.name) ?? `Season ${s.season_number}`,
+            }))
+        : [],
     tagline: nonEmptyString(r.tagline),
     status: nonEmptyString(r.status),
     certification: resolveCertification(r, mediaType, region),

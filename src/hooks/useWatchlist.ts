@@ -5,9 +5,13 @@ import { Movie, WatchlistItem, WatchlistState } from '@/types/movie';
 import type { WatchlistItemDTO, WatchlistStateDTO } from '../../shared/types/watchlist';
 import * as api from '@/lib/watchlistApi';
 import { findWatched, watchedKeys, titleKey } from '@/lib/watched';
+import { nextEpisode, type SeasonSummary } from '@/lib/progress';
 import { useAuth } from '@/hooks/useAuth';
 
 const QUERY_KEY = ['watchlist'];
+/** Named so the progress mutation can ask how many of its own kind are still
+ *  in flight — see the onSettled guard below. */
+const PROGRESS_MUTATION_KEY = ['watchlist', 'progress'];
 
 function toWatchlistItem(dto: WatchlistItemDTO): WatchlistItem {
   return {
@@ -37,6 +41,7 @@ function toState(dto: WatchlistStateDTO): WatchlistState {
     watchLater: dto.watchLater.map(toWatchlistItem),
     customLists: dto.customLists,
     customListItems,
+    progress: dto.progress ?? {},
   };
 }
 
@@ -62,6 +67,7 @@ const EMPTY_STATE: WatchlistState = {
   watchLater: [],
   customLists: [],
   customListItems: {},
+  progress: {},
 };
 
 export function useWatchlist() {
@@ -121,6 +127,41 @@ export function useWatchlist() {
       api.moveWatchlistItem(vars.dbId, vars.bucket, vars.listId),
     onSuccess: invalidate,
     onError: onError('move that title'),
+  });
+
+  const progressMutation = useMutation({
+    mutationKey: PROGRESS_MUTATION_KEY,
+    mutationFn: (vars: { tmdbId: number; season: number | null; episode?: number }) =>
+      api.setTitleProgress(vars.tmdbId, vars.season, vars.episode),
+    // Optimistic, unlike the other writes here. Ticking off an episode is the
+    // one action someone does repeatedly in a row, and a control that waits a
+    // round trip before moving reads as broken by the third tap.
+    onMutate: async (vars) => {
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY });
+      const previous = queryClient.getQueryData<WatchlistState>(QUERY_KEY);
+      queryClient.setQueryData<WatchlistState>(QUERY_KEY, (old) => {
+        if (!old) return old;
+        const next = { ...old.progress };
+        const key = titleKey('tv', vars.tmdbId);
+        if (vars.season === null) delete next[key];
+        else next[key] = { season: vars.season, episode: vars.episode ?? 1 };
+        return { ...old, progress: next };
+      });
+      return { previous };
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(QUERY_KEY, context.previous);
+      onError('save your place')(err);
+    },
+    // Only the LAST tap refetches. Watching four episodes is four taps in a
+    // row, and invalidating after each one meant a refetch fired for tap 1
+    // could land after tap 3 had already been applied optimistically — the
+    // server's honest answer at that moment, and two episodes stale by the
+    // time it arrived. The counter still includes this mutation while
+    // onSettled runs, so 1 means "no others are pending".
+    onSettled: () => {
+      if (queryClient.isMutating({ mutationKey: PROGRESS_MUTATION_KEY }) === 1) invalidate();
+    },
   });
 
   const removeMutation = useMutation({
@@ -203,6 +244,32 @@ export function useWatchlist() {
   // Recomputed per render rather than memoised: the watched bucket is a
   // handful of rows, and a stale set here would leave an eye lit on a title
   // that was just un-marked.
+  /** Where this account is up to in a series, or null for one not started. */
+  const progressFor = (tmdbId: number) => state.progress[titleKey('tv', tmdbId)] ?? null;
+  const setProgress = (tmdbId: number, season: number | null, episode?: number) => {
+    if (!requireLogin()) return;
+    progressMutation.mutate({ tmdbId, season, episode });
+  };
+
+  /**
+   * "Watched the next one."
+   *
+   * Reads the pointer out of the query cache at click time rather than taking
+   * it from `state`, which is a value captured when the component last
+   * rendered. Two taps in quick succession — someone marking off a couple of
+   * episodes — would otherwise both compute their "next" from the same stale
+   * pointer and the second would be a no-op. The optimistic write in onMutate
+   * has already landed in the cache by then, so this sees it.
+   */
+  const advanceProgress = (tmdbId: number, seasons: SeasonSummary[]) => {
+    if (!requireLogin()) return;
+    const live = queryClient.getQueryData<WatchlistState>(QUERY_KEY) ?? state;
+    const current = live.progress?.[titleKey('tv', tmdbId)] ?? null;
+    const next = nextEpisode(seasons, current);
+    if (!next) return; // Already finished.
+    progressMutation.mutate({ tmdbId, season: next.season, episode: next.episode });
+  };
+
   const watchedKeySet = watchedKeys(state.watched);
   const isWatched = (mediaType: string, tmdbId: number) =>
     watchedKeySet.has(titleKey(mediaType, tmdbId));
@@ -245,6 +312,9 @@ export function useWatchlist() {
     markWatched,
     toggleWatched,
     isWatched,
+    progressFor,
+    setProgress,
+    advanceProgress,
     watchedKeys: watchedKeySet,
     removeFromList,
     reorderWatchlist,

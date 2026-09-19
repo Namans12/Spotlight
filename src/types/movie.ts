@@ -39,4 +39,6 @@ export interface WatchlistState {
   watchLater: WatchlistItem[];
   customLists: CustomList[];
   customListItems: Record<number, WatchlistItem[]>;
+  /** Series progress, keyed "tv:1396". Arrives with the list. */
+  progress: Record<string, { season: number; episode: number }>;
 }
