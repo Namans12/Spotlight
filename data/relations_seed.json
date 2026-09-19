@@ -68,6 +68,22 @@
         "direction": "before",
         "confidence": 0.75,
         "reason": "Thanos's fraught relationship with his adopted daughter Gamora — the emotional core of the Soul Stone sacrifice — is established here."
+      },
+      {
+        "title": "Black Panther",
+        "year": 2018,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.8,
+        "reason": "Wakanda and its vibranium, kept hidden until this film, become the site of the finale and the source of the one weapon that can remove the Mind Stone safely."
+      },
+      {
+        "title": "Doctor Strange",
+        "year": 2016,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.75,
+        "reason": "Strange and the Time Stone he's sworn to protect are central to the film's ending and its entire bargain with Thanos."
       }
     ],
     "can": []
@@ -86,6 +102,14 @@
         "direction": "before",
         "confidence": 0.85,
         "reason": "The Quantum Realm mechanics that make Endgame's time-travel plan possible — and how Scott Lang ends up trapped there during the five-year gap — are set up here."
+      },
+      {
+        "title": "Avengers: Infinity War",
+        "year": 2018,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 1.0,
+        "reason": "Picks up in the immediate aftermath of the snap -- the entire film is the direct response to how Infinity War ends."
       }
     ],
     "can": [
@@ -721,7 +745,15 @@
         "reason": "Superman's death at the end of this film is the specific reason Bruce and Diana are racing to assemble the League."
       }
     ],
-    "can": []
+    "can": [
+      {
+        "title": "Suicide Squad",
+        "year": 2016,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Amanda Waller and Task Force X's government-oversight angle on metahumans runs through both films, though Justice League doesn't require it."
+      }
+    ]
   },
   {
     "from": {
@@ -939,6 +971,14 @@
         "direction": "before",
         "confidence": 0.85,
         "reason": "The Sokovia Accords that split the Avengers and drive this film's entire conflict exist because of the civilian casualties Ultron causes in Sokovia here."
+      },
+      {
+        "title": "Captain America: The Winter Soldier",
+        "year": 2014,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.85,
+        "reason": "Bucky Barnes and the fallout of Hydra's infiltration of SHIELD are the film's entire spine -- the Accords fight is really a fight over what to do about him."
       }
     ],
     "can": [
@@ -1012,7 +1052,7 @@
         "title": "Ant-Man and the Wasp",
         "year": 2018,
         "direction": "before",
-        "confidence": 0.7,
+        "confidence": 0.75,
         "reason": "Ava Starr/Ghost's unstable molecular condition and tragic backstory, which the team is trying to help her survive, are established in this film."
       }
     ],
@@ -1195,6 +1235,14 @@
         "direction": "before",
         "confidence": 0.75,
         "reason": "This film's Gamora is the 2014 variant pulled forward during Endgame's time heist — a version who never fell for Peter Quill and barely knows the team, which is why she's a stranger to them here."
+      },
+      {
+        "title": "Guardians of the Galaxy Vol. 2",
+        "year": 2017,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.8,
+        "reason": "Rocket's backstory and the High Evolutionary, the film's central threat, are set up directly here."
       }
     ],
     "can": []
@@ -1755,6 +1803,953 @@
         "media_type": "movie",
         "confidence": 0.85,
         "reason": "A theatrical omnibus of the final two TV episodes, released as the franchise's last theatrical cut -- the same ending the show already aired."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 10138,
+      "title": "Iron Man 2",
+      "year": 2010
+    },
+    "must": [
+      {
+        "title": "Iron Man",
+        "year": 2008,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.85,
+        "reason": "Tony's palladium poisoning and Ivan Vanko's revenge both stem directly from the arc reactor and Stark family history established here."
+      }
+    ],
+    "can": [
+      {
+        "title": "The Incredible Hulk",
+        "year": 2008,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Fury's SHIELD recruitment thread and the shared-universe framing both start showing up around this film."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 10195,
+      "title": "Thor",
+      "year": 2011
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Iron Man 2",
+        "year": 2010,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Hawkeye's cameo and the wider SHIELD thread connect the two, though Thor's own story needs neither."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 24428,
+      "title": "The Avengers",
+      "year": 2012
+    },
+    "must": [
+      {
+        "title": "Thor",
+        "year": 2011,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.9,
+        "reason": "Loki, the film's villain, and the Tesseract's importance are both established directly here."
+      },
+      {
+        "title": "Captain America: The First Avenger",
+        "year": 2011,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.85,
+        "reason": "Cap is thawed out of the ice this film ends on, and the Tesseract's history with Hydra carries straight over."
+      }
+    ],
+    "can": [
+      {
+        "title": "Iron Man 2",
+        "year": 2010,
+        "media_type": "movie",
+        "confidence": 0.6,
+        "reason": "The Tesseract and SHIELD's Avengers Initiative, both introduced there, are why this team is being assembled at all."
+      },
+      {
+        "title": "The Incredible Hulk",
+        "year": 2008,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Banner's control over the Hulk, the throughline of his arc here, was first tested in that film."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 68721,
+      "title": "Iron Man 3",
+      "year": 2013
+    },
+    "must": [
+      {
+        "title": "The Avengers",
+        "year": 2012,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.85,
+        "reason": "Tony's PTSD from the Battle of New York -- panic attacks, obsessive suit-building -- is the film's entire emotional core."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 76338,
+      "title": "Thor: The Dark World",
+      "year": 2013
+    },
+    "must": [
+      {
+        "title": "The Avengers",
+        "year": 2012,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.75,
+        "reason": "Loki's imprisonment for his role in the New York attack, and Thor and Loki's fractured relationship since, both carry straight over."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 100402,
+      "title": "Captain America: The Winter Soldier",
+      "year": 2014
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "The Avengers",
+        "year": 2012,
+        "media_type": "movie",
+        "confidence": 0.6,
+        "reason": "Cap's uneasy adjustment to the modern world and his standing with SHIELD both continue from here."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 118340,
+      "title": "Guardians of the Galaxy",
+      "year": 2014
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "The Avengers",
+        "year": 2012,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "A different corner of the same universe -- the Infinity Stones tie them together eventually, but nothing here depends on it yet."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 99861,
+      "title": "Avengers: Age of Ultron",
+      "year": 2015
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Iron Man 3",
+        "year": 2013,
+        "media_type": "movie",
+        "confidence": 0.55,
+        "reason": "Tony's guilt and his compulsion to build ever more suits of armor -- the impulse that creates Ultron -- come directly from here."
+      },
+      {
+        "title": "Thor: The Dark World",
+        "year": 2013,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Loki's scepter, the object that turns out to house Ultron's key components, was last seen at the end of this film."
+      },
+      {
+        "title": "Captain America: The Winter Soldier",
+        "year": 2014,
+        "media_type": "movie",
+        "confidence": 0.6,
+        "reason": "SHIELD's collapse and Hydra's infiltration are why the team is operating without institutional backup here."
+      },
+      {
+        "title": "Guardians of the Galaxy",
+        "year": 2014,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Thanos's interest in the Infinity Stones, teased at the end of Guardians, starts becoming relevant to the wider story here."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 102899,
+      "title": "Ant-Man",
+      "year": 2015
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Avengers: Age of Ultron",
+        "year": 2015,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "The Avengers' new compound, glimpsed here, and Falcon's cameo tie it loosely to the team's post-Ultron status."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 284052,
+      "title": "Doctor Strange",
+      "year": 2016
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "The Avengers",
+        "year": 2012,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Strange references the Avengers' existence directly, though his own origin needs none of it."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 283995,
+      "title": "Guardians of the Galaxy Vol. 2",
+      "year": 2017
+    },
+    "must": [
+      {
+        "title": "Guardians of the Galaxy",
+        "year": 2014,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.85,
+        "reason": "A direct continuation of the same team, picking up shortly after the first film's ending."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 315635,
+      "title": "Spider-Man: Homecoming",
+      "year": 2017
+    },
+    "must": [
+      {
+        "title": "Captain America: Civil War",
+        "year": 2016,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.8,
+        "reason": "Peter's recruitment by Stark and the airport battle he took part in are both referenced directly, and the villain's tech comes from cleaning up after it."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 284053,
+      "title": "Thor: Ragnarok",
+      "year": 2017
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Avengers: Age of Ultron",
+        "year": 2015,
+        "media_type": "movie",
+        "confidence": 0.6,
+        "reason": "Thor's search for answers about the Infinity Stones, and Hulk's disappearance since the final battle there, both continue directly."
+      },
+      {
+        "title": "Doctor Strange",
+        "year": 2016,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Strange's cameo assumes you already know who he is."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 284054,
+      "title": "Black Panther",
+      "year": 2018
+    },
+    "must": [
+      {
+        "title": "Captain America: Civil War",
+        "year": 2016,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.85,
+        "reason": "T'Chaka's death and T'Challa becoming king are exactly where this film picks up."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 299537,
+      "title": "Captain Marvel",
+      "year": 2019
+    },
+    "must": [],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 429617,
+      "title": "Spider-Man: Far From Home",
+      "year": 2019
+    },
+    "must": [
+      {
+        "title": "Avengers: Endgame",
+        "year": 2019,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.9,
+        "reason": "Peter's grief over Tony's death and the aftermath of the Blip -- five years passing for everyone left behind -- are the film's whole emotional setup."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 524434,
+      "title": "Eternals",
+      "year": 2021
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Avengers: Endgame",
+        "year": 2019,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "The Blip is referenced directly as part of why the Eternals finally step in."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 634649,
+      "title": "Spider-Man: No Way Home",
+      "year": 2021
+    },
+    "must": [
+      {
+        "title": "Spider-Man: Far From Home",
+        "year": 2019,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.9,
+        "reason": "Mysterio's public reveal of Peter's identity at the end of that film is the entire premise this one opens with."
+      }
+    ],
+    "can": [
+      {
+        "title": "Spider-Man 3",
+        "year": 2007,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "The multiverse brings Green Goblin and Sandman back from this continuity -- recognisable without it, richer with it."
+      },
+      {
+        "title": "The Amazing Spider-Man 2",
+        "year": 2014,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Electro crosses over from this continuity, and his and Peter's unfinished business carries over with him."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 616037,
+      "title": "Thor: Love and Thunder",
+      "year": 2022
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Avengers: Endgame",
+        "year": 2019,
+        "media_type": "movie",
+        "confidence": 0.6,
+        "reason": "Thor's state of mind -- adrift after giving up the throne, and his role in the final battle there -- carries into this film."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 505642,
+      "title": "Black Panther: Wakanda Forever",
+      "year": 2022
+    },
+    "must": [
+      {
+        "title": "Black Panther",
+        "year": 2018,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.9,
+        "reason": "The film is built directly around T'Challa's death and Wakanda reckoning with it."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 969681,
+      "title": "Spider-Man: Brand New Day",
+      "year": 2026
+    },
+    "must": [
+      {
+        "title": "Spider-Man: No Way Home",
+        "year": 2021,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.8,
+        "reason": "Picks up after the world was made to forget Peter Parker exists -- the premise this film has to work from."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 36658,
+      "title": "X2",
+      "year": 2003
+    },
+    "must": [
+      {
+        "title": "X-Men",
+        "year": 2000,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.85,
+        "reason": "A direct continuation of the same team and the same conflict with Magneto and human-mutant relations."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 2080,
+      "title": "X-Men Origins: Wolverine",
+      "year": 2009
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "X2",
+        "year": 2003,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Fills in Wolverine's past referenced in the earlier trilogy, though it stands on its own as an origin story."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 49538,
+      "title": "X-Men: First Class",
+      "year": 2011
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "X-Men",
+        "year": 2000,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "A prequel to the original trilogy's Charles-and-Erik friendship, watchable in either order."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 76170,
+      "title": "The Wolverine",
+      "year": 2013
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "X-Men Origins: Wolverine",
+        "year": 2009,
+        "media_type": "movie",
+        "confidence": 0.55,
+        "reason": "A direct continuation of Logan's arc, now grieving Jean Grey's death from the trilogy."
+      },
+      {
+        "title": "X-Men: The Last Stand",
+        "year": 2006,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Jean Grey's death there is the reason Logan is haunted by her throughout this film."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 340102,
+      "title": "The New Mutants",
+      "year": 2020
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "X-Men: Apocalypse",
+        "year": 2016,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Set in the same rebooted timeline, though its own small-cast story needs none of it."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 293660,
+      "title": "Deadpool",
+      "year": 2016
+    },
+    "must": [],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 383498,
+      "title": "Deadpool 2",
+      "year": 2018
+    },
+    "must": [
+      {
+        "title": "Deadpool",
+        "year": 2016,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.9,
+        "reason": "A direct continuation of the same character and relationship the first film ends on."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 558,
+      "title": "Spider-Man 2",
+      "year": 2004
+    },
+    "must": [
+      {
+        "title": "Spider-Man",
+        "year": 2002,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.9,
+        "reason": "A direct continuation of Peter and MJ's relationship and the origin story established there."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 559,
+      "title": "Spider-Man 3",
+      "year": 2007
+    },
+    "must": [
+      {
+        "title": "Spider-Man 2",
+        "year": 2004,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.9,
+        "reason": "Directly continues the same relationships and the Harry Osborn thread left open at the end of the second film."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 1930,
+      "title": "The Amazing Spider-Man",
+      "year": 2012
+    },
+    "must": [],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 102382,
+      "title": "The Amazing Spider-Man 2",
+      "year": 2014
+    },
+    "must": [
+      {
+        "title": "The Amazing Spider-Man",
+        "year": 2012,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.9,
+        "reason": "A direct continuation of Peter and Gwen's relationship and the mystery of his parents set up there."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 569094,
+      "title": "Spider-Man: Across the Spider-Verse",
+      "year": 2023
+    },
+    "must": [
+      {
+        "title": "Spider-Man: Into the Spider-Verse",
+        "year": 2018,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.95,
+        "reason": "A direct continuation of Miles's story and the multiverse rules established in the first film."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 911916,
+      "title": "Spider-Man: Beyond the Spider-Verse",
+      "year": 2027
+    },
+    "must": [
+      {
+        "title": "Spider-Man: Across the Spider-Verse",
+        "year": 2023,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 1.0,
+        "reason": "The direct second half of the story Across the Spider-Verse ends on a cliffhanger partway through."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 71676,
+      "title": "Ghost Rider: Spirit of Vengeance",
+      "year": 2011
+    },
+    "must": [
+      {
+        "title": "Ghost Rider",
+        "year": 2007,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.8,
+        "reason": "A direct continuation of Johnny Blaze's deal with Mephisto from the first film."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 9947,
+      "title": "Elektra",
+      "year": 2005
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Daredevil",
+        "year": 2003,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "A spinoff of the same character from this film, in the same now-abandoned continuity, not the Netflix/MCU Daredevil."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 297761,
+      "title": "Suicide Squad",
+      "year": 2016
+    },
+    "must": [],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 297762,
+      "title": "Wonder Woman",
+      "year": 2017
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Batman v Superman: Dawn of Justice",
+        "year": 2016,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Diana is introduced there first; this film is her own origin, told as her flashback."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 464052,
+      "title": "Wonder Woman 1984",
+      "year": 2020
+    },
+    "must": [
+      {
+        "title": "Wonder Woman",
+        "year": 2017,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.85,
+        "reason": "A direct continuation of Diana's story and her grief over Steve Trevor from the first film."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 297802,
+      "title": "Aquaman",
+      "year": 2018
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Justice League",
+        "year": 2017,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Arthur's arc toward accepting the throne, the film's whole plot, picks up from where Justice League leaves him."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 572802,
+      "title": "Aquaman and the Lost Kingdom",
+      "year": 2023
+    },
+    "must": [
+      {
+        "title": "Aquaman",
+        "year": 2018,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.9,
+        "reason": "A direct continuation of the same story and the same villain's defeat there."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 287947,
+      "title": "Shazam!",
+      "year": 2019
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Justice League",
+        "year": 2017,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Set in the same shared universe, referenced with a poster cameo, nothing more."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 594767,
+      "title": "Shazam! Fury of the Gods",
+      "year": 2023
+    },
+    "must": [
+      {
+        "title": "Shazam!",
+        "year": 2019,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.9,
+        "reason": "A direct continuation of the same foster family and the same power set established there."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 495764,
+      "title": "Birds of Prey (and the Fantabulous Emancipation of One Harley Quinn)",
+      "year": 2020
+    },
+    "must": [
+      {
+        "title": "Suicide Squad",
+        "year": 2016,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.75,
+        "reason": "Opens directly on the fallout of Harley's breakup with the Joker, which this film assumes you already know about."
+      }
+    ],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 436270,
+      "title": "Black Adam",
+      "year": 2022
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Shazam!",
+        "year": 2019,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Set in the same magic-based corner of the universe, referenced but not required."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 298618,
+      "title": "The Flash",
+      "year": 2023
+    },
+    "must": [
+      {
+        "title": "Man of Steel",
+        "year": 2013,
+        "media_type": "movie",
+        "direction": "before",
+        "confidence": 0.8,
+        "reason": "Zod's invasion from that film is directly revisited as a plot device when Barry alters the timeline."
+      }
+    ],
+    "can": [
+      {
+        "title": "Batman v Superman: Dawn of Justice",
+        "year": 2016,
+        "media_type": "movie",
+        "confidence": 0.5,
+        "reason": "Bruce Wayne's history and the Batcave carry over, though this film's Batman is an alternate-timeline version."
+      }
+    ]
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 565770,
+      "title": "Blue Beetle",
+      "year": 2023
+    },
+    "must": [],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 1061474,
+      "title": "Superman",
+      "year": 2025
+    },
+    "must": [],
+    "can": []
+  },
+  {
+    "from": {
+      "media_type": "movie",
+      "tmdb_id": 1081003,
+      "title": "Supergirl",
+      "year": 2026
+    },
+    "must": [],
+    "can": [
+      {
+        "title": "Superman",
+        "year": 2025,
+        "media_type": "movie",
+        "confidence": 0.6,
+        "reason": "The next film in the same newly-launched DC universe, not a continuation of the pre-2025 Man of Steel continuity -- watchable on its own."
       }
     ]
   }
