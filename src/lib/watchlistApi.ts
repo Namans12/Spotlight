@@ -68,3 +68,12 @@ export function setTitleProgress(
     body: JSON.stringify({ tmdbId, mediaType: "tv", season, episode }),
   });
 }
+
+/** Records or withdraws an opinion. `liked: null` withdraws it — see the
+ *  route comment on why there is no stored neutral. */
+export function setTitleOpinion(tmdbId: number, mediaType: string, liked: boolean | null) {
+  return req("/api/watchlist/opinion", {
+    method: "POST",
+    body: JSON.stringify({ tmdbId, mediaType, liked }),
+  });
+}

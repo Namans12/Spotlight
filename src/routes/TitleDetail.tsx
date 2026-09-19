@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useWatchlistContext } from '@/contexts/WatchlistContext';
 import { ActionButton } from '@/components/watchlist/ActionButton';
 import { WatchedToggle } from '@/components/watchlist/WatchedToggle';
+import { TasteThumbs } from '@/components/watchlist/TasteThumbs';
 import { PosterRow } from '@/components/release/PosterRow';
 import { useRelations } from '@/hooks/useRelations';
 import { hasAnyRelations, hasChain } from '@/lib/relations';
@@ -13,6 +14,7 @@ import { titleDetailMeta } from '../../shared/seo';
 import { useDocumentMeta, siteUrl } from '@/hooks/useDocumentMeta';
 import { getYouMayAlsoLike, getCredits, type MediaType } from '@/lib/tmdb';
 import { withoutWatched } from '@/lib/watched';
+import { buildTaste, rerankByTaste } from '@/lib/taste';
 import { RatingBadges } from '@/components/release/RatingBadges';
 import { useRating } from '@/hooks/useRatings';
 import { hasAnyScore } from '@/lib/ratings';
@@ -81,7 +83,16 @@ export default function TitleDetail() {
   // down. Filtered in the browser rather than server-side on purpose: the
   // /you-may-also-like response is shared by every reader through the edge
   // cache, and personalising it would make that cache per-user.
-  const recommendations = withoutWatched(recommendationsQuery.data ?? [], wl.watchedKeys);
+  // Reranked in the browser rather than on the server: /you-may-also-like is
+  // shared by every reader through the edge cache, and personalising it there
+  // would make that cache per-user. Taste only nudges — the server ranked
+  // these on real evidence about these specific titles (shared director, cast,
+  // franchise), and a broad preference must not be able to overrule that.
+  const taste = buildTaste(wl.watched, wl.opinions);
+  const recommendations = rerankByTaste(
+    withoutWatched(recommendationsQuery.data ?? [], wl.watchedKeys),
+    taste,
+  );
   const ratingQuery = useRating(mediaType, tmdbId);
 
   // Its own request rather than folded into /detail: credits are a separate
@@ -280,6 +291,15 @@ export default function TitleDetail() {
               watched={wl.isWatched(mediaType, tmdbId)}
               onToggle={() => wl.toggleWatched(movie)}
             />
+            {/* Only once it is marked seen. A thumb on something unwatched
+                would be answering a different question, and one control
+                meaning both is the conflation this exists to undo. */}
+            {wl.isWatched(mediaType, tmdbId) && (
+              <TasteThumbs
+                opinion={wl.opinionFor(mediaType, tmdbId)}
+                onSet={(liked) => wl.setOpinion(mediaType, tmdbId, liked)}
+              />
+            )}
           </>
         ) : (
           <Link to="/login" className="text-xs text-muted-foreground hover:text-foreground underline">

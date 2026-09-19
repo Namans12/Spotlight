@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Movie, WatchlistItem } from '@/types/movie';
 import { getRecommendations, getCredits, discover, type MediaType } from '@/lib/tmdb';
 import { useWatchlistContext } from '@/contexts/WatchlistContext';
+import { likedSeeds } from '@/lib/taste';
 
 export interface SuggestionRow {
   key: string;
@@ -31,11 +32,19 @@ async function fetchGenres(type: MediaType, id: number): Promise<{ ids: number[]
 export function useSuggestions() {
   const wl = useWatchlistContext();
 
-  // Most recently added first, across the "want to watch" buckets — watched
-  // titles are weaker signal for what to surface next.
-  const seeds: WatchlistItem[] = [...wl.watchlist, ...wl.watchLater]
-    .sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0))
-    .slice(0, SEED_COUNT);
+  // Titles the reader actually said they liked come first, then the most
+  // recently saved.
+  //
+  // Saving something is a guess about what you will enjoy; a thumbs-up is a
+  // report of what you did. Seeding from the second where it exists is the
+  // whole reason the thumb was worth building — before it, watch history
+  // could only ever be used to *suppress* suggestions, never to shape them.
+  //
+  // Watched-but-unrated titles are still excluded from seeding: having seen
+  // something says nothing about wanting more like it.
+  const liked = likedSeeds(wl.watched, wl.opinions, SEED_COUNT);
+  const saved = [...wl.watchlist, ...wl.watchLater].sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0));
+  const seeds: WatchlistItem[] = [...liked, ...saved].slice(0, SEED_COUNT);
 
   const seedKey = seeds.map((s) => `${s.mediaType}:${s.id}`).join(',');
 
@@ -49,6 +58,7 @@ export function useSuggestions() {
         [...wl.watchlist, ...wl.watchLater, ...wl.watched].map((i) => i.id),
       );
 
+      const likedIds = new Set(liked.map((s) => s.id));
       const rows: SuggestionRow[] = [];
 
       const becauseRows = await Promise.all(
@@ -56,7 +66,7 @@ export function useSuggestions() {
           const items = await getRecommendations(seed.mediaType as MediaType, seed.id).catch(() => [] as Movie[]);
           return {
             key: `because-${seed.mediaType}-${seed.id}`,
-            title: `Because you added ${seed.title}`,
+            title: likedIds.has(seed.id) ? `Because you liked ${seed.title}` : `Because you added ${seed.title}`,
             items: items.filter((m) => !owned.has(m.id)).slice(0, 20),
           };
         }),

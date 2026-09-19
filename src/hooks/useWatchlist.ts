@@ -6,6 +6,7 @@ import type { WatchlistItemDTO, WatchlistStateDTO } from '../../shared/types/wat
 import * as api from '@/lib/watchlistApi';
 import { findWatched, watchedKeys, titleKey } from '@/lib/watched';
 import { nextEpisode, type SeasonSummary } from '@/lib/progress';
+import { opinionKey } from '@/lib/taste';
 import { useAuth } from '@/hooks/useAuth';
 
 const QUERY_KEY = ['watchlist'];
@@ -42,6 +43,7 @@ function toState(dto: WatchlistStateDTO): WatchlistState {
     customLists: dto.customLists,
     customListItems,
     progress: dto.progress ?? {},
+    opinions: dto.opinions ?? {},
   };
 }
 
@@ -68,6 +70,7 @@ const EMPTY_STATE: WatchlistState = {
   customLists: [],
   customListItems: {},
   progress: {},
+  opinions: {},
 };
 
 export function useWatchlist() {
@@ -162,6 +165,31 @@ export function useWatchlist() {
     onSettled: () => {
       if (queryClient.isMutating({ mutationKey: PROGRESS_MUTATION_KEY }) === 1) invalidate();
     },
+  });
+
+  const opinionMutation = useMutation({
+    mutationFn: (vars: { tmdbId: number; mediaType: string; liked: boolean | null }) =>
+      api.setTitleOpinion(vars.tmdbId, vars.mediaType, vars.liked),
+    // Optimistic: a thumb is a one-tap judgement and a control that waits for
+    // a round trip before filling in reads as ignored.
+    onMutate: async (vars) => {
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY });
+      const previous = queryClient.getQueryData<WatchlistState>(QUERY_KEY);
+      queryClient.setQueryData<WatchlistState>(QUERY_KEY, (old) => {
+        if (!old) return old;
+        const next = { ...old.opinions };
+        const key = opinionKey(vars.mediaType, vars.tmdbId);
+        if (vars.liked === null) delete next[key];
+        else next[key] = vars.liked;
+        return { ...old, opinions: next };
+      });
+      return { previous };
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(QUERY_KEY, context.previous);
+      onError('save that')(err);
+    },
+    onSettled: invalidate,
   });
 
   const removeMutation = useMutation({
@@ -270,7 +298,27 @@ export function useWatchlist() {
     progressMutation.mutate({ tmdbId, season: next.season, episode: next.episode });
   };
 
-  const watchedKeySet = watchedKeys(state.watched);
+  /** true, false, or null for "not said". */
+  const opinionFor = (mediaType: string, tmdbId: number): boolean | null =>
+    state.opinions[opinionKey(mediaType, tmdbId)] ?? null;
+
+  /**
+   * Taps the thumb. Tapping the one already lit withdraws the opinion, which
+   * is the only way back to "not said" — and it has to exist, because a
+   * mis-tap that cannot be undone is worse than no control at all.
+   */
+  const setOpinion = (mediaType: string, tmdbId: number, liked: boolean | null) => {
+    if (!requireLogin()) return;
+    const current = opinionFor(mediaType, tmdbId);
+    opinionMutation.mutate({ tmdbId, mediaType, liked: current === liked ? null : liked });
+  };
+
+  // Memoised on the bucket it is built from. Building the Set is cheap, but
+  // its *identity* changes on every render, and anything downstream that
+  // memoises against it then recomputes every render too — which is how the
+  // duel's pool ended up being re-dealt, and a fresh TMDB batch fired, several
+  // times per screen.
+  const watchedKeySet = useMemo(() => watchedKeys(state.watched), [state.watched]);
   const isWatched = (mediaType: string, tmdbId: number) =>
     watchedKeySet.has(titleKey(mediaType, tmdbId));
 
@@ -315,6 +363,8 @@ export function useWatchlist() {
     progressFor,
     setProgress,
     advanceProgress,
+    opinionFor,
+    setOpinion,
     watchedKeys: watchedKeySet,
     removeFromList,
     reorderWatchlist,

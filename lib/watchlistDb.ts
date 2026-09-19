@@ -7,6 +7,7 @@ import type {
   Bucket,
 } from "../shared/types/watchlist.js";
 import { getProgressForUser } from "./progressDb.js";
+import { getOpinionsForUser } from "./opinionsDb.js";
 
 // Every query here is scoped to one signed-in user's rows. That scoping is
 // deliberately on every write, not just the reads: dbId (BIGSERIAL) is a
@@ -45,7 +46,10 @@ export async function getWatchlistState(sql: postgres.Sql<any>, userId: number):
   // Part of the same state, fetched with it. A separate request would load on
   // exactly the same screens a moment later and make every TV card pop from
   // "not started" to "S2 E4" after the list had already painted.
-  const progress = await getProgressForUser(sql, userId);
+  const [progress, opinions] = await Promise.all([
+    getProgressForUser(sql, userId),
+    getOpinionsForUser(sql, userId),
+  ]);
 
   const state: WatchlistStateDTO = {
     watchlist: [],
@@ -54,6 +58,7 @@ export async function getWatchlistState(sql: postgres.Sql<any>, userId: number):
     customLists: listRows.map(toListDTO),
     customListItems: {},
     progress,
+    opinions,
   };
 
   for (const row of rows) {
