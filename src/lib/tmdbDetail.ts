@@ -30,6 +30,10 @@ export interface TitleDetail {
   /** Movies only, whole US dollars. Null when TMDB doesn't know. */
   budget: number | null;
   revenue: number | null;
+  /** Bare TMDB path to the title's own logo/wordmark artwork — size it with
+   *  tmdbLogo() before rendering. Null for the many titles TMDB has none for. */
+  logoPath: string | null;
+  trailer: { key: string; site: 'YouTube'; name: string } | null;
 }
 
 export async function fetchTitleDetail(mediaType: 'movie' | 'tv', id: number): Promise<TitleDetail> {

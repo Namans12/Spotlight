@@ -571,6 +571,16 @@ export interface TitleDetailResult {
   /** Movies only, whole US dollars, 0 when TMDB doesn't know. */
   budget: number | null;
   revenue: number | null;
+  /** The title's own wordmark/logo artwork, bare TMDB path (client sizes it) —
+   *  null for the titles TMDB has none for, which is common outside big
+   *  studio releases. This is what lets a hero show the film's actual title
+   *  treatment over the backdrop instead of a plain-text heading rendered in
+   *  the site's own font. Free: `images` is one more append on a call this
+   *  page already makes. */
+  logoPath: string | null;
+  /** The best trailer to point at, or null. Never embedded — see
+   *  resolveTrailer for why this is a link, not a player. */
+  trailer: { key: string; site: "YouTube"; name: string } | null;
 }
 
 const IMG_BASE = "https://image.tmdb.org/t/p/w500";
@@ -619,11 +629,78 @@ function positiveOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
 
+/**
+ * The title's own logo artwork, for the hero.
+ *
+ * TMDB serves logos in whatever language a studio submitted them in, most
+ * often the title's own original language plus English — and, confusingly,
+ * `null` for "no language tag", which covers a lot of the actually-useful
+ * generic wordmarks. English is preferred because this app's own chrome
+ * (nav, buttons, everything else on the page) is in English, and a page that
+ * mixes a Hindi logo with an English interface around it looks like a
+ * rendering bug rather than a deliberate choice. Language-untagged assets are
+ * the fallback, ahead of every other language, on the theory that a symbol
+ * mark with no language commitment sits more comfortably in an English UI
+ * than a wordmark in a third language would.
+ *
+ * TMDB's own popularity-ish ordering within a language is trusted for the
+ * final tie-break rather than re-sorted by, say, aspect ratio — chasing a
+ * "best" logo by pixel dimensions is exactly the kind of scoring that looks
+ * clever on one title and picks the cropped-off backup logo on the next.
+ */
+function resolveLogo(payload: TmdbRow): string | null {
+  const logos: TmdbRow[] = payload?.images?.logos ?? [];
+  if (logos.length === 0) return null;
+
+  for (const wanted of ["en", null]) {
+    const match = logos.find((logo) => (logo?.iso_639_1 ?? null) === wanted);
+    if (match?.file_path) return match.file_path;
+  }
+  return nonEmptyString(logos[0]?.file_path);
+}
+
+/**
+ * The one trailer worth pointing at.
+ *
+ * Deliberately a link, never an embed. An embedded YouTube player loads
+ * YouTube's own script and sets YouTube's own cookies on every title page
+ * view, for every reader, whether or not they ever press play — a
+ * third-party tracking surface added to get a thumbnail with a play button
+ * on it. `youtube.com/watch?v=…` in a new tab gets the same outcome (someone
+ * chooses to go watch the trailer) without that cost landing on people who
+ * don't.
+ *
+ * Preference order: an official trailer, then any trailer, then an official
+ * teaser, then anything at all with a name — because a title with no
+ * trailer yet (freshly announced, or obscure) often still has a teaser, and
+ * "nothing" is a worse answer than a teaser labelled as such.
+ */
+function resolveTrailer(payload: TmdbRow): TitleDetailResult["trailer"] {
+  const videos: TmdbRow[] = (payload?.videos?.results ?? []).filter((v: TmdbRow) => v?.site === "YouTube" && v?.key);
+  if (videos.length === 0) return null;
+
+  const pick =
+    videos.find((v) => v.type === "Trailer" && v.official) ??
+    videos.find((v) => v.type === "Trailer") ??
+    videos.find((v) => v.type === "Teaser" && v.official) ??
+    videos.find((v) => typeof v.name === "string" && v.name.trim());
+
+  if (!pick) return null;
+  return { key: pick.key, site: "YouTube", name: nonEmptyString(pick.name) ?? "Trailer" };
+}
+
 export async function tmdbDetail(mediaType: "movie" | "tv", id: number, region = "IN"): Promise<TitleDetailResult> {
   const path = mediaType === "movie" ? "movie" : "tv";
-  const append =
-    mediaType === "movie" ? "release_dates,watch/providers" : "content_ratings,watch/providers";
-  const url = `${TMDB_BASE_URL}/${path}/${id}?api_key=${requireApiKey()}&append_to_response=${append}`;
+  const certAppend = mediaType === "movie" ? "release_dates" : "content_ratings";
+  const url =
+    `${TMDB_BASE_URL}/${path}/${id}?api_key=${requireApiKey()}` +
+    `&append_to_response=${certAppend},watch/providers,images,videos` +
+    // Restricts the logos array to what resolveLogo actually chooses between
+    // (English, then language-untagged). A well-covered title can carry
+    // logos in thirty languages that would never be picked; asking TMDB to
+    // filter server-side is one query param versus shipping all thirty back
+    // to throw most of them away here.
+    `&include_image_language=en,null`;
   const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`TMDB detail failed: ${res.status}`);
   const r = await res.json();
@@ -668,6 +745,8 @@ export async function tmdbDetail(mediaType: "movie" | "tv", id: number, region =
     certification: resolveCertification(r, mediaType, region),
     budget: mediaType === "movie" ? positiveOrNull(r.budget) : null,
     revenue: mediaType === "movie" ? positiveOrNull(r.revenue) : null,
+    logoPath: resolveLogo(r),
+    trailer: resolveTrailer(r),
   };
 }
 

@@ -447,3 +447,103 @@ describe('tmdbDetail money', () => {
     expect(detail.revenue).toBe(117_234_000);
   });
 });
+
+describe('tmdbDetail logo', () => {
+  function withLogos(logos: TmdbRow[]) {
+    return { id: 1, title: 'A Film', release_date: '2026-01-01', images: { logos } };
+  }
+
+  it('prefers an English logo over the title’s own language', () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(
+        200,
+        withLogos([
+          { iso_639_1: 'hi', file_path: '/hindi-logo.png' },
+          { iso_639_1: 'en', file_path: '/english-logo.png' },
+        ]),
+      ),
+    );
+
+    const detail = tmdbDetail('movie', 1, 'IN');
+    return expect(detail).resolves.toMatchObject({ logoPath: '/english-logo.png' });
+  });
+
+  // A language-untagged mark is usually a generic symbol, which sits more
+  // comfortably in an English UI than a wordmark in a third language would.
+  it('falls back to a language-untagged logo before anything else', () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(
+        200,
+        withLogos([
+          { iso_639_1: 'fr', file_path: '/french-logo.png' },
+          { iso_639_1: null, file_path: '/untagged-logo.png' },
+        ]),
+      ),
+    );
+
+    const detail = tmdbDetail('movie', 1, 'IN');
+    return expect(detail).resolves.toMatchObject({ logoPath: '/untagged-logo.png' });
+  });
+
+  it('takes whatever is available when neither English nor untagged exists', () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, withLogos([{ iso_639_1: 'fr', file_path: '/french-logo.png' }])));
+
+    const detail = tmdbDetail('movie', 1, 'IN');
+    return expect(detail).resolves.toMatchObject({ logoPath: '/french-logo.png' });
+  });
+
+  it('is null for a title with no logo artwork at all', () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, withLogos([])));
+
+    const detail = tmdbDetail('movie', 1, 'IN');
+    return expect(detail).resolves.toMatchObject({ logoPath: null });
+  });
+});
+
+describe('tmdbDetail trailer', () => {
+  function withVideos(results: TmdbRow[]) {
+    return { id: 1, title: 'A Film', release_date: '2026-01-01', videos: { results } };
+  }
+
+  it('prefers an official trailer over an unofficial one', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(
+        200,
+        withVideos([
+          { type: 'Trailer', site: 'YouTube', official: false, key: 'fan-cut', name: 'Fan Trailer' },
+          { type: 'Trailer', site: 'YouTube', official: true, key: 'real-trailer', name: 'Official Trailer' },
+        ]),
+      ),
+    );
+
+    const detail = await tmdbDetail('movie', 1, 'IN');
+    expect(detail.trailer).toEqual({ key: 'real-trailer', site: 'YouTube', name: 'Official Trailer' });
+  });
+
+  // No trailer yet is common for a freshly announced or obscure title; a
+  // teaser is a better answer than nothing, as long as it is labelled as one.
+  it('falls back to a teaser when there is no trailer', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(200, withVideos([{ type: 'Teaser', site: 'YouTube', official: true, key: 'teaser-1', name: 'Teaser' }])),
+    );
+
+    const detail = await tmdbDetail('movie', 1, 'IN');
+    expect(detail.trailer).toEqual({ key: 'teaser-1', site: 'YouTube', name: 'Teaser' });
+  });
+
+  it('ignores a video that is not hosted on YouTube', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(200, withVideos([{ type: 'Trailer', site: 'Vimeo', official: true, key: 'x', name: 'Trailer' }])),
+    );
+
+    const detail = await tmdbDetail('movie', 1, 'IN');
+    expect(detail.trailer).toBeNull();
+  });
+
+  it('is null when there are no videos at all', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, withVideos([])));
+
+    const detail = await tmdbDetail('movie', 1, 'IN');
+    expect(detail.trailer).toBeNull();
+  });
+});
