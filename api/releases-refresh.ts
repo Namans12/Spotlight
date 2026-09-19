@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "http";
 import { requireUserId } from "../lib/auth.js";
 import { getDb } from "../lib/db.js";
-import { checkRefreshRateLimit, recordRefreshDispatch } from "../lib/refreshDispatchDb.js";
+import { checkRefreshRateLimit, isRateLimited, recordRefreshDispatch } from "../lib/refreshDispatchDb.js";
 
 // Which repository's workflow this endpoint triggers. Env-configured rather
 // than hardcoded so a fork, a staging deployment, or a renamed repo does not
@@ -32,7 +32,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   const sql = getDb();
   const rateLimit = await checkRefreshRateLimit(sql, userId);
-  if (!rateLimit.allowed) {
+  // isRateLimited rather than `!rateLimit.allowed` — see its definition for
+  // why the shorthand type-checks locally but breaks the Vercel build.
+  if (isRateLimited(rateLimit)) {
     res.statusCode = 429;
     res.setHeader("Retry-After", String(rateLimit.retryAfterSeconds));
     res.end(JSON.stringify({ error: rateLimit.reason }));

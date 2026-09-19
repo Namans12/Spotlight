@@ -17,7 +17,23 @@ import type postgres from "postgres";
 export const GLOBAL_COOLDOWN_MINUTES = 15;
 export const PER_USER_DAILY_QUOTA = 5;
 
-export type RateLimitCheck = { allowed: true } | { allowed: false; retryAfterSeconds: number; reason: string };
+export type RateLimitDenied = { allowed: false; retryAfterSeconds: number; reason: string };
+export type RateLimitCheck = { allowed: true } | RateLimitDenied;
+
+/** Narrows a check to its denied branch.
+ *
+ *  Explicit rather than letting a caller write `if (!check.allowed)`, because
+ *  TypeScript only narrows a discriminated union when strictNullChecks is on,
+ *  and this repository's ROOT tsconfig.json sets it to false. That is the
+ *  config Vercel type-checks api/ against, so the shorthand compiled locally
+ *  (tsconfig.server.json turns strictNullChecks on) and then failed the
+ *  deploy with "Property 'reason' does not exist on type RateLimitCheck".
+ *
+ *  A user-defined type predicate narrows regardless of that flag, so this
+ *  works under every config in the repo instead of only the strict ones. */
+export function isRateLimited(check: RateLimitCheck): check is RateLimitDenied {
+  return check.allowed === false;
+}
 
 function pluralize(n: number, unit: string): string {
   return `${n} ${unit}${n === 1 ? "" : "s"}`;

@@ -1,0 +1,35 @@
+{
+  // Type-checks api/, lib/ and shared/ the way the DEPLOYMENT does, not the
+  // way we would like to.
+  //
+  // tsconfig.server.json turns strictNullChecks ON, which is the better
+  // setting and catches real bugs. But the repository's ROOT tsconfig.json
+  // sets "strictNullChecks": false, and that is the config Vercel type-checks
+  // the serverless functions against. The two disagree in one specific and
+  // costly way: TypeScript only narrows a discriminated union when
+  // strictNullChecks is on. So `if (!check.allowed) { check.reason }` compiled
+  // cleanly here and failed the production build with "Property 'reason' does
+  // not exist" — a green local run and a red deploy, which is the worst
+  // combination a type checker can produce.
+  //
+  // Mirrors the root compilerOptions exactly. If you change tsconfig.json,
+  // change this too, or it stops being a simulation of anything.
+  "compilerOptions": {
+    "allowJs": true,
+    "noImplicitAny": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "paths": { "@/*": ["./src/*"] },
+    "skipLibCheck": true,
+    "strictNullChecks": false,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "resolveJsonModule": true,
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM"],
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["api", "lib", "shared"],
+  "exclude": ["**/*.test.ts"]
+}
