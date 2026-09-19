@@ -66,13 +66,49 @@ export async function getSimilar(type: MediaType, id: number): Promise<Movie[]> 
   return fetchProxy(`/api/tmdb/similar?type=${type}&id=${id}`);
 }
 
+export interface CreditsPerson {
+  id: number;
+  name: string;
+  /** Bare TMDB path — size it with tmdbProfile() before rendering. */
+  profilePath: string | null;
+}
+
+export interface CastMember extends CreditsPerson {
+  character: string | null;
+}
+
 export interface Credits {
-  cast: { id: number; name: string }[];
-  directors: { id: number; name: string }[];
+  cast: CastMember[];
+  directors: CreditsPerson[];
 }
 
 export async function getCredits(type: MediaType, id: number): Promise<Credits> {
   const res = await fetch(`/api/tmdb/credits?type=${type}&id=${id}`);
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+  return res.json();
+}
+
+export interface PersonCredit extends Movie {
+  /** Character played, or crew job. */
+  role: string | null;
+  /** Ordering signal only — the server has already sorted by it. */
+  popularity: number;
+}
+
+export interface Person {
+  id: number;
+  name: string;
+  profilePath: string | null;
+  biography: string;
+  knownFor: string | null;
+  birthday: string | null;
+  deathday: string | null;
+  placeOfBirth: string | null;
+  credits: PersonCredit[];
+}
+
+export async function getPerson(id: number): Promise<Person> {
+  const res = await fetch(`/api/tmdb/person?id=${id}`);
   if (!res.ok) throw new Error(`Request failed: ${res.status}`);
   return res.json();
 }

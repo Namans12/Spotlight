@@ -20,6 +20,7 @@ const Search = lazy(() => import('./routes/Search'));
 const Browse = lazy(() => import('./routes/Browse'));
 const TitleDetail = lazy(() => import('./routes/TitleDetail'));
 const TitleConnections = lazy(() => import('./routes/TitleConnections'));
+const PersonDetail = lazy(() => import('./routes/PersonDetail'));
 const Login = lazy(() => import('./routes/Login'));
 const ListLayout = lazy(() => import('./routes/list/ListLayout'));
 const Watchlist = lazy(() => import('./routes/list/Watchlist'));
@@ -54,6 +55,7 @@ const App = () => (
                     <Route path="/browse" element={<Browse />} />
                     <Route path="/title/:type/:id" element={<TitleDetail />} />
                     <Route path="/title/:type/:id/connections" element={<TitleConnections />} />
+                    <Route path="/person/:id" element={<PersonDetail />} />
                     <Route path="/login" element={<Login />} />
                     <Route
                       path="/list"

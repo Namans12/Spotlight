@@ -8,6 +8,7 @@ import {
   tmdbRecommendations,
   tmdbSimilar,
   tmdbCredits,
+  tmdbPerson,
   tmdbDiscover,
   tmdbWatchProvidersBatch,
   tmdbRecommendationBuckets,
@@ -131,6 +132,18 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
             ? "public, s-maxage=30, stale-while-revalidate=60"
             : "public, s-maxage=3600, stale-while-revalidate=86400";
         }
+        break;
+      }
+      case "person": {
+        const personId = Number(url.searchParams.get("id"));
+        if (!Number.isFinite(personId) || personId <= 0) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: "id is required" }));
+          return;
+        }
+        body = await tmdbPerson(personId);
+        // A filmography changes when a new film is announced, not by the hour.
+        cacheControl = "public, s-maxage=86400, stale-while-revalidate=604800";
         break;
       }
       case "discover": {

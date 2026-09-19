@@ -311,23 +311,182 @@ export async function tmdbCollectionParts(
     : null;
 }
 
-export interface CreditsResult {
-  cast: { id: number; name: string }[];
-  directors: { id: number; name: string }[];
+export interface CreditsPerson {
+  id: number;
+  name: string;
+  /** Bare TMDB path, not a URL: the client sizes it (src/lib/tmdbImage.ts) and
+   *  a 45px avatar has no business downloading a w500. Null for the many crew
+   *  and bit-part credits TMDB has no photo for. */
+  profilePath: string | null;
 }
+
+export interface CastMember extends CreditsPerson {
+  /** Who they play. The reason a cast list is worth reading at all — "Anne
+   *  Hathaway" is a fact, "Anne Hathaway as Denise Platt" is the cast list. */
+  character: string | null;
+}
+
+export interface CreditsResult {
+  cast: CastMember[];
+  directors: CreditsPerson[];
+}
+
+// Enough to fill a scrolling row two or three screens wide without turning the
+// page into a phone book. TMDB orders `cast` by billing, so the first N are
+// the billed leads — the ones a reader is scanning for.
+const MAX_CAST = 18;
 
 export async function tmdbCredits(mediaType: "movie" | "tv", id: number): Promise<CreditsResult> {
   const res = await fetchWithRetry(`${TMDB_BASE_URL}/${mediaType}/${id}/credits?api_key=${requireApiKey()}`);
   if (!res.ok) throw new Error(`TMDB credits failed: ${res.status}`);
   const data = await res.json();
   return {
-    cast: (data.cast ?? []).slice(0, 10).map((c: any) => ({ id: c.id, name: c.name })),
+    cast: (data.cast ?? []).slice(0, MAX_CAST).map((c: TmdbRow) => ({
+      id: c.id,
+      name: c.name,
+      profilePath: c.profile_path ?? null,
+      character: nonEmptyString(c.character),
+    })),
     // TV credits expose creators as "Director" rarely; fall back to any
     // directing-department crew so show pages aren't left empty.
     directors: (data.crew ?? [])
-      .filter((c: any) => c.job === "Director" || c.department === "Directing")
+      .filter((c: TmdbRow) => c.job === "Director" || c.department === "Directing")
       .slice(0, 3)
-      .map((c: any) => ({ id: c.id, name: c.name })),
+      .map((c: TmdbRow) => ({ id: c.id, name: c.name, profilePath: c.profile_path ?? null })),
+  };
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+export interface PersonCreditEntry {
+  id: number;
+  mediaType: "movie" | "tv";
+  title: string;
+  posterPath: string | null;
+  backdropPath: string | null;
+  overview: string;
+  releaseDate: string;
+  voteAverage: number;
+  originalLanguage: string;
+  /** What they did in it — a character name, or a crew job. */
+  role: string | null;
+  /** TMDB's own popularity for the title, used only for ordering — the client
+   *  never shows it. Kept on the wire because the ranking is done here. */
+  popularity: number;
+}
+
+export interface PersonResult {
+  id: number;
+  name: string;
+  profilePath: string | null;
+  biography: string;
+  knownFor: string | null;
+  birthday: string | null;
+  deathday: string | null;
+  placeOfBirth: string | null;
+  credits: PersonCreditEntry[];
+}
+
+// A prolific actor has hundreds of credits, most of them a single guest
+// episode. Popularity ordering puts the work they are actually known for
+// first, and the cut keeps the page to a browsable grid.
+const MAX_PERSON_CREDITS = 40;
+
+/**
+ * "Was on the telly once" vs. "was in it".
+ *
+ * Sorting a filmography by popularity has one failure mode, and it is severe:
+ * TMDB's popularity scores for long-running talk shows dwarf those of any
+ * film, so a single guest spot on The Tonight Show outranks the work someone
+ * spent a year making. Owen Wilson's page opened with The Daily Show, Colbert,
+ * SNL and Graham Norton — six chat shows before a single film.
+ *
+ * Three rules, all of them already established elsewhere in this file:
+ *   - talk / news / reality genres are not filmography (TV_NOISE_GENRE_IDS,
+ *     the same set the recommendation engine screens out)
+ *   - a TV credit under MIN_TV_EPISODES is a guest appearance, not a part
+ *   - playing yourself is an appearance, whatever the show
+ */
+function isAppearanceNotARole(credit: TmdbRow, mediaType: "movie" | "tv"): boolean {
+  if (/^(self|him|her)self$|^self\b/i.test(String(credit?.character ?? "").trim())) return true;
+  if (mediaType !== "tv") return false;
+  if ((credit?.genre_ids ?? []).some((g: number) => TV_NOISE_GENRE_IDS.has(g))) return true;
+  return typeof credit?.episode_count === "number" && credit.episode_count < MIN_TV_EPISODES;
+}
+
+/**
+ * A person, and what they have been in.
+ *
+ * `combined_credits` rather than /discover: TMDB's discover endpoint has no
+ * person filter for TV at all (see tmdbDiscover), and even for film it returns
+ * a popularity-ranked slice rather than the filmography. This is one request
+ * for both halves of the page.
+ */
+export async function tmdbPerson(id: number): Promise<PersonResult> {
+  const url = `${TMDB_BASE_URL}/person/${id}?api_key=${requireApiKey()}&append_to_response=combined_credits`;
+  const res = await fetchWithRetry(url);
+  if (!res.ok) throw new Error(`TMDB person failed: ${res.status}`);
+  const r = await res.json();
+
+  const raw = [...(r.combined_credits?.cast ?? []), ...(r.combined_credits?.crew ?? [])];
+  // One person can hold several credits on the same title (actor and producer,
+  // or two characters). Keep the first — cast is concatenated first, so an
+  // acting credit wins over a crew one, which is the more interesting answer.
+  const byKey = new Map<string, PersonCreditEntry>();
+  for (const c of raw) {
+    const mediaType = c.media_type === "tv" ? "tv" : "movie";
+    const key = `${mediaType}:${c.id}`;
+    if (byKey.has(key)) continue;
+    if (typeof c.id !== "number") continue;
+    if (isAppearanceNotARole(c, mediaType)) continue;
+    byKey.set(key, {
+      id: c.id,
+      mediaType,
+      title: c.title || c.name || "Untitled",
+      posterPath: c.poster_path ?? null,
+      backdropPath: c.backdrop_path ?? null,
+      overview: c.overview || "",
+      releaseDate: c.release_date || c.first_air_date || "",
+      voteAverage: typeof c.vote_average === "number" ? c.vote_average : 0,
+      originalLanguage: c.original_language || "",
+      role: nonEmptyString(c.character) ?? nonEmptyString(c.job),
+      popularity: typeof c.popularity === "number" ? c.popularity : 0,
+    });
+  }
+
+  // Ranked by the title's own popularity, not by date.
+  //
+  // Recency is the obvious ordering and the wrong one: TMDB carries announced
+  // projects years ahead of release, so a newest-first filmography opens with
+  // three unmade films nobody can name and buries the work the person is
+  // actually known for. Sorting by popularity is what makes the heading true.
+  //
+  // Unreleased titles are pushed behind released ones regardless of how much
+  // buzz they carry, because "what has this person been in" is a question
+  // about work that exists.
+  const today = new Date().toISOString().slice(0, 10);
+  const released = (c: PersonCreditEntry) => Boolean(c.releaseDate) && c.releaseDate <= today;
+
+  const credits = [...byKey.values()]
+    .sort((a, b) => {
+      if (released(a) !== released(b)) return released(a) ? -1 : 1;
+      if (b.popularity !== a.popularity) return b.popularity - a.popularity;
+      return b.releaseDate.localeCompare(a.releaseDate);
+    })
+    .slice(0, MAX_PERSON_CREDITS);
+
+  return {
+    id: r.id,
+    name: r.name || "Unknown",
+    profilePath: r.profile_path ?? null,
+    biography: r.biography || "",
+    knownFor: nonEmptyString(r.known_for_department),
+    birthday: nonEmptyString(r.birthday),
+    deathday: nonEmptyString(r.deathday),
+    placeOfBirth: nonEmptyString(r.place_of_birth),
+    credits,
   };
 }
 
@@ -385,14 +544,72 @@ export interface TitleDetailResult {
    *  Free here — this is the one TMDB call already made for every title-detail
    *  page view, so no separate seasons lookup is needed on this page. */
   numberOfSeasons: number | null;
+  /** TV only. */
+  numberOfEpisodes: number | null;
+  /** The marketing one-liner. Often absent, often better than the synopsis. */
+  tagline: string | null;
+  /** "Released", "Post Production", "Returning Series", "Ended", ... */
+  status: string | null;
+  /** Age rating for the reader's own country where TMDB has one, falling back
+   *  to the US certificate. Region-tagged so the UI can say which body issued
+   *  it — "UA" and "PG-13" mean different things and come from different
+   *  regulators, and an untagged badge would quietly conflate them. */
+  certification: { value: string; region: string } | null;
+  /** Movies only, whole US dollars, 0 when TMDB doesn't know. */
+  budget: number | null;
+  revenue: number | null;
 }
 
 const IMG_BASE = "https://image.tmdb.org/t/p/w500";
 const BACKDROP_BASE = "https://image.tmdb.org/t/p/w1280";
 
+/**
+ * The age rating, from whichever of TMDB's two differently-shaped endpoints
+ * applies. Movies carry `release_dates` (a list of releases per country, each
+ * with its own certificate); TV carries `content_ratings` (one certificate per
+ * country). Both are already appended to the single detail call.
+ *
+ * Preference is the reader's own region, then the US — not because the US
+ * matters more, but because it is the one certificate TMDB almost always has,
+ * and "PG-13 (US)" is a more useful answer than nothing. The region travels
+ * with the value so the label can never imply a certificate was issued by a
+ * board that never saw the film.
+ */
+function resolveCertification(payload: TmdbRow, mediaType: "movie" | "tv", region: string) {
+  const preferred = [region, "US"];
+
+  if (mediaType === "movie") {
+    const results = payload?.release_dates?.results ?? [];
+    for (const wanted of preferred) {
+      const entry = results.find((x: TmdbRow) => x?.iso_3166_1 === wanted);
+      for (const release of entry?.release_dates ?? []) {
+        const value = nonEmptyString(release?.certification);
+        if (value) return { value, region: wanted };
+      }
+    }
+    return null;
+  }
+
+  const results = payload?.content_ratings?.results ?? [];
+  for (const wanted of preferred) {
+    const entry = results.find((x: TmdbRow) => x?.iso_3166_1 === wanted);
+    const value = nonEmptyString(entry?.rating);
+    if (value) return { value, region: wanted };
+  }
+  return null;
+}
+
+/** TMDB reports 0 for an unknown budget or box office, which is essentially
+ *  never a real zero. Collapsed to null so the UI can omit the row entirely
+ *  rather than assert that a film earned nothing. */
+function positiveOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+}
+
 export async function tmdbDetail(mediaType: "movie" | "tv", id: number, region = "IN"): Promise<TitleDetailResult> {
   const path = mediaType === "movie" ? "movie" : "tv";
-  const append = mediaType === "movie" ? "release_dates,watch/providers" : "watch/providers";
+  const append =
+    mediaType === "movie" ? "release_dates,watch/providers" : "content_ratings,watch/providers";
   const url = `${TMDB_BASE_URL}/${path}/${id}?api_key=${requireApiKey()}&append_to_response=${append}`;
   const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`TMDB detail failed: ${res.status}`);
@@ -421,6 +638,12 @@ export async function tmdbDetail(mediaType: "movie" | "tv", id: number, region =
       mediaType === "tv" && typeof r.number_of_seasons === "number" && r.number_of_seasons > 0
         ? r.number_of_seasons
         : null,
+    numberOfEpisodes: mediaType === "tv" ? positiveOrNull(r.number_of_episodes) : null,
+    tagline: nonEmptyString(r.tagline),
+    status: nonEmptyString(r.status),
+    certification: resolveCertification(r, mediaType, region),
+    budget: mediaType === "movie" ? positiveOrNull(r.budget) : null,
+    revenue: mediaType === "movie" ? positiveOrNull(r.revenue) : null,
   };
 }
 

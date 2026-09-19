@@ -16,6 +16,15 @@ export interface TitleDetail {
   originalLanguage: string;
   /** TV only; null for movies and for a show TMDB has no season count for. */
   numberOfSeasons: number | null;
+  /** TV only. */
+  numberOfEpisodes: number | null;
+  tagline: string | null;
+  status: string | null;
+  /** Age rating plus the country whose board issued it. */
+  certification: { value: string; region: string } | null;
+  /** Movies only, whole US dollars. Null when TMDB doesn't know. */
+  budget: number | null;
+  revenue: number | null;
 }
 
 export async function fetchTitleDetail(mediaType: 'movie' | 'tv', id: number): Promise<TitleDetail> {
