@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Plus, RotateCcw, Sparkles, Swords } from 'lucide-react';
+import { Clapperboard, Loader2, Plus, RotateCcw, Sparkles, Swords, Tv } from 'lucide-react';
 import { getTrending, getPopularMovies, getPopularTV, getYouMayAlsoLike, type MediaType } from '@/lib/tmdb';
 import { useWatchlistContext } from '@/contexts/WatchlistContext';
 import { useGenres, useRuntimes } from '@/hooks/useProviders';
@@ -33,8 +33,14 @@ const POOL_SIZE = 20;
  * what this reader saved and never watched, and what the recommendation engine
  * makes of their taste; the picks reweight the pool as they go.
  */
+/** null means "hasn't chosen yet" -- the picker screen renders instead of any
+ *  duel. Not a third pool source: this decides which of the existing sources'
+ *  items are even eligible, before anything is dealt. */
+type MediaFilter = 'movie' | 'tv' | null;
+
 export default function Duel() {
   const wl = useWatchlistContext();
+  const [mediaFilter, setMediaFilter] = useState<MediaFilter>(null);
   const [weights, setWeights] = useState<Weights>({});
   const [picks, setPicks] = useState<DuelPick[]>([]);
   const [seen, setSeen] = useState<Set<string>>(new Set());
@@ -60,8 +66,15 @@ export default function Duel() {
   });
 
   // Every source is in, or is never coming. Recommendations are only waited
-  // for when there is something to seed them from.
-  const ready = !trending.isLoading && !films.isLoading && !shows.isLoading && (!seed || !recommended.isLoading);
+  // for when there is something to seed them from. Nothing about the type
+  // choice matters yet -- the queries above run regardless, so switching
+  // between "Movies" and "Shows" costs a re-deal, never a re-fetch.
+  const ready =
+    mediaFilter !== null &&
+    !trending.isLoading &&
+    !films.isLoading &&
+    !shows.isLoading &&
+    (!seed || !recommended.isLoading);
 
   /**
    * The pool is dealt ONCE per run, into state.
@@ -80,19 +93,25 @@ export default function Duel() {
 
   useEffect(() => {
     if (rawPool !== null || !ready) return;
+    // Filtered down to the chosen type before dealing, not after -- a pool
+    // dealt from everything and then filtered could hand back fewer than
+    // POOL_SIZE eligible posters for a type that happened to lose the shuffle,
+    // even though plenty more of that type exist in the sources.
+    const onlyChosenType = <T extends { mediaType: string }>(items: T[]) =>
+      items.filter((item) => item.mediaType === mediaFilter);
     const sources: PoolSource[] = [
       // Saved and never watched leads deliberately: the reader has already
       // said they want to see these, so the only thing standing between them
       // and a decision is the decision.
-      { name: 'saved', items: [...wl.watchlist, ...wl.watchLater] },
-      { name: 'recommended', items: recommended.data ?? [] },
-      { name: 'trending', items: trending.data ?? [] },
-      { name: 'films', items: films.data ?? [] },
-      { name: 'shows', items: shows.data ?? [] },
+      { name: 'saved', items: onlyChosenType([...wl.watchlist, ...wl.watchLater]) },
+      { name: 'recommended', items: onlyChosenType(recommended.data ?? []) },
+      { name: 'trending', items: onlyChosenType(trending.data ?? []) },
+      { name: 'films', items: mediaFilter === 'movie' ? (films.data ?? []) : [] },
+      { name: 'shows', items: mediaFilter === 'tv' ? (shows.data ?? []) : [] },
     ];
     setRawPool(buildPool(sources, { watchedKeys: wl.watchedKeys, limit: POOL_SIZE }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, rawPool, run]);
+  }, [ready, rawPool, run, mediaFilter]);
 
   const loading = !ready || rawPool === null;
 
@@ -137,6 +156,22 @@ export default function Duel() {
     setRun((n) => n + 1);
   }
 
+  /** Back to the picker screen entirely -- a real change of mind, not a
+   *  replay of the same kind of duel. */
+  function changeType() {
+    setMediaFilter(null);
+    restart();
+  }
+
+  if (mediaFilter === null) {
+    return (
+      <div className="space-y-6 max-w-3xl">
+        <Header />
+        <MediaPicker onChoose={setMediaFilter} />
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -147,15 +182,17 @@ export default function Duel() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <header className="space-y-1">
-        <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-accent">
-          <Swords size={14} /> Pick one
-        </p>
-        <h1 className="font-display text-3xl sm:text-4xl font-bold text-foreground">Can&rsquo;t decide?</h1>
-        <p className="text-sm text-muted-foreground">
-          Two posters, five times. No right answer — just pick whichever you&rsquo;d rather watch tonight.
-        </p>
-      </header>
+      <Header />
+
+      <div className="flex items-center gap-2 text-xs">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground font-medium">
+          {mediaFilter === 'tv' ? <Tv size={12} /> : <Clapperboard size={12} />}
+          {mediaFilter === 'tv' ? 'Shows' : 'Movies'}
+        </span>
+        <button type="button" onClick={changeType} className="text-muted-foreground hover:text-foreground underline">
+          Change
+        </button>
+      </div>
 
       {pair ? (
         <>
@@ -181,6 +218,53 @@ export default function Duel() {
       ) : (
         <NothingToOffer signedIn={Boolean(seed)} />
       )}
+    </div>
+  );
+}
+
+function Header() {
+  return (
+    <header className="space-y-1">
+      <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-accent">
+        <Swords size={14} /> Pick one
+      </p>
+      <h1 className="font-display text-3xl sm:text-4xl font-bold text-foreground">Can&rsquo;t decide?</h1>
+      <p className="text-sm text-muted-foreground">
+        Two posters, five times. No right answer, just pick whichever you&rsquo;d rather watch tonight.
+      </p>
+    </header>
+  );
+}
+
+/**
+ * Movie or show, decided before a single poster is dealt.
+ *
+ * Not a third duel round -- a reader who wants a two-hour film and one who
+ * wants a ten-season commitment are answering different questions, and
+ * mixing them into the same five rounds means half the choices are between
+ * things that were never comparable in the first place.
+ */
+function MediaPicker({ onChoose }: { onChoose: (type: 'movie' | 'tv') => void }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 max-w-md">
+      <button
+        type="button"
+        onClick={() => onChoose('movie')}
+        className="flex flex-col items-center gap-2 rounded-2xl bg-card p-6 ring-1 ring-border hover:ring-accent active:scale-[0.98] transition-all"
+      >
+        <Clapperboard size={28} className="text-accent" />
+        <span className="text-sm font-semibold text-foreground">Movies</span>
+        <span className="text-[11px] text-muted-foreground">One sitting, tonight</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => onChoose('tv')}
+        className="flex flex-col items-center gap-2 rounded-2xl bg-card p-6 ring-1 ring-border hover:ring-accent active:scale-[0.98] transition-all"
+      >
+        <Tv size={28} className="text-accent" />
+        <span className="text-sm font-semibold text-foreground">Shows</span>
+        <span className="text-[11px] text-muted-foreground">Something to get into</span>
+      </button>
     </div>
   );
 }
@@ -294,7 +378,7 @@ function NothingToOffer({ signedIn }: { signedIn: boolean }) {
       <p className="text-sm text-muted-foreground leading-relaxed">
         {signedIn
           ? 'Almost everything on offer is already marked seen. Browse a little and this fills back up.'
-          : 'This works best once there is something to go on — save a few titles and it gets sharper.'}
+          : 'This works best once there is something to go on - save a few titles and it gets sharper.'}
       </p>
       <Link
         to="/browse"

@@ -41,7 +41,7 @@ async function ensureAuthenticated(queryClient: QueryClient): Promise<void> {
   // silently, and the agent needs to be told that in words it can relay to
   // the user rather than being handed an opaque failure.
   if (!DEMO_GUEST_ENABLED) {
-    throw new Error('Sign in with Google first — this action writes to your own private list.');
+    throw new Error('Sign in with Google first - this action writes to your own private list.');
   }
 
   const res = await fetch('/api/auth', {
@@ -238,7 +238,7 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
     register({
       name: 'get_release_digest',
       description:
-        "Get Spotlight's twice-weekly OTT release digest for India — what's Out Now and Coming Up, split into Hindi OTT, English OTT, and Popular (Other Languages), grouped by streaming platform.",
+        "Get Spotlight's twice-weekly OTT release digest for India - what's Out Now and Coming Up, split into Hindi OTT, English OTT, and Popular (Other Languages), grouped by streaming platform.",
       inputSchema: {
         type: 'object',
         properties: {
@@ -314,7 +314,7 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
         const after = relations?.mustWatch.after ?? [];
 
         if (before.length === 0 && after.length === 0 && (relations?.canWatch.length ?? 0) === 0) {
-          return { ok: true, resolvedTitle: movie.title, hasChain: false, message: 'This title stands on its own — nothing else required.' };
+          return { ok: true, resolvedTitle: movie.title, hasChain: false, message: 'This title stands on its own - nothing else required.' };
         }
 
         const chain = [
@@ -346,7 +346,7 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
     register({
       name: 'plan_watch_order',
       description:
-        "Build a title's full watch-order chain into the user's watchlist, in the correct order, skipping anything already watched or already on their list. This is the one-shot 'get me caught up on X' action — it reads the real relations graph, cross-references the user's real watch history, and writes the remaining titles to their real watchlist in sequence.",
+        "Build a title's full watch-order chain into the user's watchlist, in the correct order, skipping anything already watched or already on their list. This is the one-shot 'get me caught up on X' action - it reads the real relations graph, cross-references the user's real watch history, and writes the remaining titles to their real watchlist in sequence.",
       inputSchema: {
         type: 'object',
         properties: {
@@ -367,7 +367,7 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
         const chain: Movie[] = await enrichChain([...before.map(relatedToMovie), movie, ...after.map(relatedToMovie)]);
 
         if (chain.length === 1) {
-          return { ok: true, title: movie.title, added: [], message: 'This title stands on its own — nothing else to plan.' };
+          return { ok: true, title: movie.title, added: [], message: 'This title stands on its own - nothing else to plan.' };
         }
 
         const state = await watchlistApi.fetchWatchlistState();
@@ -433,8 +433,8 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
           message:
             added.length > 0
               ? `Added ${added.length} title(s) to the watchlist${reordered ? ', in watch order' : ''}.` +
-                (relations?.hasMore ? ' The chain is longer than this — some titles were beyond the lookup depth.' : '')
-              : 'Nothing new to add — already caught up on this one.',
+                (relations?.hasMore ? ' The chain is longer than this - some titles were beyond the lookup depth.' : '')
+              : 'Nothing new to add - already caught up on this one.',
         };
       },
     }),
@@ -538,7 +538,7 @@ function registerDynamicTools(modelContext: ModelContext, queryClient: QueryClie
         // so a tie is reported rather than resolved by list position.
         return {
           ok: false,
-          message: `"${title}" matches ${ambiguous.length} titles — say which one.`,
+          message: `"${title}" matches ${ambiguous.length} titles - say which one.`,
           candidates: ambiguous.map((i) => i.title),
         };
       }
@@ -552,7 +552,7 @@ function registerDynamicTools(modelContext: ModelContext, queryClient: QueryClie
   const reorderTool: ModelContextTool = {
     name: 'reorder_watchlist',
     description:
-      "Reorder the user's watchlist. Give the titles in the desired order (a prefix is fine — anything not mentioned keeps its relative order after the ones you listed).",
+      "Reorder the user's watchlist. Give the titles in the desired order (a prefix is fine - anything not mentioned keeps its relative order after the ones you listed).",
     inputSchema: {
       type: 'object',
       properties: {

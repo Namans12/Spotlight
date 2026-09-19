@@ -48,8 +48,8 @@ export function WatchedToggle({ watched, onToggle, variant = 'card', className =
       type="button"
       onClick={handleClick}
       aria-pressed={watched}
-      aria-label={watched ? 'Seen — tap to unmark' : 'Mark as seen'}
-      title={watched ? 'Seen — tap to unmark' : 'Mark as seen'}
+      aria-label={watched ? 'Seen - tap to unmark' : 'Mark as seen'}
+      title={watched ? 'Seen - tap to unmark' : 'Mark as seen'}
       className={`${base} ${tone} active:scale-95 transition-all ${className}`}
     >
       <Eye size={variant === 'detail' ? 12 : 13} fill={watched ? 'currentColor' : 'none'} className="shrink-0" />

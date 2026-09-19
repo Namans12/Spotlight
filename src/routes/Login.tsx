@@ -45,7 +45,7 @@ export default function Login() {
         setScriptReady(true);
       } else if (attempts > 50) {
         clearInterval(poll);
-        setError('Could not reach Google Sign-In — check your connection and reload.');
+        setError('Could not reach Google Sign-In - check your connection and reload.');
       }
     }, 100);
     return () => clearInterval(poll);

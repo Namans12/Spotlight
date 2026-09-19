@@ -199,7 +199,7 @@ export function AgentChat() {
 
       setMessages((m) => [
         ...m,
-        { role: 'assistant', text: "That took more tool calls than I'd like to keep going automatically — here's where it got to.", toolCalls: toolLog },
+        { role: 'assistant', text: "That took more tool calls than I'd like to keep going automatically - here's where it got to.", toolCalls: toolLog },
       ]);
     } catch (err) {
       setMessages((m) => [...m, { role: 'assistant', text: `Error: ${err instanceof Error ? err.message : String(err)}` }]);
@@ -242,7 +242,7 @@ export function AgentChat() {
           {showSettings && (
             <div className="space-y-2 border-b border-border bg-secondary/40 px-4 py-3">
               <label className="block text-xs font-medium text-muted-foreground">
-                API key — stored only in this browser, never on Spotlight's servers.
+                API key - stored only in this browser, never on Spotlight's servers.
               </label>
               <input
                 type="password"
@@ -268,8 +268,8 @@ export function AgentChat() {
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground font-mono"
               />
               <p className="text-[11px] leading-snug text-muted-foreground">
-                Defaults to Groq (free key at console.groq.com) — any OpenAI-compatible, Bearer-auth endpoint works by
-                changing the base URL. Sent to a stateless relay (api/agent-relay.ts) that forwards it and back —
+                Defaults to Groq (free key at console.groq.com) - any OpenAI-compatible, Bearer-auth endpoint works by
+                changing the base URL. Sent to a stateless relay (api/agent-relay.ts) that forwards it and back -
                 required only because these providers block direct browser requests. Nothing is logged or stored
                 server-side.
               </p>
@@ -279,7 +279,7 @@ export function AgentChat() {
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
             {messages.length === 0 && (
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Try: "What order should I watch the John Wick movies in, and get me caught up?" — this calls the
+                Try: "What order should I watch the John Wick movies in, and get me caught up?" - this calls the
                 real <code>plan_watch_order</code> WebMCP tool against your actual watchlist.
               </p>
             )}

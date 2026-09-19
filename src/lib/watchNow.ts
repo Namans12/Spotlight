@@ -30,7 +30,7 @@ export interface RuntimeBandSpec {
  *  and past that is a deliberate commitment. */
 export const RUNTIME_BANDS: RuntimeBandSpec[] = [
   { id: 'short', label: 'Under 45 min', min: 0, max: 45 },
-  { id: 'medium', label: '45 min – 2 hr', min: 45, max: 120 },
+  { id: 'medium', label: '45 min - 2 hr', min: 45, max: 120 },
   { id: 'long', label: 'Over 2 hr', min: 120, max: Number.POSITIVE_INFINITY },
 ];
 

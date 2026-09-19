@@ -264,7 +264,7 @@ describe('wrappedSummary', () => {
     // One clause, saved first: the watched titles are a subset of the saved
     // ones, so "2 titles watched. 3 saved." would read as five titles.
     expect(summary).toContain('My 2026 on Spotlight:');
-    expect(summary).toContain('3 titles saved, 2 watched — about 4 hours of film.');
+    expect(summary).toContain('3 titles saved, 2 watched - about 4 hours of film.');
     expect(summary).toContain('Mostly Thriller.');
     // Ranked, then joined with "and": English twice (the two watched), Hindi once.
     expect(summary).toContain('In English and Hindi.');
