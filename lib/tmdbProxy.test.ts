@@ -1,5 +1,17 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { resolveProviders, tmdbWatchProvidersBatch, providerCacheKey, tmdbCollectionParts } from './tmdbProxy';
+
+// Same shape-free alias lib/tmdbProxy.ts uses for raw TMDB JSON: these
+// fixtures are deliberately partial payloads, not typed records.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TmdbRow = any;
+import {
+  resolveProviders,
+  tmdbWatchProvidersBatch,
+  providerCacheKey,
+  tmdbCollectionParts,
+  tmdbPerson,
+  tmdbDetail,
+} from './tmdbProxy';
 
 function watchProvidersPayload(region: string, buckets: Record<string, { provider_name: string }[]>) {
   return { 'watch/providers': { results: { [region]: buckets } } };
@@ -166,5 +178,272 @@ describe('tmdbCollectionParts retry budget', () => {
   it('returns null for a title in no collection', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, { belongs_to_collection: null }) as never);
     expect(await tmdbCollectionParts(603)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tmdbPerson
+//
+// The filmography behind every cast link. Its whole job is ordering, and the
+// ordering has one dangerous failure mode (see isAppearanceNotARole): TMDB's
+// popularity score for a nightly talk show is an order of magnitude above any
+// film's, so a naive popularity sort opens an actor's page with six chat shows
+// they once sat on a sofa for.
+// ---------------------------------------------------------------------------
+
+function personPayload(cast: TmdbRow[], crew: TmdbRow[] = []) {
+  return {
+    id: 887,
+    name: 'Owen Wilson',
+    profile_path: '/face.jpg',
+    biography: 'An actor.',
+    known_for_department: 'Acting',
+    birthday: '1968-11-18',
+    place_of_birth: 'Dallas, Texas, USA',
+    combined_credits: { cast, crew },
+  };
+}
+
+const FILM = {
+  id: 920,
+  media_type: 'movie',
+  title: 'Cars',
+  release_date: '2006-06-08',
+  character: 'Lightning McQueen',
+  popularity: 40,
+  poster_path: '/cars.jpg',
+};
+
+const TALK_SHOW = {
+  id: 2224,
+  media_type: 'tv',
+  name: 'The Daily Show',
+  first_air_date: '1996-07-22',
+  character: 'Self',
+  popularity: 900,
+  genre_ids: [10767], // Talk
+  episode_count: 3,
+};
+
+describe('tmdbPerson', () => {
+  it('does not let a talk-show appearance outrank an actual film', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, personPayload([TALK_SHOW, FILM])));
+
+    const person = await tmdbPerson(887);
+
+    expect(person.credits.map((c) => c.title)).toEqual(['Cars']);
+  });
+
+  it('drops a one-off guest spot on a scripted show but keeps a real part', async () => {
+    const guestSpot = {
+      id: 1,
+      media_type: 'tv',
+      name: 'Anthology',
+      first_air_date: '2015-01-01',
+      character: 'Waiter',
+      popularity: 500,
+      genre_ids: [18],
+      episode_count: 1,
+    };
+    const realRole = {
+      id: 2,
+      media_type: 'tv',
+      name: 'Loki',
+      first_air_date: '2021-06-09',
+      character: 'Mobius',
+      popularity: 80,
+      genre_ids: [10765],
+      episode_count: 12,
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, personPayload([guestSpot, realRole])));
+
+    const person = await tmdbPerson(887);
+
+    expect(person.credits.map((c) => c.title)).toEqual(['Loki']);
+  });
+
+  it('drops playing yourself even in a film', async () => {
+    const asSelf = { ...FILM, id: 5, title: 'A Documentary', character: 'Himself', popularity: 999 };
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, personPayload([asSelf, FILM])));
+
+    const person = await tmdbPerson(887);
+
+    expect(person.credits.map((c) => c.title)).toEqual(['Cars']);
+  });
+
+  it('ranks released work ahead of an unreleased project, however hyped', async () => {
+    const unmade = {
+      id: 99,
+      media_type: 'movie',
+      title: 'Announced Sequel',
+      release_date: '2031-01-01',
+      character: 'Lead',
+      popularity: 5000,
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, personPayload([unmade, FILM])));
+
+    const person = await tmdbPerson(887);
+
+    expect(person.credits.map((c) => c.title)).toEqual(['Cars', 'Announced Sequel']);
+  });
+
+  it('keeps one entry per title when a person is credited twice on it', async () => {
+    // Directed and starred in the same film: two rows, one piece of work. The
+    // acting credit wins because `cast` is read first.
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(200, personPayload([FILM], [{ ...FILM, character: undefined, job: 'Director' }])),
+    );
+
+    const person = await tmdbPerson(887);
+
+    expect(person.credits).toHaveLength(1);
+    expect(person.credits[0].role).toBe('Lightning McQueen');
+  });
+
+  it('reports a crew job as the role when there is no character', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(200, personPayload([], [{ ...FILM, character: undefined, job: 'Director' }])),
+    );
+
+    const person = await tmdbPerson(887);
+
+    expect(person.credits[0].role).toBe('Director');
+  });
+
+  it('carries the person themselves, not only their credits', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, personPayload([FILM])));
+
+    const person = await tmdbPerson(887);
+
+    expect(person).toMatchObject({
+      id: 887,
+      name: 'Owen Wilson',
+      knownFor: 'Acting',
+      birthday: '1968-11-18',
+      placeOfBirth: 'Dallas, Texas, USA',
+      deathday: null,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tmdbDetail — the fields the title page's facts panel is built from.
+// ---------------------------------------------------------------------------
+
+describe('tmdbDetail certification', () => {
+  function movieWithCertificates(results: TmdbRow[]) {
+    return {
+      id: 1,
+      title: 'A Film',
+      release_date: '2026-01-01',
+      runtime: 93,
+      budget: 80_000_000,
+      revenue: 117_234_000,
+      release_dates: { results },
+    };
+  }
+
+  it('prefers the region the reader is in', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(
+        200,
+        movieWithCertificates([
+          { iso_3166_1: 'US', release_dates: [{ certification: 'PG-13' }] },
+          { iso_3166_1: 'IN', release_dates: [{ certification: 'U/A 13+' }] },
+        ]),
+      ),
+    );
+
+    const detail = await tmdbDetail('movie', 1, 'IN');
+
+    expect(detail.certification).toEqual({ value: 'U/A 13+', region: 'IN' });
+  });
+
+  // TMDB's Indian certification coverage is thin. "PG-13 (US)" is a more
+  // useful answer than none, as long as the label says whose rating it is.
+  it('falls back to the US certificate, tagged as such', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(200, movieWithCertificates([{ iso_3166_1: 'US', release_dates: [{ certification: 'R' }] }])),
+    );
+
+    const detail = await tmdbDetail('movie', 1, 'IN');
+
+    expect(detail.certification).toEqual({ value: 'R', region: 'US' });
+  });
+
+  it('skips a region entry whose certificate is an empty string', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(
+        200,
+        movieWithCertificates([
+          { iso_3166_1: 'IN', release_dates: [{ certification: '' }, { certification: 'A' }] },
+        ]),
+      ),
+    );
+
+    const detail = await tmdbDetail('movie', 1, 'IN');
+
+    expect(detail.certification).toEqual({ value: 'A', region: 'IN' });
+  });
+
+  it('reports no certificate rather than inventing one', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, movieWithCertificates([])));
+
+    const detail = await tmdbDetail('movie', 1, 'IN');
+
+    expect(detail.certification).toBeNull();
+  });
+
+  it('reads a TV certificate from content_ratings instead', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(200, {
+        id: 1396,
+        name: 'Breaking Bad',
+        first_air_date: '2008-01-20',
+        number_of_seasons: 5,
+        number_of_episodes: 62,
+        status: 'Ended',
+        content_ratings: { results: [{ iso_3166_1: 'IN', rating: 'A' }] },
+      }),
+    );
+
+    const detail = await tmdbDetail('tv', 1396, 'IN');
+
+    expect(detail.certification).toEqual({ value: 'A', region: 'IN' });
+    expect(detail.numberOfEpisodes).toBe(62);
+    expect(detail.status).toBe('Ended');
+    // Budget and revenue are movie-only concepts; a series must not report $0.
+    expect(detail.budget).toBeNull();
+    expect(detail.revenue).toBeNull();
+  });
+});
+
+describe('tmdbDetail money', () => {
+  it('treats the TMDB zero as unknown rather than as a real figure', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(200, { id: 1, title: 'Unreleased', release_date: '2027-01-01', budget: 0, revenue: 0 }),
+    );
+
+    const detail = await tmdbDetail('movie', 1, 'IN');
+
+    expect(detail.budget).toBeNull();
+    expect(detail.revenue).toBeNull();
+  });
+
+  it('passes real figures straight through for the formatter to handle', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse(200, {
+        id: 1,
+        title: 'A Film',
+        release_date: '2026-01-01',
+        budget: 80_000_000,
+        revenue: 117_234_000,
+      }),
+    );
+
+    const detail = await tmdbDetail('movie', 1, 'IN');
+
+    expect(detail.budget).toBe(80_000_000);
+    expect(detail.revenue).toBe(117_234_000);
   });
 });

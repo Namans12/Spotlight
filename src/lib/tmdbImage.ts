@@ -17,6 +17,10 @@
 /** TMDB's poster buckets, ascending. Backdrops use a different set. */
 const POSTER_WIDTHS = [92, 154, 185, 342, 500, 780] as const;
 const BACKDROP_WIDTHS = [300, 780, 1280] as const;
+/** Profile photos have only two width buckets — w45 and w185 — and w45 is far
+ *  too small even for a 48px avatar at 2x, so a cast row lands on w185 either
+ *  way. Listed rather than assumed so the srcSet logic stays honest about it. */
+const PROFILE_WIDTHS = [45, 185] as const;
 
 /** Captures the origin+prefix and the trailing path around the size segment, so
  *  the size can be swapped without caring what it currently is. */
@@ -73,6 +77,25 @@ export function tmdbPoster(url: string | null | undefined, cssWidth: number) {
  *  w780 covers them; w1280 (the previous default) is ~36KB of waste per view. */
 export function tmdbBackdrop(url: string | null | undefined, cssWidth: number) {
   return resize(url, cssWidth, BACKDROP_WIDTHS);
+}
+
+/**
+ * A cast/crew photo.
+ *
+ * Takes a bare TMDB path (`/abc.jpg`) rather than a URL, because that is what
+ * the credits endpoints return — there is no stored full URL to rewrite here,
+ * so there is nothing to be clever about.
+ */
+export function tmdbProfile(path: string | null | undefined, cssWidth: number): SizedImage | undefined {
+  if (!path) return undefined;
+  const clean = path.startsWith('/') ? path : `/${path}`;
+  const at1x = smallestCovering(PROFILE_WIDTHS, cssWidth);
+  const at2x = smallestCovering(PROFILE_WIDTHS, cssWidth * 2);
+  const base = 'https://image.tmdb.org/t/p/';
+  return {
+    src: `${base}w${at1x}${clean}`,
+    srcSet: at2x === at1x ? undefined : `${base}w${at1x}${clean} 1x, ${base}w${at2x}${clean} 2x`,
+  };
 }
 
 /**
