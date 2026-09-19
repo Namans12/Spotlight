@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Movie, WatchlistItem, WatchlistState } from '@/types/movie';
 import type { WatchlistItemDTO, WatchlistStateDTO } from '../../shared/types/watchlist';
 import * as api from '@/lib/watchlistApi';
+import { findWatched, watchedKeys, titleKey } from '@/lib/watched';
 import { useAuth } from '@/hooks/useAuth';
 
 const QUERY_KEY = ['watchlist'];
@@ -177,6 +178,35 @@ export function useWatchlist() {
 
   const markWatched = (dbId: number) => moveMutation.mutate({ dbId, bucket: 'watched' });
 
+  /**
+   * "I've seen this" / "no I haven't", from anywhere.
+   *
+   * `markWatched` above takes a dbId, which means the title has to already be
+   * saved before it can be marked — the reason the watched bucket has stayed
+   * almost empty. This takes the title itself, so a poster on Home or a
+   * recommendation on a detail page can be marked in one tap by someone who
+   * never intended to add it to anything.
+   *
+   * The add path needs no special casing for a title already sitting in
+   * another bucket: addWatchlistItem is purge-then-insert, so the server moves
+   * it rather than duplicating it (lib/watchlistDb.ts). Un-marking is a delete
+   * rather than a move back, because there is nowhere to move back to —
+   * "not seen" is the absence of a row, not a bucket of its own.
+   */
+  const toggleWatched = (movie: Movie) => {
+    if (!requireLogin()) return;
+    const existing = findWatched(state.watched, movie);
+    if (existing) removeMutation.mutate(existing.dbId);
+    else addMutation.mutate({ movie, bucket: 'watched' });
+  };
+
+  // Recomputed per render rather than memoised: the watched bucket is a
+  // handful of rows, and a stale set here would leave an eye lit on a title
+  // that was just un-marked.
+  const watchedKeySet = watchedKeys(state.watched);
+  const isWatched = (mediaType: string, tmdbId: number) =>
+    watchedKeySet.has(titleKey(mediaType, tmdbId));
+
   const removeFromList = (dbId: number) => removeMutation.mutate(dbId);
 
   const moveToWatchlist = (dbId: number) => moveMutation.mutate({ dbId, bucket: 'watchlist' });
@@ -213,6 +243,9 @@ export function useWatchlist() {
     addToWatchlist,
     addToWatchLater,
     markWatched,
+    toggleWatched,
+    isWatched,
+    watchedKeys: watchedKeySet,
     removeFromList,
     reorderWatchlist,
     reorderWatchLater,
