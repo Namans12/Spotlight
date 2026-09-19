@@ -28,6 +28,29 @@ export function useProviders(items: ProviderSubject[]): ProvidersLookup {
     staleTime: 6 * 60 * 60_000,
   });
 
-  const map = query.data;
+  const map = query.data?.providers;
   return (mediaType: string, tmdbId: number): string[] | undefined => map?.[providerKey(mediaType, tmdbId)];
+}
+
+/** Minutes for one sitting, from the same batch `useProviders` already ran —
+ * no extra request, and no extra TMDB call behind it either (see
+ * lib/tmdbProxy.ts tmdbWatchProvidersBatch). `undefined` means unknown, which
+ * a filter must treat as "do not hide it" rather than as zero. */
+export type RuntimeLookup = (mediaType: string, tmdbId: number) => number | undefined;
+
+export function useRuntimes(items: ProviderSubject[]): RuntimeLookup {
+  const keys = items.map((i) => ({ mediaType: i.mediaType, id: i.id }));
+  const cacheKey = keys.map((k) => providerKey(k.mediaType, k.id)).sort().join(',');
+
+  // Same queryKey as useProviders, deliberately: TanStack dedupes on it, so a
+  // page using both hooks over the same items still makes exactly one request.
+  const query = useQuery({
+    queryKey: ['providers', cacheKey],
+    queryFn: () => fetchProvidersBatch(keys),
+    enabled: keys.length > 0,
+    staleTime: 6 * 60 * 60_000,
+  });
+
+  const map = query.data?.runtimes;
+  return (mediaType: string, tmdbId: number): number | undefined => map?.[providerKey(mediaType, tmdbId)];
 }
