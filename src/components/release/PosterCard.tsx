@@ -3,6 +3,7 @@ import type { ReleaseItem } from '@/types/digest';
 import { ActionButton } from '@/components/watchlist/ActionButton';
 import { RatingBadges } from '@/components/release/RatingBadges';
 import { hasAnyScore, type TitleRating } from '@/lib/ratings';
+import { WatchedToggle, WatchedBadge } from '@/components/watchlist/WatchedToggle';
 import { ImageOff, Star, Plus, Clock, ThumbsDown } from 'lucide-react';
 import { tmdbPosterFluid } from '@/lib/tmdbImage';
 
@@ -25,6 +26,10 @@ interface PosterCardProps {
   reason?: string | null;
   /** Thumbs-down, owner-only. Present only on relation cards. */
   onSuppress?: () => void;
+  /** "Seen it", from anywhere — the title need not be saved first. Omit on
+   * surfaces where the control would be meaningless. */
+  onToggleWatched?: () => void;
+  watched?: boolean;
 }
 
 /** Poster-forward vertical tile for grid contexts (Home, Calendar, Browse,
@@ -41,9 +46,11 @@ export function PosterCard({
   providers,
   reason,
   onSuppress,
+  onToggleWatched,
+  watched = false,
 }: PosterCardProps) {
   const year = item.releaseDate?.slice(0, 4);
-  const hasActions = onAddToWatchlist || onAddToWatchLater;
+  const hasActions = onAddToWatchlist || onAddToWatchLater || onToggleWatched;
   const provider = (providers ?? item.providers)?.[0];
   // This card renders both fixed-width (PosterRow, 130-150px) and fluid-grid
   // (ReleaseGrid, 3-7 responsive columns) — sizes covers both rather than
@@ -61,7 +68,9 @@ export function PosterCard({
             alt=""
             loading="lazy"
             decoding="async"
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 ${
+              watched ? 'opacity-50 saturate-50' : ''
+            }`}
           />
         ) : (
           <div className="no-poster-stripes w-full h-full rounded-xl border border-dashed border-muted-foreground/40 flex flex-col items-center justify-center gap-1.5 text-muted-foreground px-2">
@@ -97,6 +106,8 @@ export function PosterCard({
             </div>
           )
         )}
+
+        {watched && <WatchedBadge />}
       </div>
 
       {/* min-h reserves 2 lines regardless of actual title length — without it,
@@ -148,6 +159,7 @@ export function PosterCard({
               successClassName="inline-flex items-center justify-center w-9 py-2 rounded-lg bg-watched/20 text-watched"
             />
           )}
+          {onToggleWatched && <WatchedToggle watched={watched} onToggle={onToggleWatched} />}
         </div>
       )}
     </div>

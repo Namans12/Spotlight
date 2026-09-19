@@ -56,6 +56,8 @@ export function PosterRow({ title, items, icon, subtitle, reasonFor, onSuppress,
             className="flex-shrink-0 w-[130px] sm:w-[150px]"
             onAddToWatchlist={() => wl.addToWatchlist(movie)}
             onAddToWatchLater={() => wl.addToWatchLater(movie)}
+            onToggleWatched={() => wl.toggleWatched(movie)}
+            watched={wl.isWatched(movie.mediaType, movie.id)}
             reason={reasonFor?.(movie)}
             onSuppress={onSuppress ? () => onSuppress(movie) : undefined}
           />

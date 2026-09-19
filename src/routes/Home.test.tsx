@@ -22,9 +22,10 @@ vi.mock('@/lib/seasons', () => ({
   fetchSeasonsBatch: vi.fn().mockResolvedValue({}),
   seasonsKey: (tmdbId: number) => `tv:${tmdbId}`,
 }));
-vi.mock('@/contexts/WatchlistContext', () => ({
-  useWatchlistContext: () => ({ addToWatchlist: vi.fn(), addToWatchLater: vi.fn() }),
-}));
+vi.mock('@/contexts/WatchlistContext', async () => {
+  const { watchlistStub } = await import('@/test/watchlistStub');
+  return { useWatchlistContext: () => watchlistStub };
+});
 import { fetchSeasonsBatch } from '@/lib/seasons';
 
 function release(overrides: Partial<ReleaseItemDTO>): ReleaseItemDTO {

@@ -5,12 +5,14 @@ import { fetchTitleDetail, titleDetailToMovie } from '@/lib/tmdbDetail';
 import { useAuth } from '@/hooks/useAuth';
 import { useWatchlistContext } from '@/contexts/WatchlistContext';
 import { ActionButton } from '@/components/watchlist/ActionButton';
+import { WatchedToggle } from '@/components/watchlist/WatchedToggle';
 import { PosterRow } from '@/components/release/PosterRow';
 import { useRelations } from '@/hooks/useRelations';
 import { hasAnyRelations, hasChain } from '@/lib/relations';
 import { titleDetailMeta } from '../../shared/seo';
 import { useDocumentMeta, siteUrl } from '@/hooks/useDocumentMeta';
 import { getYouMayAlsoLike, getCredits, type MediaType } from '@/lib/tmdb';
+import { withoutWatched } from '@/lib/watched';
 import { RatingBadges } from '@/components/release/RatingBadges';
 import { useRating } from '@/hooks/useRatings';
 import { hasAnyScore } from '@/lib/ratings';
@@ -73,7 +75,12 @@ export default function TitleDetail() {
     enabled: Number.isFinite(tmdbId),
     staleTime: 60 * 60_000,
   });
-  const recommendations = recommendationsQuery.data ?? [];
+  // A suggestion the reader has already taken is not a weaker suggestion, it
+  // is not a suggestion — so seen titles are dropped here rather than ranked
+  // down. Filtered in the browser rather than server-side on purpose: the
+  // /you-may-also-like response is shared by every reader through the edge
+  // cache, and personalising it would make that cache per-user.
+  const recommendations = withoutWatched(recommendationsQuery.data ?? [], wl.watchedKeys);
   const ratingQuery = useRating(mediaType, tmdbId);
 
   // Its own request rather than folded into /detail: credits are a separate
@@ -266,6 +273,11 @@ export default function TitleDetail() {
               label="Watch Later"
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-xs font-medium hover:bg-card-hover active:scale-95 transition-all"
               successClassName="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-watched/20 text-watched text-xs font-medium"
+            />
+            <WatchedToggle
+              variant="detail"
+              watched={wl.isWatched(mediaType, tmdbId)}
+              onToggle={() => wl.toggleWatched(movie)}
             />
           </>
         ) : (
