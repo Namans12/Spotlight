@@ -84,8 +84,8 @@ export function watchOrderMeta(
 
   const title =
     count > 1
-      ? `${origin.title} watch order — all ${count} ${noun} in order | Spotlight`
-      : `${origin.title} — watch order | Spotlight`;
+      ? `${origin.title} watch order - all ${count} ${noun} in order | Spotlight`
+      : `${origin.title} - watch order | Spotlight`;
 
   // Front-loaded with the title, because a search engine shows roughly the
   // first 155 characters and the reader is scanning for the name they typed.
@@ -145,10 +145,10 @@ export function titleDetailMeta(
   const kind = title.mediaType === "tv" ? "series" : "film";
 
   const chainNote =
-    title.chainCount && title.chainCount > 1 ? ` One of ${title.chainCount} — see the full watch order.` : "";
+    title.chainCount && title.chainCount > 1 ? ` One of ${title.chainCount} - see the full watch order.` : "";
 
   return {
-    title: `${title.title}${y ? ` (${y})` : ""} — where to watch | Spotlight`,
+    title: `${title.title}${y ? ` (${y})` : ""} - where to watch | Spotlight`,
     description: clampDescription(
       title.overview?.trim()
         ? `${title.overview}`
@@ -188,10 +188,10 @@ export function personMeta(
   const role = person.knownFor ? person.knownFor.toLowerCase() : null;
 
   return {
-    title: `${person.name} — films and series | Spotlight`,
+    title: `${person.name} - films and series | Spotlight`,
     description: clampDescription(
       known.length > 0
-        ? `Everything ${person.name} has ${role === 'acting' ? 'appeared in' : 'worked on'}, including ${sentenceList(known)} — with where to stream each one in India.`
+        ? `Everything ${person.name} has ${role === 'acting' ? 'appeared in' : 'worked on'}, including ${sentenceList(known)} - with where to stream each one in India.`
         : `Films and series featuring ${person.name}, and where to stream them in India.`,
     ),
     canonical: absoluteUrl(siteUrl, path),
@@ -211,7 +211,7 @@ export function personMeta(
  *  which pages exist and what each one claims to be. */
 export const STATIC_ROUTE_META: Record<string, { title: string; description: string }> = {
   "/": {
-    title: "Spotlight — new OTT releases in India, and what's worth watching",
+    title: "Spotlight - new OTT releases in India, and what's worth watching",
     description:
       "What just landed on Netflix, Prime Video, JioHotstar and more in India, updated twice a week. Plus watch orders, a release calendar, and your own watchlist.",
   },
@@ -220,7 +220,7 @@ export const STATIC_ROUTE_META: Record<string, { title: string; description: str
     description: "Trending and popular films and series right now, with where to stream each one in India.",
   },
   "/calendar": {
-    title: "Release calendar — what's coming to cinemas and OTT | Spotlight",
+    title: "Release calendar - what's coming to cinemas and OTT | Spotlight",
     description:
       "Upcoming theatrical and streaming releases in India, month by month, with platforms and dates.",
   },
@@ -229,12 +229,12 @@ export const STATIC_ROUTE_META: Record<string, { title: string; description: str
   "/wrapped": {
     title: "Your year in film and TV | Spotlight",
     description:
-      "What you saved, what you watched, and how long it took — your year on Spotlight, counted from your own watchlist.",
+      "What you saved, what you watched, and how long it took - your year on Spotlight, counted from your own watchlist.",
   },
   "/duel": {
     title: "Can't decide what to watch? Pick one | Spotlight",
     description:
-      "Two posters, five rounds, one answer. No questionnaires and no fixed list — the choices come from what's streaming now and what you've saved.",
+      "Two posters, five rounds, one answer. No questionnaires and no fixed list - the choices come from what's streaming now and what you've saved.",
   },
   "/search": {
     title: "Search films and series | Spotlight",

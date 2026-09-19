@@ -58,7 +58,7 @@ describe('clampDescription', () => {
 describe('watchOrderMeta', () => {
   it('titles the page for the query people actually type', () => {
     const meta = watchOrderMeta({ title: 'John Wick', mediaType: 'movie', tmdbId: 245891 }, JOHN_WICK, SITE);
-    expect(meta.title).toBe('John Wick watch order — all 4 films in order | Spotlight');
+    expect(meta.title).toBe('John Wick watch order - all 4 films in order | Spotlight');
   });
 
   it('names the chain in the description, front-loaded with the title', () => {
@@ -125,7 +125,7 @@ describe('titleDetailMeta', () => {
       },
       SITE,
     );
-    expect(meta.title).toBe('Dune (2021) — where to watch | Spotlight');
+    expect(meta.title).toBe('Dune (2021) - where to watch | Spotlight');
     expect(meta.description).toContain('Paul Atreides');
     expect(ld(meta)['@type']).toBe('Movie');
   });
@@ -136,7 +136,7 @@ describe('titleDetailMeta', () => {
       SITE,
     );
     expect(meta.description).toContain('Where to stream Obscure Film');
-    expect(meta.title).toBe('Obscure Film — where to watch | Spotlight');
+    expect(meta.title).toBe('Obscure Film - where to watch | Spotlight');
   });
 
   it('marks a series as a TVSeries', () => {

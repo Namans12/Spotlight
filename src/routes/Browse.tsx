@@ -260,7 +260,7 @@ export default function Browse() {
 
       {nothingInScope && (
         <p className="py-20 text-center text-sm text-muted-foreground">
-          Nothing here for this media type — switch back to All in the topbar.
+          Nothing here for this media type - switch back to All in the topbar.
         </p>
       )}
 

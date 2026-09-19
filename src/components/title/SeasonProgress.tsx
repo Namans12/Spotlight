@@ -85,7 +85,7 @@ export function SeasonProgress({ seasons, progress, onSet, onAdvance }: SeasonPr
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-accent-foreground text-xs font-semibold hover:brightness-110 active:scale-95 transition-all"
             >
               <Check size={13} strokeWidth={3} />
-              {current ? `Watched ${formatProgress(next)}` : `Start — ${formatProgress(next)}`}
+              {current ? `Watched ${formatProgress(next)}` : `Start - ${formatProgress(next)}`}
             </button>
           )}
 

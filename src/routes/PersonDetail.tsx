@@ -155,6 +155,6 @@ function BackButton({ onClick }: { onClick: () => void }) {
 
 /** "b. 12 Aug 1962" while living, "1962 – 2019" once there is a death date. */
 function lifespan(birthday: string, deathday: string | null): string {
-  if (deathday) return `${birthday.slice(0, 4)} – ${deathday.slice(0, 4)}`;
+  if (deathday) return `${birthday.slice(0, 4)} - ${deathday.slice(0, 4)}`;
   return `b. ${formatDate(birthday) ?? birthday}`;
 }

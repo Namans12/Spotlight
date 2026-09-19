@@ -68,7 +68,7 @@ const ORDER_OPTIONS: SegmentedOption<OrderMode>[] = [
 /** Where the viewed title sits in its chain, in words. */
 function standing(beforeCount: number, afterCount: number): string {
   if (beforeCount === 0 && afterCount > 0) return 'This is where the story starts.';
-  if (afterCount === 0 && beforeCount > 0) return 'This is the latest chapter — everything else comes first.';
+  if (afterCount === 0 && beforeCount > 0) return 'This is the latest chapter - everything else comes first.';
   return 'There is more of the story on both sides of this one.';
 }
 
@@ -275,9 +275,9 @@ export default function TitleConnections() {
   const standaloneCopy =
     mediaType === 'tv'
       ? seasons && seasons > 1
-        ? `No other series is required first — start at Season 1 and watch all ${seasons} seasons in order.`
+        ? `No other series is required first - start at Season 1 and watch all ${seasons} seasons in order.`
         : 'No connections recorded for this series. Spotlight only tracks cross-series order for franchises it has curated.'
-      : 'Nothing else is required to follow this one — it stands on its own.';
+      : 'Nothing else is required to follow this one - it stands on its own.';
 
   // Counted off the *rendered* order, not off before.length. Those disagree
   // whenever the list is re-sorted — under Story order a prequel moves ahead
@@ -313,7 +313,7 @@ export default function TitleConnections() {
                 <span className="font-semibold text-foreground">
                   Part {currentPosition} of {mustCount}
                 </span>{' '}
-                — {standing(priorCount, laterCount)}
+                - {standing(priorCount, laterCount)}
                 {canWatch.length > 0 && ' A few more, dashed below, are worth a look but not required.'}
               </>
             ) : canWatch.length > 0 ? (

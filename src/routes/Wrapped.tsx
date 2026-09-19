@@ -162,11 +162,11 @@ function NotEnoughYet({ saved }: { saved: number }) {
       <p className="text-sm text-foreground">
         {saved === 0
           ? 'Nothing here yet.'
-          : `${saved} ${saved === 1 ? 'title' : 'titles'} so far — ${remaining} more and there will be something worth reading.`}
+          : `${saved} ${saved === 1 ? 'title' : 'titles'} so far - ${remaining} more and there will be something worth reading.`}
       </p>
       <p className="text-sm text-muted-foreground leading-relaxed">
         This page is built from what you save and what you mark seen. The quickest way to fill it is the{' '}
-        <Eye size={13} className="inline align-text-bottom" /> on any poster — tap it for anything you have already
+        <Eye size={13} className="inline align-text-bottom" /> on any poster - tap it for anything you have already
         watched, no need to add it to a list first.
       </p>
       <div className="flex flex-wrap gap-2 pt-1">

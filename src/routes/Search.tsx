@@ -150,13 +150,13 @@ export default function Search() {
       {results.length > 0 && scoped.length === 0 && (
         <p className="py-12 text-center text-sm text-muted-foreground">
           {results.length} {results.length === 1 ? 'result' : 'results'}, but none are{' '}
-          {mediaType === 'movie' ? 'movies' : 'shows'} — switch to All in the topbar to see them.
+          {mediaType === 'movie' ? 'movies' : 'shows'} - switch to All in the topbar to see them.
         </p>
       )}
 
       {scoped.length > 0 && visible.length === 0 && (
         <p className="py-12 text-center text-sm text-muted-foreground">
-          {scoped.length} {scoped.length === 1 ? 'result' : 'results'}, but none in {selectedLanguageLabel} —{' '}
+          {scoped.length} {scoped.length === 1 ? 'result' : 'results'}, but none in {selectedLanguageLabel} -{' '}
           <button type="button" onClick={() => updateLanguages([])} className="text-accent hover:underline">
             clear the language filter
           </button>

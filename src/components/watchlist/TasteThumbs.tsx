@@ -47,8 +47,8 @@ export function TasteThumbs({ opinion, onSet, size = 'md', className = '' }: Tas
           onSet(true);
         }}
         aria-pressed={opinion === true}
-        aria-label={opinion === true ? 'Liked — tap to undo' : 'I liked this'}
-        title={opinion === true ? 'Liked — tap to undo' : 'I liked this'}
+        aria-label={opinion === true ? 'Liked - tap to undo' : 'I liked this'}
+        title={opinion === true ? 'Liked - tap to undo' : 'I liked this'}
         className={`${box} active:scale-95 transition-all ${
           opinion === true
             ? 'bg-watched/20 text-watched'
@@ -64,8 +64,8 @@ export function TasteThumbs({ opinion, onSet, size = 'md', className = '' }: Tas
           onSet(false);
         }}
         aria-pressed={opinion === false}
-        aria-label={opinion === false ? 'Not for me — tap to undo' : 'Not for me'}
-        title={opinion === false ? 'Not for me — tap to undo' : 'Not for me'}
+        aria-label={opinion === false ? 'Not for me - tap to undo' : 'Not for me'}
+        title={opinion === false ? 'Not for me - tap to undo' : 'Not for me'}
         className={`${box} active:scale-95 transition-all ${
           opinion === false
             ? 'bg-danger/20 text-danger'

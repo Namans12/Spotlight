@@ -50,7 +50,7 @@ export function RatingBadges({ rating, size = 'sm', showMetacritic = true, class
       {imdb != null && (
         <span
           className={`inline-flex items-center ${scale.gap} font-semibold text-foreground`}
-          title={rating!.imdbVotes ? `IMDb — ${rating!.imdbVotes.toLocaleString()} votes` : 'IMDb rating'}
+          title={rating!.imdbVotes ? `IMDb - ${rating!.imdbVotes.toLocaleString()} votes` : 'IMDb rating'}
         >
           <ImdbMark height={scale.icon} />
           {imdb.toFixed(1)}
@@ -60,7 +60,7 @@ export function RatingBadges({ rating, size = 'sm', showMetacritic = true, class
       {rt != null && (
         <span
           className={`inline-flex items-center ${scale.gap} font-semibold text-foreground`}
-          title={`Rotten Tomatoes — ${rtIsFresh(rt) ? 'Fresh' : 'Rotten'}`}
+          title={`Rotten Tomatoes - ${rtIsFresh(rt) ? 'Fresh' : 'Rotten'}`}
         >
           {rtIsFresh(rt) ? <TomatoMark size={scale.icon} /> : <SplatMark size={scale.icon} />}
           {rt}%

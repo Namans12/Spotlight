@@ -218,7 +218,7 @@ export function wrappedSummary(stats: WrappedStats): string {
   if (stats.seenThisYear > 0) counts.push(`${stats.seenThisYear} watched`);
   if (counts.length > 0) {
     const hours = Math.round(stats.minutesFromFilms / 60);
-    const hoursClause = hours > 0 ? ` — about ${hours} ${hours === 1 ? 'hour' : 'hours'} of film` : '';
+    const hoursClause = hours > 0 ? ` - about ${hours} ${hours === 1 ? 'hour' : 'hours'} of film` : '';
     parts.push(`${counts.join(', ')}${hoursClause}.`);
   }
   if (stats.topGenres.length > 0) parts.push(`Mostly ${sentenceList(stats.topGenres.map((g) => g.label))}.`);

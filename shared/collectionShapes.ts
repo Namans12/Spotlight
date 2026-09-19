@@ -62,8 +62,8 @@ export const EPISODIC_PART_THRESHOLD = 12;
  *  fan-out cap (scripts/lib_relations.py MAX_EDGES_PER_KIND). */
 export const MAX_CAN_NEIGHBOURS = 3;
 
-export const SAME_SERIES_REASON = "Same series — not required to follow this one.";
-export const SIDE_STORY_REASON = "A side story in the same series — not required to follow the main films.";
+export const SAME_SERIES_REASON = "Same series - not required to follow this one.";
+export const SIDE_STORY_REASON = "A side story in the same series - not required to follow the main films.";
 
 export type Classification = "chain" | "arcs" | "episodic";
 
@@ -146,7 +146,7 @@ export function planCollection(
     if (!shape?.episodic) {
       warnings.push(
         `collection ${collectionId}: ${chainable.length} parts exceeds EPISODIC_PART_THRESHOLD ` +
-          `(${EPISODIC_PART_THRESHOLD}) with no curated entry — treating as episodic`,
+          `(${EPISODIC_PART_THRESHOLD}) with no curated entry - treating as episodic`,
       );
     }
     classification = "episodic";
@@ -178,7 +178,7 @@ export function planCollection(
     if (unclaimed.length > 0) {
       warnings.push(
         `collection ${collectionId}: ${unclaimed.length} part(s) not named in any arc ` +
-          `(${unclaimed.map((p) => p.id).join(", ")}) — treated as loose`,
+          `(${unclaimed.map((p) => p.id).join(", ")}) - treated as loose`,
       );
     }
 

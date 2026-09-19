@@ -70,7 +70,7 @@ class RouteErrorBoundaryInner extends Component<Props, State> {
         <p className="max-w-sm text-sm text-muted-foreground">
           {stale
             ? 'A new version of Spotlight shipped while this tab was open. Reloading should pick it up.'
-            : 'The rest of the app still works — you can head back and try again.'}
+            : 'The rest of the app still works - you can head back and try again.'}
         </p>
         <div className="mt-2 flex items-center gap-2">
           <button

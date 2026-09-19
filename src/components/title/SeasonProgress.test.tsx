@@ -41,7 +41,7 @@ describe('the one-tap action', () => {
     const user = userEvent.setup();
     renderProgress(null);
 
-    await user.click(screen.getByRole('button', { name: /Start — S1 E1/ }));
+    await user.click(screen.getByRole('button', { name: /Start - S1 E1/ }));
 
     expect(onAdvance).toHaveBeenCalledTimes(1);
   });
