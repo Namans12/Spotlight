@@ -47,7 +47,7 @@ jobs:
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
           SEND_BROADCAST_DIGEST: "false"
-          NOTIFY_OWNER_EMAILS: ${{ vars.NOTIFY_OWNER_EMAILS || secrets.EMAIL_TO }}
+          NOTIFY_OWNER_EMAILS: ${{ vars.NOTIFY_OWNER_EMAILS }}
           REGION: IN
           LANGUAGES: hi,en
           POPULAR_MIN_POPULARITY: "25"
