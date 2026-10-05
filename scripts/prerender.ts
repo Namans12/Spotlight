@@ -42,6 +42,29 @@ import {
 
 const DIST = path.resolve(process.cwd(), "dist");
 
+const BLOCKED_CRAWLERS = [
+  "GPTBot",
+  "ChatGPT-User",
+  "OAI-SearchBot",
+  "ClaudeBot",
+  "Claude-Web",
+  "anthropic-ai",
+  "CCBot",
+  "Google-Extended",
+  "PerplexityBot",
+  "Bytespider",
+  "Amazonbot",
+  "Applebot-Extended",
+  "Meta-ExternalAgent",
+  "AhrefsBot",
+  "SemrushBot",
+  "MJ12bot",
+  "DotBot",
+  "PetalBot",
+  "DataForSeoBot",
+  "BLEXBot",
+];
+
 const NEWLINE_RE = /\r?\n/;
 const KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const QUOTE_RE = /^["']|["']$/g;
@@ -178,6 +201,36 @@ function sitemapXml(entries: SitemapEntry[]): string {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
 
+// Written on every path out of main(), including the no-database early return:
+// otherwise a build without DATABASE_URL ships the permissive public/robots.txt.
+async function writeRobotsTxt(siteUrl: string): Promise<void> {
+  await fs.writeFile(
+    path.join(DIST, "robots.txt"),
+    [
+      "# AI-training and SEO-tool crawlers: no search traffic comes from them, but",
+      "# 370+ prerendered pages is plenty for them to burn through the free tier's",
+      "# edge-request quota. Googlebot and Bingbot are deliberately not listed.",
+      ...BLOCKED_CRAWLERS.flatMap((bot) => [`User-agent: ${bot}`]),
+      "Disallow: /",
+      "",
+      "User-agent: *",
+      "Allow: /",
+      "Crawl-delay: 10",
+      "",
+      "# Private, per-account, and useless to index.",
+      "Disallow: /list",
+      "Disallow: /login",
+      // Built from the same set the sitemap skips, so the two files cannot
+      // drift into contradicting each other.
+      ...[...PRIVATE_ROUTES].map((route) => `Disallow: ${route}`),
+      "",
+      `Sitemap: ${absoluteUrl(siteUrl, "/sitemap.xml")}`,
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+}
+
 async function main(): Promise<number> {
   await loadLocalEnv();
   const SITE_URL = resolveSiteUrl();
@@ -209,6 +262,7 @@ async function main(): Promise<number> {
   if (!connectionString) {
     console.warn("[prerender] DATABASE_URL is not set — skipping title pages (site still builds)");
     await fs.writeFile(path.join(DIST, "sitemap.xml"), sitemapXml(sitemap), "utf8");
+    await writeRobotsTxt(SITE_URL);
     return 0;
   }
 
@@ -320,24 +374,7 @@ async function main(): Promise<number> {
   }
 
   await fs.writeFile(path.join(DIST, "sitemap.xml"), sitemapXml(sitemap), "utf8");
-  await fs.writeFile(
-    path.join(DIST, "robots.txt"),
-    [
-      "User-agent: *",
-      "Allow: /",
-      "",
-      "# Private, per-account, and useless to index.",
-      "Disallow: /list",
-      "Disallow: /login",
-      // Built from the same set the sitemap skips, so the two files cannot
-      // drift into contradicting each other.
-      ...[...PRIVATE_ROUTES].map((route) => `Disallow: ${route}`),
-      "",
-      `Sitemap: ${absoluteUrl(SITE_URL, "/sitemap.xml")}`,
-      "",
-    ].join("\n"),
-    "utf8",
-  );
+  await writeRobotsTxt(SITE_URL);
 
   console.log(`[prerender] ${titlePages} title pages, ${orderPages} watch-order pages`);
   console.log(`[prerender] sitemap.xml with ${sitemap.length} urls, robots.txt written`);
