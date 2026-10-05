@@ -8,7 +8,7 @@ import { checkRefreshRateLimit, isRateLimited, recordRefreshDispatch } from "../
 // need a code change — and so the public source does not name the private
 // automation target of whatever deployment happens to be running it.
 const REPO_OWNER = process.env.GITHUB_DISPATCH_OWNER || "Namans12";
-const REPO_NAME = process.env.GITHUB_DISPATCH_REPO || "ms-trigger";
+const REPO_NAME = process.env.GITHUB_DISPATCH_REPO || "Spotlight";
 const WORKFLOW_FILE = process.env.GITHUB_DISPATCH_WORKFLOW || "ott-radar-nightly.yml";
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {

@@ -224,7 +224,7 @@ And one repo **variable** (not secret) under the same page's "Variables" tab:
 | `DEMO_GUEST` | unset | `1` enables the shared demo account (`POST /api/auth {guest:true}`). **Leave unset on any public deployment** — it is one `users` row that every visitor who takes it becomes, so they share a watchlist and can delete each other's items. Only the hackathon deployment sets it |
 | `VITE_DEMO_GUEST` | unset | Build-time twin of `DEMO_GUEST`. Set both, or neither: this one hides the guest button and the auto-session, `DEMO_GUEST` is what actually enforces it server-side |
 | `GITHUB_DISPATCH_OWNER` | `Namans12` | Repo owner whose workflow `/api/releases-refresh` triggers |
-| `GITHUB_DISPATCH_REPO` | `ms-trigger` | Repo name for the same |
+| `GITHUB_DISPATCH_REPO` | `Spotlight` | Repo name for the same |
 | `GITHUB_DISPATCH_WORKFLOW` | `ott-radar-nightly.yml` | Workflow file for the same |
 | `SITE_URL` | Vercel's production domain, else `https://spotlighthub.vercel.app` | Canonical origin baked into prerendered pages, the sitemap and Open Graph tags. Set it on a fork or a custom domain |
 

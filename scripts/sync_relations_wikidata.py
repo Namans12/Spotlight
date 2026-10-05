@@ -110,7 +110,7 @@ from lib_relations import (  # noqa: E402
 
 WDQS_ENDPOINT = "https://query.wikidata.org/sparql"
 # WDQS requires a descriptive User-Agent identifying the client.
-USER_AGENT = "Spotlight/0.1 (https://github.com/Namans12/ms-trigger; title-relations sync) python-requests"
+USER_AGENT = "Spotlight/0.1 (https://github.com/Namans12/Spotlight; title-relations sync) python-requests"
 # WDQS asks for roughly one request per second from anonymous clients.
 WDQS_GAP_SECONDS = 1.0
 WDQS_TIMEOUT_SECONDS = 60
