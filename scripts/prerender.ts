@@ -42,6 +42,29 @@ import {
 
 const DIST = path.resolve(process.cwd(), "dist");
 
+const BLOCKED_CRAWLERS = [
+  "GPTBot",
+  "ChatGPT-User",
+  "OAI-SearchBot",
+  "ClaudeBot",
+  "Claude-Web",
+  "anthropic-ai",
+  "CCBot",
+  "Google-Extended",
+  "PerplexityBot",
+  "Bytespider",
+  "Amazonbot",
+  "Applebot-Extended",
+  "Meta-ExternalAgent",
+  "AhrefsBot",
+  "SemrushBot",
+  "MJ12bot",
+  "DotBot",
+  "PetalBot",
+  "DataForSeoBot",
+  "BLEXBot",
+];
+
 const NEWLINE_RE = /\r?\n/;
 const KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const QUOTE_RE = /^["']|["']$/g;
@@ -323,8 +346,15 @@ async function main(): Promise<number> {
   await fs.writeFile(
     path.join(DIST, "robots.txt"),
     [
+      "# AI-training and SEO-tool crawlers: no search traffic comes from them, but",
+      "# 370+ prerendered pages is plenty for them to burn through the free tier's",
+      "# edge-request quota. Googlebot and Bingbot are deliberately not listed.",
+      ...BLOCKED_CRAWLERS.flatMap((bot) => [`User-agent: ${bot}`]),
+      "Disallow: /",
+      "",
       "User-agent: *",
       "Allow: /",
+      "Crawl-delay: 10",
       "",
       "# Private, per-account, and useless to index.",
       "Disallow: /list",
