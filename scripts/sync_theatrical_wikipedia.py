@@ -53,7 +53,7 @@ REQUEST_GAP_SECONDS = 0.5
 # Wikipedia's bot policy (https://w.wiki/4wJS) asks for a UA identifying the
 # tool and where to find it — a bare default UA gets a 403 with a message
 # pointing at that policy (confirmed by testing).
-USER_AGENT = "Mozilla/5.0 (OTT-Radar; +https://github.com/Namans12/ms-trigger)"
+USER_AGENT = "Mozilla/5.0 (OTT-Radar; +https://github.com/Namans12/Spotlight)"
 
 # Wikipedia's own name for each language's per-year list page. Only
 # languages with a maintained "List of X films of YYYY" page are listed —

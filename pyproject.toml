@@ -1,5 +1,5 @@
 [project]
-name = "ms-trigger"
+name = "spotlight"
 version = "0.1.0"
 description = "Deployment project"
 requires-python = ">=3.12"
