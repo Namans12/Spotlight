@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createHarnessTransport, type McpSession } from "./harness.js";
+import { buildChildEnv, createHarnessTransport, parseEnvelope, type McpSession } from "./harness.js";
 
 function fakeSession(over: Partial<McpSession> = {}): McpSession & { closed: boolean; calls: string[] } {
   const s = {
@@ -63,9 +63,50 @@ describe("the harness transport", () => {
     const session = fakeSession();
     const t = createHarnessTransport({ connect: async () => session });
     await t.close();
-    await t.callTool("qloo_find_tags", {});
+    expect(session.closed).toBe(false);
+
+    const used = fakeSession();
+    const t2 = createHarnessTransport({ connect: async () => used });
+    await t2.callTool("qloo_find_tags", {});
+    await t2.close();
+    expect(used.closed).toBe(true);
+  });
+
+  it("does not respawn the harness for a call that failed because close() ran", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let connects = 0;
+    const session = fakeSession({
+      async callTool() {
+        await gate;
+        throw new Error("MCP error -32000: Connection closed");
+      },
+    });
+    const t = createHarnessTransport({ connect: async () => { connects++; return session; } });
+    const inFlight = t.callTool("qloo_find_tags", {});
+    const settled = expect(inFlight).rejects.toThrow(/transport closed/i);
+    await Promise.resolve();
+    await Promise.resolve();
     await t.close();
-    expect(session.closed).toBe(true);
+    release();
+    await settled;
+    expect(connects).toBe(1);
+    await expect(t.callTool("qloo_find_tags", {})).rejects.toThrow(/transport closed/i);
+    expect(connects).toBe(1);
+  });
+
+  it("times a REST lookup out instead of holding a limiter slot forever", async () => {
+    let signal: AbortSignal | null | undefined;
+    const t = createHarnessTransport({
+      connect: async () => fakeSession(),
+      env: { QLOO_API_KEY: "k" },
+      fetchFn: async (_url, init) => {
+        signal = init?.signal;
+        throw new DOMException("The operation timed out.", "TimeoutError");
+      },
+    });
+    await expect(t.getJson("/search", { query: "x" })).rejects.toMatchObject({ name: "TimeoutError" });
+    expect(signal).toBeInstanceOf(AbortSignal);
   });
 
   it("sends the Qloo key as X-Api-Key to the configured base URL for REST lookups", async () => {
@@ -100,5 +141,43 @@ describe("the harness transport", () => {
     });
     await expect(t.getJson("/search", { query: "x" })).rejects.toThrow(/QLOO_API_KEY/);
     expect(called).toBe(false);
+  });
+});
+
+describe("buildChildEnv", () => {
+  it("hands the harness the Qloo settings and the basics, but none of the service's other secrets", () => {
+    const env = buildChildEnv({
+      PATH: "/usr/bin", HOME: "/home/x", HTTPS_proxy: "http://p", https_proxy: "http://p", NODE_OPTIONS: "--x",
+      QLOO_API_KEY: "test-key-123", QLOO_HOME: "/q",
+      DATABASE_URL: "postgres://secret", GROQ_API_KEY: "groq-secret", PULSE_WARM_SECRET: "warm",
+    });
+    expect(env.QLOO_API_KEY).toBe("test-key-123");
+    expect(env.QLOO_HOME).toBe("/q");
+    expect(env.PATH).toBe("/usr/bin");
+    expect(env.HOME).toBe("/home/x");
+    expect(env.https_proxy).toBe("http://p");
+    expect(env.NODE_OPTIONS).toBe("--x");
+    expect(env).not.toHaveProperty("DATABASE_URL");
+    expect(env).not.toHaveProperty("GROQ_API_KEY");
+    expect(env).not.toHaveProperty("PULSE_WARM_SECRET");
+  });
+
+  it("points the child at one base URL and trusts it", () => {
+    expect(buildChildEnv({}).QLOO_BASE_URL).toBe("https://hackathon.api.qloo.com");
+    expect(buildChildEnv({}).QLOO_TRUSTED_BASE_URL).toBe("https://hackathon.api.qloo.com");
+    const custom = buildChildEnv({ QLOO_BASE_URL: "https://q.example.test/" });
+    expect(custom.QLOO_BASE_URL).toBe("https://q.example.test");
+    expect(custom.QLOO_TRUSTED_BASE_URL).toBe("https://q.example.test");
+  });
+});
+
+describe("parseEnvelope", () => {
+  it("prefers structured content", () => {
+    expect(parseEnvelope({ structuredContent: { status: "ok" }, content: [] })).toEqual({ status: "ok" });
+  });
+
+  it("surfaces an isError text reply as the error rather than failing to parse it", () => {
+    expect(() => parseEnvelope({ isError: true, content: [{ type: "text", text: "Invalid arguments for qloo_recommend" }] }))
+      .toThrow("Invalid arguments for qloo_recommend");
   });
 });

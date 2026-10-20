@@ -157,7 +157,12 @@ function venue(item: unknown): Venue | null {
 
 const venues = (results: unknown[]): Venue[] => results.flatMap((r) => { const v = venue(r); return v ? [v] : []; });
 
-export function places(entityId: string, city: City, includeTagIds: string[]): ToolRecipe<Venue[]> {
+// qloo_recommend accepts 1-10 include_tags; more is rejected outright, which
+// would turn the whole section into an error. Empty means "no filter".
+const MAX_INCLUDE_TAGS = 10;
+
+export function places(entityId: string, city: City, tagIds: string[]): ToolRecipe<Venue[]> {
+  const includeTagIds = tagIds.slice(0, MAX_INCLUDE_TAGS);
   return {
     call: "recommend_places",
     tool: "qloo_recommend",

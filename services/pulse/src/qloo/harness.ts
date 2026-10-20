@@ -47,29 +47,51 @@ export interface HarnessTransportOptions {
 // childEnv) and the two paths cannot disagree about the host.
 const DEFAULT_BASE_URL = "https://hackathon.api.qloo.com";
 
+const REST_TIMEOUT_MS = 15_000;
+
 const harnessBin = fileURLToPath(new URL("../../node_modules/.bin/qloo", import.meta.url));
 
 function baseUrlOf(env: Readonly<Record<string, string | undefined>>): string {
   return (env.QLOO_BASE_URL?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, "");
 }
 
+// Only these (and every QLOO_*) reach the child. The service's own secrets,
+// GROQ_API_KEY and DATABASE_URL among them, have no business in a third-party
+// package's process.
+const PASSTHROUGH_ENV = new Set([
+  "PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "NODE_OPTIONS", "NODE_EXTRA_CA_CERTS",
+  "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
+]);
+
 /** The harness refuses a non-official base URL unless it is also marked
  *  trusted. The operator choosing QLOO_BASE_URL is that decision, so mirror
  *  it rather than make every deploy set two variables to the same value. */
-function childEnv(env: Readonly<Record<string, string | undefined>>): Record<string, string> {
+export function buildChildEnv(env: Readonly<Record<string, string | undefined>>): Record<string, string> {
   const base = baseUrlOf(env);
-  const merged: Record<string, string | undefined> = { ...env, QLOO_BASE_URL: base };
-  merged.QLOO_TRUSTED_BASE_URL = env.QLOO_TRUSTED_BASE_URL?.trim() || base;
-  return Object.fromEntries(Object.entries(merged).filter((e): e is [string, string] => typeof e[1] === "string"));
+  const picked: Record<string, string | undefined> = {};
+  for (const [k, v] of Object.entries(env)) {
+    if (PASSTHROUGH_ENV.has(k) || k.startsWith("QLOO_")) picked[k] = v;
+  }
+  picked.QLOO_BASE_URL = base;
+  picked.QLOO_TRUSTED_BASE_URL = env.QLOO_TRUSTED_BASE_URL?.trim() || base;
+  return Object.fromEntries(Object.entries(picked).filter((e): e is [string, string] => typeof e[1] === "string"));
 }
 
-function parseEnvelope(result: { structuredContent?: unknown; content?: unknown }): unknown {
+export function parseEnvelope(result: { structuredContent?: unknown; content?: unknown; isError?: unknown }): unknown {
   if (result.structuredContent && typeof result.structuredContent === "object") return result.structuredContent;
   const first = Array.isArray(result.content) ? result.content[0] : undefined;
-  if (first && typeof first === "object" && (first as { type?: unknown }).type === "text") {
-    return JSON.parse(String((first as { text?: unknown }).text));
+  const text = first && typeof first === "object" && (first as { type?: unknown }).type === "text"
+    ? String((first as { text?: unknown }).text)
+    : null;
+  // An error reply without an envelope (bad arguments, an unknown tool) is
+  // plain text; show it rather than a JSON parse failure about it.
+  if (result.isError === true) throw new Error(text ?? "Qloo harness returned an error with no details.");
+  if (text === null) throw new Error("Qloo harness returned a result with no structured content.");
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Qloo harness returned a result that is not JSON: ${text.slice(0, 200)}`);
   }
-  throw new Error("Qloo harness returned a result with no structured content.");
 }
 
 async function connectToHarness(env: Readonly<Record<string, string | undefined>>): Promise<McpSession> {
@@ -77,7 +99,7 @@ async function connectToHarness(env: Readonly<Record<string, string | undefined>
   // (a global install), rather than failing on a path we guessed.
   const command = existsSync(harnessBin) ? harnessBin : "qloo";
   // `env` must be passed whole: the child reads QLOO_API_KEY from it.
-  const transport = new StdioClientTransport({ command, args: ["mcp"], env: childEnv(env) });
+  const transport = new StdioClientTransport({ command, args: ["mcp"], env: buildChildEnv(env) });
   const client = new Client({ name: "spotlight-pulse", version: "0.1.0" });
   let alive = true;
   client.onclose = () => { alive = false; };
@@ -89,7 +111,7 @@ async function connectToHarness(env: Readonly<Record<string, string | undefined>
       return tools.map((t) => ({ name: t.name, description: t.description ?? "", inputSchema: t.inputSchema }));
     },
     async callTool(name, args) {
-      return parseEnvelope((await client.callTool({ name, arguments: args })) as { structuredContent?: unknown; content?: unknown });
+      return parseEnvelope((await client.callTool({ name, arguments: args })) as { structuredContent?: unknown; content?: unknown; isError?: unknown });
     },
     async close() {
       alive = false;
@@ -112,10 +134,12 @@ export function createHarnessTransport(opts: HarnessTransportOptions = {}): Harn
 
   let session: McpSession | null = null;
   let starting: Promise<McpSession> | null = null;
+  let closed = false;
 
   // Started lazily so a service that only serves cached briefs never spawns
   // the child, and shared so concurrent first calls do not spawn several.
   const acquire = async (): Promise<McpSession> => {
+    if (closed) throw new Error("Qloo harness transport closed");
     if (session?.isAlive()) return session;
     session = null;
     starting ??= connect().then(
@@ -139,6 +163,8 @@ export function createHarnessTransport(opts: HarnessTransportOptions = {}): Harn
       try {
         return await op(s);
       } catch (err) {
+        // A call that failed because close() ran is the shutdown, not a crash.
+        if (closed) throw new Error("Qloo harness transport closed");
         const died = !s.isAlive() || looksLikeDeadConnection(err);
         if (!died || attempt >= 1) throw err;
         drop(s);
@@ -153,12 +179,17 @@ export function createHarnessTransport(opts: HarnessTransportOptions = {}): Harn
       const key = env.QLOO_API_KEY?.trim();
       if (!key) throw new Error("QLOO_API_KEY is not set; refusing to call Qloo without it.");
       const url = `${baseUrlOf(env)}${path}?${new URLSearchParams(params).toString()}`;
-      const res = await fetchFn(url, { headers: { "X-Api-Key": key, accept: "application/json" } });
+      // Bounded, so a hung lookup frees its limiter slot instead of holding it.
+      const res = await fetchFn(url, {
+        headers: { "X-Api-Key": key, accept: "application/json" },
+        signal: AbortSignal.timeout(REST_TIMEOUT_MS),
+      });
       if (res.status === 429) throw new RateLimitedError(`Qloo ${path} returned 429`);
       if (!res.ok) throw new Error(`Qloo ${path} returned HTTP ${res.status}`);
       return res.json();
     },
     async close() {
+      closed = true;
       const current = session ?? (await starting?.catch(() => null)) ?? null;
       session = null;
       if (current) await current.close();

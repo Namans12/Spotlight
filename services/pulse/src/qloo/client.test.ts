@@ -185,11 +185,21 @@ describe("the harness-backed client", () => {
     expect(s.data).toEqual([{ entityId: "v-1", name: "Fixture Café 1", address: "1 Test Road", lat: null, lon: null, priceLevel: 2, tags: [], affinity: 0.7 }]);
   });
 
+  it("sends at most 10 include_tags, the harness maximum, and cites the same 10", async () => {
+    const { t, calls } = fakeTransport({ qloo_recommend: [{ status: "ok", result_count: 1, results: [{ entity_id: "v-1", name: "Fixture Café 1" }] }] });
+    const q = createHarnessQlooClient(t, { sleep: noSleep });
+    const twelve = Array.from({ length: 12 }, (_, i) => `urn:tag:fx:${i + 1}`);
+    const s = await q.places("ent-1", delhi, twelve);
+    expect(calls[0]?.args.include_tags).toEqual(twelve.slice(0, 10));
+    expect(s.provenance[0]?.params.include_tags).toBe(twelve.slice(0, 10).join(","));
+  });
+
   it("omits include_tags when none are given", async () => {
     const { t, calls } = fakeTransport({ qloo_recommend: [{ status: "empty", results: [] }] });
     const q = createHarnessQlooClient(t, { sleep: noSleep });
     const s = await q.places("ent-1", delhi, []);
     expect(calls[0]?.args).not.toHaveProperty("include_tags");
+    expect(s.provenance[0]?.params).not.toHaveProperty("include_tags");
     expect(s.status).toBe("empty");
     expect(s.data).toBeNull();
   });
@@ -317,6 +327,26 @@ describe("the harness-backed client", () => {
       { entityId: "e2", name: "Fixture Show 2", type: "tv_show", year: null },
     ]);
     expect(rest[0]).toEqual({ path: "/search", params: { query: "Fixture Show", types: "urn:entity:tv_show", take: "5" } });
+  });
+
+  it("reports a hung or failed REST lookup as an error instead of hanging", async () => {
+    const t: HarnessTransport = {
+      ...fakeTransport({}).t,
+      async getJson() { throw new DOMException("The operation timed out.", "TimeoutError"); },
+    };
+    const q = createHarnessQlooClient(t, { sleep: noSleep });
+    await expect(q.searchTitles("x", "movie")).rejects.toMatchObject({ name: "TimeoutError" });
+  });
+
+  it("turns an isError text reply from the harness into an error section carrying that text", async () => {
+    const t: HarnessTransport = {
+      ...fakeTransport({}).t,
+      async callTool() { throw new Error("Invalid arguments for qloo_recommend"); },
+    };
+    const q = createHarnessQlooClient(t, { sleep: noSleep });
+    const s = await q.artists("ent-1");
+    expect(s.status).toBe("error");
+    expect(s.note).toContain("Invalid arguments for qloo_recommend");
   });
 
   it("passes agent tool calls straight through, behind the limiter", async () => {
