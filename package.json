@@ -10,9 +10,10 @@
     "build": "vite build && tsx scripts/prerender.ts",
     "preview": "vite preview",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.deploy.json",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.deploy.json && tsc --noEmit -p tsconfig.service.json",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:pulse": "npm --prefix services/pulse test"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
