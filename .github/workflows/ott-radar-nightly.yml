@@ -86,6 +86,19 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/seed_relations.py
 
+      # Release Pulse: which titles were filmed or set in each launch city,
+      # from Wikipedia categories + Wikidata (P915/P840). continue-on-error
+      # because this runs against the PRODUCTION database, which may not have
+      # migration 0016 yet: the script then prints one line and exits 0 without
+      # writing, but a Wikipedia/WDQS outage must not turn the whole nightly
+      # red either. It only ever touches title_locations, places and
+      # neighbourhoods. Needs no secret beyond DATABASE_URL.
+      - name: Sync filming locations for Release Pulse
+        continue-on-error: true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/sync_title_locations.py
+
       # Keeps calendar_entries populated past whatever the one-time editorial
       # CSV covered. Region-aware theatrical dates + TV premieres (scoped to
       # --tv-countries to avoid TMDB's crowdsourced global noise), idempotent,

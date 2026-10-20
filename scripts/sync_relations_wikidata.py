@@ -188,7 +188,13 @@ def run_query(
         "idProp": "P4947" if media_type == "movie" else "P4983",
         "seqProp": seq_prop,
     }
+    return run_sparql(session, query)
 
+
+def run_sparql(session: requests.Session, query: str) -> list[dict[str, Any]]:
+    """One SPARQL round trip with retry and backoff, for any query. Split out of
+    run_query so other Wikidata consumers (sync_title_locations.py) get the same
+    User-Agent, timeout and backoff instead of growing their own copy."""
     last_error: Exception | str = "no attempt made"
     for attempt in range(WDQS_ATTEMPTS):
         try:
