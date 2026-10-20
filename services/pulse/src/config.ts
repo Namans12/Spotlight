@@ -17,12 +17,14 @@ const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
 const DEFAULT_SESSION_DAILY_CHAT = 30;
 const DEFAULT_GLOBAL_DAILY_LLM = 800;
 
-/** Unset, empty or non-numeric values all fall back to the default: a typo in
- *  a quota variable should not turn into NaN, which every `count >= limit`
- *  comparison treats as "never exceeded" and so silently disables the cap. */
+/** Only plain digit strings parse; anything else falls back to the default.
+ *  parseInt would accept "8787abc" as 8787 and a typo in a quota variable would
+ *  then be silently honoured, while a NaN result would be worse still, since
+ *  every `count >= limit` comparison treats it as "never exceeded" and so
+ *  disables the cap. */
 function intOr(raw: string | undefined, fallback: number): number {
-  const n = Number.parseInt(raw ?? "", 10);
-  return Number.isFinite(n) && n >= 0 ? n : fallback;
+  const v = raw?.trim();
+  return v && /^\d+$/.test(v) ? Number(v) : fallback;
 }
 
 /** Empty strings count as unset, since deploy dashboards commonly leave a

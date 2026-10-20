@@ -9,7 +9,7 @@ export function corsHeaders(origin: string | undefined, allowed: string[]): Reco
   if (origin && allowed.includes(origin)) {
     headers["Access-Control-Allow-Origin"] = origin;
     headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
-    headers["Access-Control-Allow-Headers"] = "Content-Type";
+    headers["Access-Control-Allow-Headers"] = "Content-Type, X-Pulse-Session";
     headers["Access-Control-Max-Age"] = "600";
   }
   return headers;

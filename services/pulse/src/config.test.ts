@@ -12,4 +12,23 @@ describe("loadConfig", () => {
   it("throws when DATABASE_URL is missing", () => {
     expect(() => loadConfig({})).toThrow(/DATABASE_URL/);
   });
+
+  it("defaults the port and the daily quotas", () => {
+    const c = loadConfig({ DATABASE_URL: "postgres://x" });
+    expect(c.port).toBe(8787);
+    expect(c.sessionDailyChat).toBe(30);
+    expect(c.globalDailyLlm).toBe(800);
+  });
+
+  it("honours valid numeric overrides", () => {
+    const c = loadConfig({ DATABASE_URL: "postgres://x", PORT: "9000", PULSE_SESSION_DAILY_CHAT: "5", PULSE_GLOBAL_DAILY_LLM: "0" });
+    expect(c.port).toBe(9000);
+    expect(c.sessionDailyChat).toBe(5);
+    expect(c.globalDailyLlm).toBe(0);
+  });
+
+  it("falls back to the default for values that are not plain integers", () => {
+    expect(loadConfig({ DATABASE_URL: "postgres://x", PORT: "8787abc" }).port).toBe(8787);
+    expect(loadConfig({ DATABASE_URL: "postgres://x", PULSE_GLOBAL_DAILY_LLM: "1e3" }).globalDailyLlm).toBe(800);
+  });
 });

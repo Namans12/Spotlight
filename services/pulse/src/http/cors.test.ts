@@ -6,6 +6,13 @@ describe("corsHeaders", () => {
     expect(corsHeaders("https://pulse.example", ["https://pulse.example"])["Access-Control-Allow-Origin"]).toBe("https://pulse.example");
   });
 
+  it("allows the session header the frontend sends, but not Authorization", () => {
+    const allowHeaders = corsHeaders("https://pulse.example", ["https://pulse.example"])["Access-Control-Allow-Headers"];
+    expect(allowHeaders).toContain("X-Pulse-Session");
+    expect(allowHeaders).toContain("Content-Type");
+    expect(allowHeaders).not.toContain("Authorization");
+  });
+
   it("never sends a wildcard or a foreign origin", () => {
     expect(corsHeaders("https://evil.example", ["https://pulse.example"])["Access-Control-Allow-Origin"]).toBeUndefined();
   });
