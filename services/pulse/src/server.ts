@@ -15,6 +15,8 @@ import { boardHandler } from "./routes/board.js";
 import { briefHandler } from "./routes/brief.js";
 import { chatHandler } from "./routes/chat.js";
 import { guessHandler } from "./routes/guess.js";
+import { planNightHandler } from "./routes/planNight.js";
+import { titleLocationsHandler } from "./routes/titleLocations.js";
 import { warmHandler } from "./routes/warm.js";
 import { createBackgroundWarmer, createWarmQueue, warmCities, type WarmDeps } from "./warm.js";
 import { createTitleLookup } from "./titleHeader.js";
@@ -91,6 +93,25 @@ const boardRoute = boardHandler({
   onError: logError,
 });
 
+// The title page's two consumer reads. /plan-night spends Qloo calls, so it is
+// gated on known titles and has its own limiter (20/min); /title-locations only
+// reads title_locations, so it needs no gate and a looser limiter (60/min).
+const planNightRoute = planNightHandler({
+  sql,
+  qloo,
+  resolve: (key) => resolveTitle(sql, qloo, key),
+  header: titleHeader,
+  isKnown: (key) => isKnownTitle(sql, key),
+  rateLimiter: createRateLimiter({ max: 20, windowMs: 60_000 }),
+  onError: (context, err) => console.error(`plan-night: ${context} failed:`, err instanceof Error ? err.message : String(err)),
+});
+
+const titleLocationsRoute = titleLocationsHandler({
+  sql,
+  rateLimiter: createRateLimiter({ max: 60, windowMs: 60_000 }),
+  onError: logError,
+});
+
 const warmRoute = warmHandler({
   secret: config.warmSecret,
   warm: (city) => warmCities(warmDeps, city ? [city] : undefined),
@@ -107,6 +128,8 @@ const route = createRouter({
   "GET /brief": briefRoute,
   "GET /guess": guessRoute,
   "GET /board": boardRoute,
+  "GET /plan-night": planNightRoute,
+  "GET /title-locations": titleLocationsRoute,
   "POST /warm": warmRoute,
   "POST /chat": chatRoute,
 });

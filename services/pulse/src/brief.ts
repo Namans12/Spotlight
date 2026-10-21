@@ -48,8 +48,8 @@ export interface BriefRequest {
   signal?: AbortSignal;
 }
 
-const NO_ENTITY_NOTE = "Qloo has no entity for this title yet, so there is no taste data for it.";
-const RESOLVE_FAILED_NOTE = "Qloo could not be reached to look this title up, so there is no taste data for it right now. Try again shortly.";
+export const NO_ENTITY_NOTE = "Qloo has no entity for this title yet, so there is no taste data for it.";
+export const RESOLVE_FAILED_NOTE = "Qloo could not be reached to look this title up, so there is no taste data for it right now. Try again shortly.";
 const RATE_LIMITED_NOTE = "Qloo is busy and rate limiting requests, so this section is missing. Try again in a moment.";
 const GENERIC_ERROR_NOTE = "This section could not be loaded just now. Try again shortly.";
 const HOOK_LIMITS =
@@ -58,25 +58,25 @@ const HOOK_LIMITS =
 // Error sections this module builds carry notes written here, so they are
 // exempt from the rewrite below; one that arrives from a client or drafter is not.
 const ownErrors = new WeakSet<object>();
-const errorSection = (note: string): EvidenceSection<unknown> => {
+export const errorSection = (note: string): EvidenceSection<unknown> => {
   const s: EvidenceSection<unknown> = { status: "error", data: null, provenance: [], note };
   ownErrors.add(s);
   return s;
 };
-const emptySection = (note: string): EvidenceSection<unknown> => ({ status: "empty", data: null, provenance: [], note });
+export const emptySection = (note: string): EvidenceSection<unknown> => ({ status: "empty", data: null, provenance: [], note });
 
 /** The real Qloo client reports a failure as an error SECTION whose note is
  *  "Qloo call failed: <upstream text>", and the campaign drafter may do the
  *  same with a model provider's text. Neither belongs in a public stream, so
  *  the note becomes a fixed sentence and the original goes to the log. */
-function sanitiseError(section: EvidenceSection<unknown>, context: string, report: (c: string, e: unknown) => void): EvidenceSection<unknown> {
+export function sanitiseError(section: EvidenceSection<unknown>, context: string, report: (c: string, e: unknown) => void): EvidenceSection<unknown> {
   if (section.status !== "error" || ownErrors.has(section)) return section;
   const original = section.note ?? "";
   report(context, new Error(original || "error section without a note"));
   return { ...section, note: /rate.?limit|429|busy/i.test(original) ? RATE_LIMITED_NOTE : GENERIC_ERROR_NOTE };
 }
 
-function noteFor(err: unknown): string {
+export function noteFor(err: unknown): string {
   return err instanceof RateLimitedError ? RATE_LIMITED_NOTE : GENERIC_ERROR_NOTE;
 }
 

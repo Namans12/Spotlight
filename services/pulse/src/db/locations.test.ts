@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getNeighbourhoods, getTitleLocations, getTitleLocationsBatch, type LocationsSql } from "./locations.js";
+import { getLocationsForTitle, getNeighbourhoods, getTitleLocations, getTitleLocationsBatch, type LocationsSql } from "./locations.js";
 
 function recorder(rows: Record<string, unknown>[]) {
   const calls: { text: string; values: unknown[] }[] = [];
@@ -66,5 +66,25 @@ describe("getTitleLocationsBatch", () => {
     const { sql, calls } = recorder([]);
     expect((await getTitleLocationsBatch(sql, [], "delhi")).size).toBe(0);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("getLocationsForTitle", () => {
+  it("reads every city of one title with exact columns and parameters, skipping unattributed rows", async () => {
+    const { sql, calls } = recorder([
+      { city_slug: "delhi", kind: "filmed", source: "both", landmark_label: "Chandni Chowk" },
+      { city_slug: "new-york", kind: "set", source: "wikipedia", landmark_label: null },
+    ]);
+    const out = await getLocationsForTitle(sql, { tmdbId: 9, mediaType: "tv" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].text).toContain("SELECT city_slug, kind, source, landmark_label FROM title_locations");
+    expect(calls[0].text).toContain("WHERE tmdb_id = ? AND media_type = ?");
+    expect(calls[0].text).toContain("source IS NOT NULL");
+    expect(calls[0].text).not.toContain("city_slug =");
+    expect(calls[0].values).toEqual([9, "tv"]);
+    expect(out).toEqual([
+      { citySlug: "delhi", kind: "filmed", source: "both", landmark: "Chandni Chowk" },
+      { citySlug: "new-york", kind: "set", source: "wikipedia", landmark: null },
+    ]);
   });
 });

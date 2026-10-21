@@ -32,6 +32,27 @@ export async function getTitleLocations(sql: LocationsSql, key: EntityKey, cityS
   }));
 }
 
+export interface TitleCityLocation extends TitleLocation { citySlug: string }
+
+/** Every launch city one title is tied to, for the title page's "Filmed in"
+ *  panel. A plain read of title_locations: no Qloo, no TMDB. Rows with no
+ *  source are skipped for the same reason as above. The order here is only
+ *  stable; the caller sorts by city name, which lives in cities.json. */
+export async function getLocationsForTitle(sql: LocationsSql, key: EntityKey): Promise<TitleCityLocation[]> {
+  const rows = await sql`
+    SELECT city_slug, kind, source, landmark_label
+    FROM title_locations
+    WHERE tmdb_id = ${key.tmdbId} AND media_type = ${key.mediaType}
+      AND source IS NOT NULL
+    ORDER BY kind, city_slug`;
+  return rows.map((r) => ({
+    citySlug: String(r.city_slug),
+    kind: r.kind as TitleLocation["kind"],
+    source: r.source as TitleLocation["source"],
+    landmark: (r.landmark_label as string | null) ?? null,
+  }));
+}
+
 export interface TitleLocationRow extends TitleLocation { tmdbId: number; mediaType: "movie" | "tv" }
 
 /** The same read for many titles in one statement, for the board: twenty

@@ -6,7 +6,12 @@ import type { EvidenceSection, EvidenceStatus } from "../../../shared/types/puls
 import type { City } from "./cities.js";
 import { readEvidence, upsertEvidence, type EvidenceSql } from "./db/evidence.js";
 
-export type EvidenceKind = "demographics" | "heatmap" | "places" | "place_tags" | "artists" | "brands" | "trends";
+/** `places_open` is the unfiltered venue list behind "Plan the night". It has
+ *  its own kind because the brief's `places` rows are narrowed by the business
+ *  type's tag filter, and (entity, city, kind) is the cache key: sharing one
+ *  kind would serve each feature the other's answer. qloo_evidence.kind has no
+ *  CHECK constraint, so a new kind needs no migration. */
+export type EvidenceKind = "demographics" | "heatmap" | "places" | "places_open" | "place_tags" | "artists" | "brands" | "trends";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FRESH_DAYS = 3;
