@@ -18,7 +18,8 @@
 // an error message, a stack or a log line from here.
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
-const REQUEST_TIMEOUT_MS = 8_000;
+/** Per attempt. */
+export const TMDB_TIMEOUT_MS = 8_000;
 const MAX_ATTEMPTS = 3;
 /** Waits before the 2nd and 3rd attempt. */
 const BACKOFF_MS = [250, 750];
@@ -76,6 +77,12 @@ type Attempt =
   | { kind: "retry"; reason: string; waitMs: number | null }
   | { kind: "fatal"; reason: string };
 
+/** The body of a response we will not read holds its socket until it is
+ *  consumed or cancelled. */
+async function discard(res: Response): Promise<void> {
+  try { await res.body?.cancel(); } catch { /* already closed or locked: nothing to release */ }
+}
+
 async function attempt(url: string, doFetch: typeof fetch, timeoutMs: number): Promise<Attempt> {
   let res: Response;
   try {
@@ -83,12 +90,12 @@ async function attempt(url: string, doFetch: typeof fetch, timeoutMs: number): P
   } catch (err) {
     return { kind: "retry", reason: describeFailure(err), waitMs: null };
   }
-  if (res.status === 404) return { kind: "missing" };
-  if (res.status === 429) return { kind: "retry", reason: "HTTP 429", waitMs: retryAfterMs(res) };
-  if (res.status >= 500) return { kind: "retry", reason: `HTTP ${res.status}`, waitMs: null };
+  if (res.status === 404) { await discard(res); return { kind: "missing" }; }
+  if (res.status === 429) { const waitMs = retryAfterMs(res); await discard(res); return { kind: "retry", reason: "HTTP 429", waitMs }; }
+  if (res.status >= 500) { await discard(res); return { kind: "retry", reason: `HTTP ${res.status}`, waitMs: null }; }
   // Any other non-200 (a rejected key, a bad request) will not improve with a
   // retry, and must not be mistaken for "no such title".
-  if (!res.ok) return { kind: "fatal", reason: `HTTP ${res.status}` };
+  if (!res.ok) { await discard(res); return { kind: "fatal", reason: `HTTP ${res.status}` }; }
   try {
     const payload: unknown = await res.json();
     if (typeof payload === "object" && payload !== null && !Array.isArray(payload)) {
@@ -117,7 +124,7 @@ export async function lookupTmdbTitle(
       : `${TMDB_BASE_URL}/tv/${tmdbId}?api_key=${encodeURIComponent(apiKey)}&append_to_response=external_ids`;
   const doFetch = deps.fetch ?? fetch;
   const sleep = deps.sleep ?? realSleep;
-  const timeoutMs = deps.timeoutMs ?? REQUEST_TIMEOUT_MS;
+  const timeoutMs = deps.timeoutMs ?? TMDB_TIMEOUT_MS;
 
   let lastReason = "no attempt made";
   for (let n = 1; n <= MAX_ATTEMPTS; n++) {

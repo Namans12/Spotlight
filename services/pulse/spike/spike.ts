@@ -11,9 +11,11 @@
 //   cd services/pulse && npx tsx --env-file=.env spike/spike.ts
 //
 // It makes about 70 live Qloo calls, so run it deliberately, not in a loop.
-// Raw responses go to spike/out/ (gitignored: Qloo's terms forbid publishing
-// its data), and stdout shows names too, so do not paste the output anywhere
-// public. It never prints any key.
+// stdout is summaries only: statuses, counts, booleans and tag-id families, with
+// no Qloo-returned entity, venue, artist, brand or theme names. Set
+// SPIKE_SHOW_NAMES=1 to print names and heatmap cells too (for your eyes only:
+// Qloo's terms forbid publishing its data). Raw responses go to spike/out/
+// (gitignored) either way. It never prints any key.
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -41,7 +43,11 @@ const summary = (label: string, s: { status: string; data: unknown; note?: strin
 };
 type Row = Record<string, unknown>;
 const rows_ = (xs: unknown): Row[] => (Array.isArray(xs) ? (xs as Row[]) : []);
-const names = (xs: unknown, key = "name", k = 4) => rows_(xs).slice(0, k).map((x) => String(x?.[key])).join(" | ");
+const SHOW_NAMES = process.env.SPIKE_SHOW_NAMES === "1";
+/** Names only when asked for; otherwise an empty string, so lines carry counts alone. */
+const names = (xs: unknown, key = "name", k = 4) => (SHOW_NAMES ? rows_(xs).slice(0, k).map((x) => String(x?.[key])).join(" | ") : "");
+/** The family of a tag id ("urn:tag:genre:place"), without the specific tag. */
+const families = (ids: string[]) => [...new Set(ids.map((id) => id.split(":").slice(0, 4).join(":")))].join(", ") || "(none)";
 
 async function main() {
   console.log("== tools/list");
@@ -73,7 +79,7 @@ async function main() {
         how = ref ? "search(year-matched)" : `search-miss(cands=${cands.length})`;
       } catch (e) { how = "search-error:" + String((e as Error).message).slice(0, 60); }
     }
-    console.log(`  ${String(r.title).slice(0, 38).padEnd(38)} imdb=${lk?.imdbId ?? "-"}`.padEnd(62) + ` → ${ref ? `${ref.name} (${ref.year ?? "?"}) [${how}]` : how || "no IMDb id on TMDB yet"}`);
+    console.log(`  ${String(r.title).slice(0, 38).padEnd(38)} imdb=${lk?.imdbId ?? "-"}`.padEnd(62) + ` → ${ref ? `${SHOW_NAMES ? `${ref.name} ` : "resolved "}(${ref.year ?? "?"}) [${how}]` : how || "no IMDb id on TMDB yet"}`);
     if (ref) resolved.push({ title: String(r.title), ref, how });
   }
   console.log(`  RESOLVED ${resolved.length}/${tried}   (go/no-go bar: ≥ 7/10)`);
@@ -88,24 +94,24 @@ async function main() {
       const id = p.ref.entityId;
       const rec: Record<string, unknown> = {};
       const heat = await qloo.heatmap(id, city); rec.heatmap = heat; summary("heatmap", heat);
-      if (Array.isArray(heat.data) && heat.data.length) console.log("    cells:", rows_(heat.data).slice(0, 3).map((c) => `${String(c.geohash)}@${Number(c.affinity).toFixed(2)}`).join(" "));
+      if (SHOW_NAMES && Array.isArray(heat.data) && heat.data.length) console.log("    cells:", rows_(heat.data).slice(0, 3).map((c) => `${String(c.geohash)}@${Number(c.affinity).toFixed(2)}`).join(" "));
       const tagQs = ["cafe", "coffee", "bakery", "dessert"];
       const tagIds: string[] = [];
       for (const q of tagQs) { try { const t = await qloo.findTags(q, "place"); rec["tags_" + q] = t; tagIds.push(...t.slice(0, 2).map((x) => x.tagId)); } catch (e) { rec["tags_" + q] = String(e); } }
-      console.log("    place-tag ids found:", [...new Set(tagIds)].slice(0, 6).join(", ") || "(none)");
+      console.log("    place-tag ids found:", new Set(tagIds).size, "| families:", families(tagIds));
       const places = await qloo.places(id, city, [...new Set(tagIds)].slice(0, 6)); rec.places = places; summary("places (cafe tags)", places);
       if (Array.isArray(places.data)) {
         const vs = rows_(places.data);
-        console.log("    venues:", names(places.data), "| with address:", vs.filter((v) => v.address).length, "| with lat/lon:", vs.filter((v) => v.lat != null).length, "| with tags:", vs.filter((v) => Array.isArray(v.tags) && v.tags.length).length);
+        console.log("    venues:", vs.length, names(places.data), "| with address:", vs.filter((v) => v.address).length, "| with lat/lon:", vs.filter((v) => v.lat != null).length, "| with tags:", vs.filter((v) => Array.isArray(v.tags) && v.tags.length).length);
       }
       const open = await qloo.places(id, city, []); rec.places_open = open; summary("places (no tag filter)", open);
-      if (Array.isArray(open.data)) console.log("    venues:", names(open.data));
+      if (Array.isArray(open.data)) console.log("    venues (no filter):", open.data.length, names(open.data));
       const pt = await qloo.placeTags(id, city); rec.place_tags = pt; summary("place_tags (themes)", pt);
-      if (Array.isArray(pt.data)) console.log("    themes:", names(pt.data, "name", 6));
+      if (Array.isArray(pt.data)) console.log("    themes:", pt.data.length, "| tag-id families:", families(rows_(pt.data).map((x) => String(x.tagId))), names(pt.data, "name", 6));
       if (cityId === "delhi") {
         const demo = await qloo.demographics(id); rec.demographics = demo; summary("demographics", demo);
-        const art = await qloo.artists(id); rec.artists = art; summary("artists", art); if (Array.isArray(art.data)) console.log("    artists:", names(art.data));
-        const br = await qloo.brands(id); rec.brands = br; summary("brands", br); if (Array.isArray(br.data)) console.log("    brands:", names(br.data));
+        const art = await qloo.artists(id); rec.artists = art; summary("artists", art); if (SHOW_NAMES && Array.isArray(art.data)) console.log("    artists:", names(art.data));
+        const br = await qloo.brands(id); rec.brands = br; summary("brands", br); if (SHOW_NAMES && Array.isArray(br.data)) console.log("    brands:", names(br.data));
         const tr = await qloo.trends(id); rec.trends = tr; summary("trends", tr);
       }
       raw[`${cityId}:${p.title}`] = rec;

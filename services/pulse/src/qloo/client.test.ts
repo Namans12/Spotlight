@@ -562,9 +562,10 @@ describe("place themes keep only food and drink tag families (L4)", () => {
 describe("what a business owner's tag names look like to businessFit (L4)", () => {
   it("still matches realistic food-family names against a business type's query words", async () => {
     const { businessFit } = await import("../score.js");
-    const names = ["Dessert shop", "Coffee", "Bakery", "Arab restaurant", "Burrito"];
+    // Invented names that contain a business type's query words, as real tag names do.
+    const names = ["Test Dessert Shop", "Test Coffee Stop", "Test Bakery Counter", "Test Grill Restaurant", "Test Rice Dish"];
     expect(businessFit(names, "cafe")).toBeCloseTo(3 / 5); // dessert, coffee, bakery
-    expect(businessFit(["Dessert shop", "Snacks", "Burrito", "Cold beverage"], "d2c_food")).toBeCloseTo(3 / 4);
+    expect(businessFit(["Test Dessert Shop", "Test Snacks Box", "Test Rice Dish", "Test Cold Beverage"], "d2c_food")).toBeCloseTo(3 / 4);
     expect(businessFit(["Caf\u00e9"], "cafe")).toBe(1);
   });
 });
@@ -739,5 +740,174 @@ describe("every entity-signal call maps a contract rejection to empty (follow-up
       expect(calls).toHaveLength(1);
       expect(warn).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+
+describe("describe lookup behind trends is not an entity-signal call", () => {
+  it("a QLOO_CONTRACT on it is an error, with no thin-signal warning", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const contract = { status: "error", results: [], error: { code: "QLOO_CONTRACT", layer: "qloo", retryable: false, recovery: "x" } };
+      const { t, calls } = fakeTransport({ qloo_describe: [contract], qloo_trends: [{ status: "ok", series: [] }] });
+      const s = await createHarnessQlooClient(t, { sleep: noSleep }).trends("ent-1");
+      expect(s.status).toBe("error");
+      expect(calls.map((c) => c.name)).toEqual(["qloo_describe"]);
+      expect(warn).not.toHaveBeenCalled();
+    } finally { warn.mockRestore(); }
+  });
+});
+
+describe("venue ids to tag are unique (review fix)", () => {
+  it("a venue returned twice costs one entity_tags slot", async () => {
+    const { t, calls } = fakeTransport({
+      qloo_recommend: [{ status: "ok", result_count: 3, results: [{ entity_id: "v-1", name: "A" }, { entity_id: "v-1", name: "A2" }, { entity_id: "v-2", name: "B" }] }],
+      qloo_entity_tags: [{ status: "ok", results: [{ id: "urn:tag:genre:place:x", name: "X", affinity: 0.5 }] }],
+    });
+    await createHarnessQlooClient(t, { sleep: noSleep }).placeTags("ent-1", delhi);
+    expect(calls[1]?.args.entities).toEqual(["v-1", "v-2"]);
+  });
+});
+
+// The reviewer's guard: a recipe or argument bug also surfaces as QLOO_CONTRACT
+// (the harness uses it for every HTTP 400), so a call that is rejected nearly
+// every time is not "a thin-signal title" and must not be hidden as `empty`.
+describe("contract-rejection circuit guard", () => {
+  const R = { status: "error", results: [], error: { code: "QLOO_CONTRACT", layer: "qloo", retryable: false, recovery: "x" } };
+  const OK = { status: "ok", result_count: 1, results: [{ entity_id: "a-1", name: "Test Artist", affinity: 0.3 }] };
+  const AUTH = { status: "error", results: [], error: { code: "QLOO_AUTH", layer: "qloo", retryable: false, recovery: "key" } };
+  const TRIP = "qloo contract rejections for recommend_artists exceed 90% of the last 20 calls \u2014 the recipe may be broken (not a thin-signal title)";
+
+  async function harness(replies: unknown[], tool = "qloo_recommend") {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { t } = fakeTransport({ [tool]: replies });
+    const q = createHarnessQlooClient(t, { sleep: noSleep });
+    return { q, warn, error, done: () => { warn.mockRestore(); error.mockRestore(); } };
+  }
+
+  it("9 consecutive rejections are still empty; the 10th is an error with exactly one console.error", async () => {
+    const h = await harness(Array.from({ length: 12 }, () => R));
+    try {
+      for (let i = 0; i < 9; i++) expect((await h.q.artists("e")).status).toBe("empty");
+      expect(h.error).not.toHaveBeenCalled();
+      const tenth = await h.q.artists("e");
+      expect(tenth.status).toBe("error");
+      expect(tenth.data).toBeNull();
+      expect(h.error).toHaveBeenCalledTimes(1);
+      expect(h.error).toHaveBeenCalledWith(TRIP);
+      // Still tripped, still an error, and the message is not repeated.
+      expect((await h.q.artists("e")).status).toBe("error");
+      expect((await h.q.artists("e")).status).toBe("error");
+      expect(h.error).toHaveBeenCalledTimes(1);
+      // The per-rejection warning only fires while not tripped.
+      expect(h.warn).toHaveBeenCalledTimes(9);
+    } finally { h.done(); }
+  });
+
+  it("a realistic pattern (every 4th call rejected, 40 calls) never trips", async () => {
+    const h = await harness(Array.from({ length: 40 }, (_, i) => (i % 4 === 3 ? R : OK)));
+    try {
+      const statuses: string[] = [];
+      for (let i = 0; i < 40; i++) statuses.push((await h.q.artists("e")).status);
+      expect(statuses.filter((s) => s === "error")).toHaveLength(0);
+      expect(statuses.filter((s) => s === "empty")).toHaveLength(10);
+      expect(h.error).not.toHaveBeenCalled();
+    } finally { h.done(); }
+  });
+
+  it("after a trip, a run of successes brings the ratio under 50% and empty mapping resumes", async () => {
+    const h = await harness([...Array.from({ length: 10 }, () => R), ...Array.from({ length: 11 }, () => OK), R, R]);
+    try {
+      for (let i = 0; i < 10; i++) await h.q.artists("e");
+      expect(h.error).toHaveBeenCalledTimes(1);
+      // 10 rejections + 10 successes is exactly 50%: still tripped (a rejection would still be an error).
+      for (let i = 0; i < 10; i++) expect((await h.q.artists("e")).status).toBe("ok");
+      // The 11th success pushes the oldest rejection out: 9/20 < 50%, so the trip resets.
+      expect((await h.q.artists("e")).status).toBe("ok");
+      expect((await h.q.artists("e")).status).toBe("empty");
+      expect((await h.q.artists("e")).status).toBe("empty");
+      expect(h.error).toHaveBeenCalledTimes(1);
+    } finally { h.done(); }
+  });
+
+  it("can trip again after it has reset, with a new message", async () => {
+    const h = await harness([...Array.from({ length: 10 }, () => R), ...Array.from({ length: 20 }, () => OK), ...Array.from({ length: 18 }, () => R)]);
+    try {
+      for (let i = 0; i < 30; i++) await h.q.artists("e");
+      expect(h.error).toHaveBeenCalledTimes(1);
+      // The ring is all successes now, so it takes 18 rejections of the last 20 to reach 90% again.
+      for (let i = 0; i < 17; i++) expect((await h.q.artists("e")).status).toBe("empty");
+      expect(h.error).toHaveBeenCalledTimes(1);
+      expect((await h.q.artists("e")).status).toBe("error");
+      expect(h.error).toHaveBeenCalledTimes(2);
+    } finally { h.done(); }
+  });
+
+  it("rings are per call name: a broken heatmap does not affect artists", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { t } = fakeTransport({ qloo_where_popular: [R], qloo_recommend: [R] });
+      const q = createHarnessQlooClient(t, { sleep: noSleep });
+      for (let i = 0; i < 10; i++) await q.heatmap("e", delhi);
+      expect((await q.heatmap("e", delhi)).status).toBe("error");
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(error).toHaveBeenCalledWith(expect.stringContaining("for where_popular exceed 90%"));
+      expect((await q.artists("e")).status).toBe("empty");
+      expect((await q.brands("e")).status).toBe("empty");
+    } finally { warn.mockRestore(); error.mockRestore(); }
+  });
+
+  it("state belongs to the client instance, not the module", async () => {
+    const h1 = await harness(Array.from({ length: 12 }, () => R));
+    try {
+      for (let i = 0; i < 10; i++) await h1.q.artists("e");
+      expect(h1.error).toHaveBeenCalledTimes(1);
+      const { t } = fakeTransport({ qloo_recommend: [R] });
+      const fresh = createHarnessQlooClient(t, { sleep: noSleep });
+      expect((await fresh.artists("e")).status).toBe("empty");
+    } finally { h1.done(); }
+  });
+
+  it("auth and other errors count as non-rejections, stay errors, and keep the guard from tripping", async () => {
+    const h = await harness([...Array.from({ length: 9 }, () => R), AUTH, R, R]);
+    try {
+      for (let i = 0; i < 9; i++) expect((await h.q.artists("e")).status).toBe("empty");
+      const auth = await h.q.artists("e");
+      expect(auth.status).toBe("error");
+      expect(auth.note).toContain("key");
+      // 9 rejections out of 10 samples is 90%: the next rejection (10/11) trips.
+      expect((await h.q.artists("e")).status).toBe("error");
+      expect(h.error).toHaveBeenCalledTimes(1);
+    } finally { h.done(); }
+  });
+
+  it("a thrown transport failure counts as a non-rejection", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      let n = 0;
+      const t: HarnessTransport = {
+        ...fakeTransport({}).t,
+        async callTool() { n++; if (n <= 5) throw new Error("socket hang up"); return R; },
+      };
+      const q = createHarnessQlooClient(t, { sleep: noSleep });
+      for (let i = 0; i < 5; i++) expect((await q.artists("e")).status).toBe("error");
+      // 5 failures then rejections: 5 rejections out of 10 samples is 50%, nowhere near a trip.
+      for (let i = 0; i < 5; i++) expect((await q.artists("e")).status).toBe("empty");
+      expect(error).not.toHaveBeenCalled();
+    } finally { warn.mockRestore(); error.mockRestore(); }
+  });
+
+  it("while tripped the error section is not cached, so the next request retries", async () => {
+    const h = await harness(Array.from({ length: 12 }, () => R));
+    try {
+      for (let i = 0; i < 10; i++) await h.q.artists("e");
+      const sql = fakeSql(newDb());
+      const a = await getEvidence(sql, "artists", "e", null, () => h.q.artists("e"));
+      const b = await getEvidence(sql, "artists", "e", null, () => h.q.artists("e"));
+      expect([a.status, b.status]).toEqual(["error", "error"]);
+    } finally { h.done(); }
   });
 });

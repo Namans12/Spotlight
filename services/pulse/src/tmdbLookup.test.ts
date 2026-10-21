@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { lookupTmdbTitle, TmdbNotConfiguredError, TmdbUnavailableError } from "./tmdbLookup.js";
+import { lookupTmdbTitle, TMDB_TIMEOUT_MS, TmdbNotConfiguredError, TmdbUnavailableError } from "./tmdbLookup.js";
 
 // A made-up key that must never appear in an error message or a request log.
 const KEY = "test-key-not-real-0000";
@@ -88,11 +88,33 @@ describe("lookupTmdbTitle: outages", () => {
     await expect(lookupTmdbTitle("movie", 1, d)).rejects.toBeInstanceOf(TmdbUnavailableError);
   });
 
-  it("gives every attempt an 8 second timeout signal", async () => {
-    const seen: (AbortSignal | undefined)[] = [];
-    const fetchFn = (async (_u: unknown, init?: RequestInit) => { seen.push(init?.signal ?? undefined); return json({ imdb_id: "tt0000005" }); }) as unknown as typeof fetch;
-    await lookupTmdbTitle("movie", 1, { fetch: fetchFn, sleep: async () => {}, apiKey: KEY });
-    expect(seen[0]).toBeInstanceOf(AbortSignal);
+  it("gives every attempt an 8 second timeout, and 8 seconds is the default", async () => {
+    expect(TMDB_TIMEOUT_MS).toBe(8000);
+    const spy = vi.spyOn(AbortSignal, "timeout");
+    try {
+      const { d, calls } = deps([json({}, 500), json({}, 503), json({ imdb_id: "tt0000005" })]);
+      await lookupTmdbTitle("movie", 1, d);
+      expect(calls).toHaveBeenCalledTimes(3);
+      expect(spy.mock.calls).toEqual([[8000], [8000], [8000]]);
+    } finally { spy.mockRestore(); }
+  });
+
+  it("releases the socket: an unused response body is cancelled on 404, 429, 5xx and other 4xx", async () => {
+    for (const status of [404, 429, 500, 401]) {
+      const res = new Response("unused body", { status });
+      const cancel = vi.spyOn(res.body!, "cancel");
+      const replies: (Response | Error)[] = status === 404 ? [res] : status === 401 ? [res] : [res, json({ imdb_id: "tt0000008" })];
+      const { d } = deps(replies);
+      await lookupTmdbTitle("movie", 1, d).catch(() => {});
+      expect(cancel, `status ${status}`).toHaveBeenCalled();
+    }
+  });
+
+  it("a body that cannot be cancelled does not break the lookup", async () => {
+    const res = new Response("x", { status: 404 });
+    vi.spyOn(res.body!, "cancel").mockRejectedValue(new Error("already closed"));
+    const { d } = deps([res]);
+    expect(await lookupTmdbTitle("movie", 1, d)).toBeNull();
   });
 
   it("honours Retry-After on a 429, capped at 2 seconds", async () => {

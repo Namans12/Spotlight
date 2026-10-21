@@ -37,9 +37,13 @@
 //   - findTags: the harness tool has no parent-type argument, so place/brand
 //     scoping is a local filter on the returned tag id/type.
 //   - searchTitles: the /search REST path, params and entity shape.
-//   - artists and brands can be rejected with an HTTP 400 QLOO_CONTRACT for a
-//     thin-signal title (brand-new, little taste data); the client maps that to
-//     `empty` rather than an error (see client.ts).
+//   - EVERY call keyed on one title (heatmap, demographics, trends, venues,
+//     place themes, artists, brands) can be rejected with an HTTP 400
+//     QLOO_CONTRACT for a thin-signal title (obscure or brand-new, little taste
+//     data); the client maps that to `empty` rather than an error. The harness
+//     uses QLOO_CONTRACT for every HTTP 400, so a circuit guard in client.ts
+//     turns the mapping off for a call name rejected on 90% of its last 20
+//     calls: that is a broken recipe, not a thin-signal title.
 //   - the hackathon base URL (see harness.ts) works with the harness.
 
 import type {
@@ -237,7 +241,8 @@ export function venuesToTag(entityId: string, city: City): ToolRecipe<string[]> 
   return {
     ...base,
     args: { ...base.args, limit: 10 },
-    pick: (results) => venues(results).map((v) => v.entityId),
+    // One venue can come back as two rows; each id is worth one tag-lookup slot.
+    pick: (results) => [...new Set(venues(results).map((v) => v.entityId))],
   };
 }
 

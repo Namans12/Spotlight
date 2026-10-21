@@ -127,24 +127,63 @@ export function createHarnessQlooClient(transport: HarnessTransport, opts: Harne
       return raw;
     }, { signal: callOpts.signal });
 
+  // Circuit guard for the thin-signal mapping below. The harness uses
+  // QLOO_CONTRACT for every HTTP 400, so a recipe or argument bug (a city
+  // string Qloo rejects, a renamed tag id, too many include_tags) looks exactly
+  // like "thin-signal title" for EVERY title, and would be cached as such for 3
+  // days. A call rejected nearly every time is not a thin-signal title: per
+  // call name, remember the last 20 outcomes (true = contract rejection; a
+  // success, a thin-signal answer's non-rejections and any other error all
+  // count false), and stop mapping to `empty` once a rejection arrives with
+  // at least 10 samples of which at least 90% were rejections. The trip ends
+  // when the ratio falls below 50%. State is per client instance.
+  const RING = 20;
+  const MIN_SAMPLES = 10;
+  const TRIP_RATIO = 0.9;
+  const RESET_RATIO = 0.5;
+  const rings = new Map<string, { outcomes: boolean[]; tripped: boolean }>();
+
+  /** Records one outcome; true when the call is currently tripped. */
+  function recordOutcome(call: string, rejected: boolean): boolean {
+    let st = rings.get(call);
+    if (!st) rings.set(call, (st = { outcomes: [], tripped: false }));
+    st.outcomes.push(rejected);
+    if (st.outcomes.length > RING) st.outcomes.shift();
+    const ratio = st.outcomes.filter(Boolean).length / st.outcomes.length;
+    if (st.tripped) {
+      if (ratio < RESET_RATIO) st.tripped = false;
+    } else if (rejected && st.outcomes.length >= MIN_SAMPLES && ratio >= TRIP_RATIO) {
+      st.tripped = true;
+      console.error(`qloo contract rejections for ${call} exceed 90% of the last 20 calls \u2014 the recipe may be broken (not a thin-signal title)`);
+    }
+    return st.tripped;
+  }
+
   /** Every call keyed on one title goes through here, and a contract
    *  rejection of it means "too little taste data on this title": an answer
    *  (empty, so it caches for 3 days and the board stops waiting on it) rather
    *  than a failure that re-fails on every request. It is still logged, with
    *  no params or keys, so a genuine recipe bug stays visible in the server log
-   *  instead of hiding as "empty". `thinSignal: false` is for lookups that are
-   *  not entity-signal calls (the type lookup behind trends). */
+   *  instead of hiding as "empty"; and while the circuit guard above is tripped
+   *  the rejection is an ordinary error section (never cached, so retried).
+   *  `thinSignal: false` is for lookups that are not entity-signal calls (the
+   *  type lookup behind trends): no mapping, no guard. */
   async function section<T>(r: recipes.ToolRecipe<T>, opts: { thinSignal?: boolean } = {}): Promise<EvidenceSection<T>> {
+    const guarded = opts.thinSignal !== false;
+    let recorded = false;
     try {
       const raw = await callTool(r.tool, r.args);
-      const rejected = opts.thinSignal === false ? null : contractRejection(raw);
-      if (rejected) {
+      const rejected = guarded ? contractRejection(raw) : null;
+      recorded = guarded;
+      const tripped = guarded ? recordOutcome(r.call, rejected !== null) : false;
+      if (rejected && !tripped) {
         console.warn(`qloo contract rejection (${r.call}): ${rejected}`);
         return { status: "empty", data: null, provenance: provenance(r.call, r.params), note: r.thinSignalNote ?? recipes.THIN_SIGNAL_NOTE };
       }
       const mapped = mapHarnessResult(r.envelope ? r.envelope(raw) : raw, r.call, r.params, r.pick);
       return r.emptyNote && mapped.status === "empty" ? { ...mapped, note: r.emptyNote } : mapped;
     } catch (err) {
+      if (guarded && !recorded) recordOutcome(r.call, false); // the call itself threw (transport, rate limit)
       return failed(r.call, r.params, `Qloo call failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
