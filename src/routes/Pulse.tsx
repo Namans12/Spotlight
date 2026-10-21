@@ -5,6 +5,7 @@ import { Activity, AlertCircle, Clapperboard, RefreshCw, WifiOff } from 'lucide-
 import type { BoardCard, BusinessType } from '../../shared/types/pulse';
 import { CityTypePicker } from '@/components/pulse/CityTypePicker';
 import { PendingBoardCard, RankedBoardCard } from '@/components/pulse/BoardCard';
+import { PulseChatLauncher } from '@/components/pulse/PulseChatLauncher';
 import { UnresolvedStrip } from '@/components/pulse/UnresolvedStrip';
 import { Notice, RetryButton } from '@/components/pulse/Notice';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -166,6 +167,7 @@ export default function Pulse() {
           >
             Change
           </button>
+          <PulseChatLauncher city={city.slug} type={type} />
         </div>
         {city.country !== 'IN' && (
           <p className="text-xs text-muted-foreground">Release dates are for India; audience data is for {city.name}.</p>

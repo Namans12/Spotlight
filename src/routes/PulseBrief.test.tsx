@@ -698,3 +698,27 @@ describe('Pulse brief: provenance', () => {
     expect(drawer.textContent).not.toMatch(/sk-secret|tok-abc|Bearer nope/);
   });
 });
+
+describe('Pulse brief: Ask Pulse', () => {
+  it('sits beside How this was made, and its audience prompt names the title and city', async () => {
+    const s = controlledStream();
+    const user = userEvent.setup();
+    renderBrief();
+    await s.emit(header$(), section('who', who));
+    const ask = screen.getByRole('button', { name: 'Ask Pulse' });
+    expect(ask.parentElement).toBe(screen.getByRole('button', { name: 'How this was made' }).parentElement);
+    expect(ask).toHaveClass('min-h-11');
+    await user.click(ask);
+    const dialog = await screen.findByRole('dialog', { name: 'Ask Pulse' });
+    expect(within(dialog).getByRole('button', { name: 'Who is the audience for Saffron Nights in Delhi?' })).toBeInTheDocument();
+  });
+
+  it('has no audience prompt before the title has loaded', async () => {
+    controlledStream();
+    const user = userEvent.setup();
+    renderBrief();
+    await user.click(screen.getByRole('button', { name: 'Ask Pulse' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Ask Pulse' });
+    expect(within(dialog).queryByRole('button', { name: /Who is the audience/ })).not.toBeInTheDocument();
+  });
+});

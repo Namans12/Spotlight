@@ -9,6 +9,7 @@ import { CityTypePicker } from '@/components/pulse/CityTypePicker';
 import { CampaignCompare, CompareToggle } from '@/components/pulse/CampaignCompare';
 import { Notice, RetryButton } from '@/components/pulse/Notice';
 import { ProvenanceDrawer } from '@/components/pulse/ProvenanceDrawer';
+import { PulseChatLauncher } from '@/components/pulse/PulseChatLauncher';
 import { HookList, NameChips, TrendLine, VenueList } from '@/components/pulse/SectionBodies';
 import { WhereSection } from '@/components/pulse/WhereSection';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -311,7 +312,10 @@ function BriefStream({ city, type, mediaType, tmdbId }: TitleParams) {
     <div className="mx-auto max-w-4xl space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <BackLink href={back} />
-        {hasContent && <ProvenanceDrawer order={order} sections={sections} />}
+        <div className="flex flex-wrap items-center gap-2">
+          <PulseChatLauncher city={city} type={type} title={header?.title} />
+          {hasContent && <ProvenanceDrawer order={order} sections={sections} />}
+        </div>
       </div>
 
       <HeaderBlock header={header} cityName={cityName} type={type} stalled={stalled} />

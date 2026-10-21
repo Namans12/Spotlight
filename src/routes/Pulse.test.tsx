@@ -303,3 +303,21 @@ describe('Pulse board: picker and profile', () => {
     expect(fetchBoard).not.toHaveBeenCalled();
   });
 });
+
+describe('Pulse board: Ask Pulse', () => {
+  it('offers the chat next to Change once a profile is shown, with the profile in its prompts', async () => {
+    vi.mocked(fetchBoard).mockResolvedValue(board());
+    const user = userEvent.setup();
+    renderPulse();
+    const ask = await screen.findByRole('button', { name: 'Ask Pulse' });
+    expect(screen.getByRole('button', { name: 'Change' }).parentElement).toBe(ask.parentElement);
+    await user.click(ask);
+    const dialog = await screen.findByRole('dialog', { name: 'Ask Pulse' });
+    expect(within(dialog).getByRole('button', { name: 'Which release should my Delhi café theme this weekend around?' })).toBeInTheDocument();
+  });
+
+  it('is not offered while choosing a profile', () => {
+    renderPulse('/pulse');
+    expect(screen.queryByRole('button', { name: 'Ask Pulse' })).not.toBeInTheDocument();
+  });
+});
