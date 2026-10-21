@@ -1,5 +1,5 @@
 // The Qloo harness tools the model may call directly. Only an explicit
-// allowlist is offered, intersected with what the harness really lists, so a
+// allowlist (CHAT_QLOO_TOOLS) is offered, intersected with what the harness really lists, so a
 // tool added to the harness later (or one that writes, or inspects the host)
 // never reaches the model by accident. The harness's own input schemas are the
 // tool parameters, and its reply is cut down before the model sees it.
@@ -10,16 +10,17 @@ import { boundValue } from "../sanitize.js";
 import { normaliseToolSchema } from "./schema.js";
 import type { AgentTool, AgentToolDeps } from "./types.js";
 
-/** The exact tool names from the harness's own tool list. */
-export const QLOO_AGENT_TOOLS = [
-  "qloo_recommend",
-  "qloo_where_popular",
-  "qloo_audience_demographics",
-  "qloo_rank",
-  "qloo_compare_audiences",
-  "qloo_find_tags",
-  "qloo_describe",
-] as const;
+/** The Qloo harness tools the chat offers the model: three, by exact name from
+ *  the harness's own tool list. Every tool spec is sent on every model round,
+ *  and on Groq's free tier (8,000 tokens a minute) each one costs real budget,
+ *  so the chat carries only the three that answer the questions it gets. */
+export const CHAT_QLOO_TOOLS = ["qloo_recommend", "qloo_where_popular", "qloo_audience_demographics"] as const;
+
+/** The other four allowlisted harness tools. They stay defined (and are known
+ *  to be safe to offer) but are NOT exposed: dropped from the chat to save
+ *  ~900 tokens per round on the free tier. Move a name into CHAT_QLOO_TOOLS to
+ *  bring it back, e.g. on a paid tier. */
+export const QLOO_EXTRA_TOOLS = ["qloo_rank", "qloo_compare_audiences", "qloo_find_tags", "qloo_describe"] as const;
 
 /** The fixture client's only tool, allowed in fixtures mode so the agent can be
  *  run end to end with no Qloo key. */
@@ -64,7 +65,7 @@ export async function harnessTools(deps: AgentToolDeps): Promise<AgentTool[]> {
     try { deps.onError?.("listTools", err); } catch { /* a broken logger must not break the request */ }
     return [];
   }
-  const allowed = new Set<string>([...QLOO_AGENT_TOOLS, ...(deps.fixtures ? [FIXTURE_TOOL] : [])]);
+  const allowed = new Set<string>([...CHAT_QLOO_TOOLS, ...(deps.fixtures ? [FIXTURE_TOOL] : [])]);
   return listed
     .filter((t) => allowed.has(t.name))
     .map((t): AgentTool => ({

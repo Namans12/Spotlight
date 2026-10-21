@@ -11,7 +11,7 @@ import { titlesShotInTool } from "./tools/titlesShotIn.js";
 import type { AgentTool, AgentToolDeps } from "./tools/types.js";
 
 export type { AgentTool, AgentToolDeps } from "./tools/types.js";
-export { QLOO_AGENT_TOOLS } from "./tools/harness.js";
+export { CHAT_QLOO_TOOLS, QLOO_EXTRA_TOOLS } from "./tools/harness.js";
 
 /** pulse_board, release_brief, search_releases, titles_shot_in, then whichever
  *  allowlisted harness tools the harness lists. */

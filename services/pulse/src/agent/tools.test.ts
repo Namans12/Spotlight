@@ -7,7 +7,7 @@ import { boardSql, newBoardDb, seedEvidence } from "../testing/boardFakes.js";
 import { fixtureDeps, newDb } from "../testing/fakes.js";
 import { fakeLlm } from "../testing/llm.js";
 import { runAgent } from "./loop.js";
-import { buildTools, createToolProvider, QLOO_AGENT_TOOLS, type AgentTool, type AgentToolDeps } from "./tools.js";
+import { buildTools, createToolProvider, CHAT_QLOO_TOOLS, QLOO_EXTRA_TOOLS, type AgentTool, type AgentToolDeps } from "./tools.js";
 import { escapeLike } from "./tools/searchReleases.js";
 
 const TODAY = new Date("2026-10-21T06:00:00Z");
@@ -57,23 +57,39 @@ describe("buildTools: which tools the model gets", () => {
   });
 
   it("only allowlisted harness tools are exposed", async () => {
-    const qloo = { ...toolDeps().qloo, listTools: async () => harnessTools("qloo_recommend", "qloo_dangerous_admin", "qloo_capabilities", "qloo_trends", "qloo_entity_tags", "qloo_find_tags", "shell_exec") } as QlooClient;
+    const qloo = { ...toolDeps().qloo, listTools: async () => harnessTools("qloo_recommend", "qloo_dangerous_admin", "qloo_capabilities", "qloo_trends", "qloo_entity_tags", "qloo_where_popular", "shell_exec") } as QlooClient;
     const out = names(await buildTools(toolDeps({ qloo })));
     expect(out).toContain("qloo_recommend");
-    expect(out).toContain("qloo_find_tags");
+    expect(out).toContain("qloo_where_popular");
     for (const bad of ["qloo_dangerous_admin", "qloo_capabilities", "qloo_trends", "qloo_entity_tags", "shell_exec"]) expect(out).not.toContain(bad);
   });
 
-  it("the allowlist is the seven real harness names", () => {
-    expect([...QLOO_AGENT_TOOLS].sort()).toEqual([
-      "qloo_audience_demographics", "qloo_compare_audiences", "qloo_describe", "qloo_find_tags", "qloo_rank", "qloo_recommend", "qloo_where_popular",
+  it("the chat allowlist is exactly three Qloo tools; the other four are defined but not exposed", () => {
+    expect([...CHAT_QLOO_TOOLS].sort()).toEqual(["qloo_audience_demographics", "qloo_recommend", "qloo_where_popular"]);
+    expect([...QLOO_EXTRA_TOOLS].sort()).toEqual(["qloo_compare_audiences", "qloo_describe", "qloo_find_tags", "qloo_rank"]);
+  });
+
+  it("the chat exposes exactly seven tools (four Pulse + three Qloo), plus the fixture echo in fixtures mode", async () => {
+    // The harness lists all seven real tools and the fixture echo; the four extras and (outside fixtures mode) the echo are filtered out.
+    const all = harnessTools(...CHAT_QLOO_TOOLS, ...QLOO_EXTRA_TOOLS, "qloo_fixture_echo");
+    const qloo = { ...toolDeps().qloo, listTools: async () => all } as QlooClient;
+    expect(names(await buildTools(toolDeps({ qloo }))).sort()).toEqual([
+      "pulse_board", "qloo_audience_demographics", "qloo_recommend", "qloo_where_popular", "release_brief", "search_releases", "titles_shot_in",
+    ]);
+    expect(names(await buildTools(toolDeps({ qloo, fixtures: true }))).sort()).toEqual([
+      "pulse_board", "qloo_audience_demographics", "qloo_fixture_echo", "qloo_recommend", "qloo_where_popular", "release_brief", "search_releases", "titles_shot_in",
     ]);
   });
 
+  it("does not expose the dropped extras even when the harness lists them", async () => {
+    const qloo = { ...toolDeps().qloo, listTools: async () => harnessTools(...QLOO_EXTRA_TOOLS) } as QlooClient;
+    expect(names(await buildTools(toolDeps({ qloo })))).toEqual(["pulse_board", "release_brief", "search_releases", "titles_shot_in"]);
+  });
+
   it("offers an allowlisted tool only if the harness actually lists it", async () => {
-    const qloo = { ...toolDeps().qloo, listTools: async () => harnessTools("qloo_rank") } as QlooClient;
+    const qloo = { ...toolDeps().qloo, listTools: async () => harnessTools("qloo_where_popular") } as QlooClient;
     const out = names(await buildTools(toolDeps({ qloo })));
-    expect(out).toContain("qloo_rank");
+    expect(out).toContain("qloo_where_popular");
     expect(out).not.toContain("qloo_recommend");
   });
 
@@ -94,8 +110,8 @@ describe("buildTools: which tools the model gets", () => {
       $schema: "http://json-schema.org/draft-07/schema#", type: "object", required: ["entity"], additionalProperties: false,
       properties: { entity: { type: "string", minLength: 1, examples: ["x"] }, limit: { type: "integer", default: 10, minimum: 1 }, tags: { type: "array", uniqueItems: true, items: { type: "string" } } },
     };
-    const qloo = { ...toolDeps().qloo, listTools: async () => [{ name: "qloo_describe", description: "d", inputSchema }] } as QlooClient;
-    const params = find(await buildTools(toolDeps({ qloo })), "qloo_describe").spec.function.parameters;
+    const qloo = { ...toolDeps().qloo, listTools: async () => [{ name: "qloo_recommend", description: "d", inputSchema }] } as QlooClient;
+    const params = find(await buildTools(toolDeps({ qloo })), "qloo_recommend").spec.function.parameters;
     expect(params).toEqual({
       type: "object", required: ["entity"], additionalProperties: false,
       properties: { entity: { type: "string", minLength: 1 }, limit: { type: "integer", minimum: 1 }, tags: { type: "array", items: { type: "string" } } },
@@ -103,8 +119,8 @@ describe("buildTools: which tools the model gets", () => {
   });
 
   it("uses the harness's own schema as the tool's parameters", async () => {
-    const qloo = { ...toolDeps().qloo, listTools: async () => harnessTools("qloo_describe") } as QlooClient;
-    const tool = find(await buildTools(toolDeps({ qloo })), "qloo_describe");
+    const qloo = { ...toolDeps().qloo, listTools: async () => harnessTools("qloo_recommend") } as QlooClient;
+    const tool = find(await buildTools(toolDeps({ qloo })), "qloo_recommend");
     expect(tool.spec.function.parameters).toMatchObject({ type: "object", properties: { entity: { type: "string" } }, additionalProperties: false });
     expect(tool.spec.type).toBe("function");
   });
@@ -124,14 +140,14 @@ describe("buildTools: which tools the model gets", () => {
       execution: { transport: "mcp", correlation_id: "abc", duration_ms: 3 }, provenance: { source: "qloo", endpoint: "/x", documentation: "d" },
       query_intent: { big: "z".repeat(5000) },
     }));
-    const qloo = { ...toolDeps().qloo, listTools: async () => harnessTools("qloo_describe"), callTool } as unknown as QlooClient;
-    const tool = find(await buildTools(toolDeps({ qloo })), "qloo_describe");
+    const qloo = { ...toolDeps().qloo, listTools: async () => harnessTools("qloo_recommend"), callTool } as unknown as QlooClient;
+    const tool = find(await buildTools(toolDeps({ qloo })), "qloo_recommend");
     const ac = new AbortController();
     const out = (await tool.run({ entity: "Fake Place" }, { signal: ac.signal })) as Record<string, unknown>;
     // The call's signal travels to the client, so a queued call can be dropped.
-    expect(callTool).toHaveBeenCalledWith("qloo_describe", { entity: "Fake Place" }, { signal: ac.signal });
+    expect(callTool).toHaveBeenCalledWith("qloo_recommend", { entity: "Fake Place" }, { signal: ac.signal });
     expect(tool.budget).toBe("harness");
-    expect(out).toMatchObject({ tool: "qloo_describe", status: "ok", summary: "Found it.", result_count: 1 });
+    expect(out).toMatchObject({ tool: "qloo_recommend", status: "ok", summary: "Found it.", result_count: 1 });
     expect(out).not.toHaveProperty("execution");
     expect(out).not.toHaveProperty("query_intent");
     expect(JSON.stringify(out).length).toBeLessThan(3000);
@@ -139,15 +155,15 @@ describe("buildTools: which tools the model gets", () => {
 
   it("a harness error envelope reaches the model as data (code and recovery hint), not an exception", async () => {
     const callTool = vi.fn(async () => ({ status: "error", error: { code: "validation", layer: "input", retryable: false, recovery: "Pass an entity." } }));
-    const qloo = { ...toolDeps().qloo, listTools: async () => harnessTools("qloo_describe"), callTool } as unknown as QlooClient;
-    const out = await find(await buildTools(toolDeps({ qloo })), "qloo_describe").run({});
-    expect(out).toMatchObject({ tool: "qloo_describe", status: "error", error: { code: "validation", recovery: "Pass an entity." } });
+    const qloo = { ...toolDeps().qloo, listTools: async () => harnessTools("qloo_recommend"), callTool } as unknown as QlooClient;
+    const out = await find(await buildTools(toolDeps({ qloo })), "qloo_recommend").run({});
+    expect(out).toMatchObject({ tool: "qloo_recommend", status: "error", error: { code: "validation", recovery: "Pass an entity." } });
   });
 });
 
 describe("createToolProvider", () => {
   it("builds once and reuses the tools until the ttl passes", async () => {
-    const listTools = vi.fn(async () => harnessTools("qloo_describe"));
+    const listTools = vi.fn(async () => harnessTools("qloo_recommend"));
     const qloo = { ...toolDeps().qloo, listTools } as QlooClient;
     let now = 0;
     const get = createToolProvider(toolDeps({ qloo }), { ttlMs: 1000, now: () => now });
@@ -160,12 +176,12 @@ describe("createToolProvider", () => {
 
   it("does not keep a degraded build (a harness outage must not stick for the ttl)", async () => {
     let fail = true;
-    const listTools = vi.fn(async () => { if (fail) throw new Error("down"); return harnessTools("qloo_describe"); });
+    const listTools = vi.fn(async () => { if (fail) throw new Error("down"); return harnessTools("qloo_recommend"); });
     const qloo = { ...toolDeps().qloo, listTools } as QlooClient;
     const get = createToolProvider(toolDeps({ qloo }), { ttlMs: 1000, now: () => 0 });
-    expect(names(await get())).not.toContain("qloo_describe");
+    expect(names(await get())).not.toContain("qloo_recommend");
     fail = false;
-    expect(names(await get())).toContain("qloo_describe");
+    expect(names(await get())).toContain("qloo_recommend");
   });
 });
 
