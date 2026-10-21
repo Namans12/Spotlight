@@ -53,6 +53,9 @@ export const MAX_HARNESS_CALLS_PER_CHAT = 8;
 export const MAX_TOOL_CALLS_PER_CHAT = 12;
 export const TOOL_TIMEOUT_MS = 25_000;
 export const CHAT_DEADLINE_MS = 90_000;
+/** Completion budget for a chat round: final answers are at most 180 words, and
+ *  the free tier meters tokens per minute (the campaign writer keeps 4096). */
+export const CHAT_MAX_TOKENS = 1200;
 const MAX_NAME = 64;
 const MAX_SHOWN_ARGS = 300;
 
@@ -155,7 +158,7 @@ export async function* runAgent(llm: LlmClient, tools: AgentTool[], history: Cha
 
       let reply: ChatMessage;
       try {
-        const got = await Promise.race([llm.chat(messages, { tools: specs, signal: ac.signal }), aborted]);
+        const got = await Promise.race([llm.chat(messages, { tools: specs, signal: ac.signal, maxTokens: CHAT_MAX_TOKENS }), aborted]);
         if (got === ABORTED) { yield* stopped(); return; }
         reply = got;
       } catch (err) {

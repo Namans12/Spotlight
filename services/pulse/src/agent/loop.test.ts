@@ -418,3 +418,57 @@ describe("runAgent", () => {
     });
   });
 });
+
+describe("runAgent: what is re-sent to the model on each round (free-tier token budget)", () => {
+  const spec = { type: "object", properties: { city: { type: "string" }, business_type: { type: "string" } }, additionalProperties: false };
+  const bytes = (v: unknown) => JSON.stringify(v).length;
+
+  it("asks for at most 1,200 completion tokens per chat round", async () => {
+    const llm = fakeLlm([toolCallMsg(call("pulse_board", {})), text("ok")]);
+    await collect(runAgent(llm, [fakeTool("pulse_board", {}, spec)], [user("hi")]));
+    expect(llm.opts.map((o) => o?.maxTokens)).toEqual([1200, 1200]);
+  });
+
+  it("the assistant message carries the sanitised arguments only, and the tool message the truncated result once", async () => {
+    const big = { rows: Array.from({ length: 3000 }, (_, i) => `row number ${i}`) };
+    const llm = fakeLlm([
+      toolCallMsg(call("pulse_board", { city: "delhi", business_type: "cafe", injected: "x".repeat(5000), extra: { deep: [1, 2, 3] } }, "c1")),
+      text("done"),
+    ]);
+    await collect(runAgent(llm, [fakeTool("pulse_board", big, spec)], [user("hi")]));
+    const second = llm.calls[1];
+    const assistantMsg = second.find((m) => m.role === "assistant")!;
+    expect(assistantMsg.content).toBeNull();
+    expect(assistantMsg.tool_calls).toEqual([{ id: "c1", type: "function", function: { name: "pulse_board", arguments: '{"city":"delhi","business_type":"cafe"}' } }]);
+    const toolMsgs = second.filter((m) => m.role === "tool");
+    expect(toolMsgs).toHaveLength(1);
+    expect(toolMsgs[0].content!.length).toBeLessThanOrEqual(2800);
+    // The full (un-truncated) result never re-enters the history, and the truncated one appears once.
+    expect(JSON.stringify(second)).not.toContain("row number 2999");
+    expect(JSON.stringify(second).split("row number 0").length - 1).toBe(1);
+  });
+
+  it("a three-round conversation (two tool rounds, then the answer) re-sends a bounded amount in total", async () => {
+    // Each round is one model request carrying the system prompt (~1,700 chars), the
+    // user turn, the tool specs, and everything so far. A tool result is cut to 2,800
+    // characters (about 3,700 once serialised, because the cut preview is itself JSON and
+    // its quotes are escaped on the wire) and is re-sent once per later request. Measured
+    // with the two small fake tools below: 2,271 / 6,148 / 10,027 characters per request,
+    // 18,446 cumulative (~5,000 tokens). The bounds leave ~10% headroom; a regression that
+    // duplicated a result in the history, or sent it un-truncated, would blow through them.
+    const bigResult = { rows: Array.from({ length: 3000 }, (_, i) => `row ${i}`) };
+    const tools = [fakeTool("pulse_board", bigResult, spec), fakeTool("release_brief", bigResult, spec)];
+    const llm = fakeLlm([
+      toolCallMsg(call("pulse_board", { city: "delhi", business_type: "cafe" }, "a")),
+      toolCallMsg(call("release_brief", { city: "delhi", business_type: "cafe" }, "b")),
+      text("final answer"),
+    ]);
+    await collect(runAgent(llm, tools, [user("Which release should my Delhi cafe theme this weekend around, and why? Keep it short.")]));
+    expect(llm.calls).toHaveLength(3);
+    const sentChars = llm.calls.map((messages) => bytes(messages) + bytes(tools.map((t) => t.spec)));
+    expect(sentChars[0]).toBeLessThan(2_500);
+    expect(sentChars[1]).toBeLessThan(6_800);
+    expect(sentChars[2]).toBeLessThan(11_100);
+    expect(sentChars.reduce((x, y) => x + y, 0)).toBeLessThan(20_300);
+  });
+});
