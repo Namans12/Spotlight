@@ -16,6 +16,7 @@ import { RouteFallback } from '@/components/system/RouteFallback';
 
 const Home = lazy(() => import('./routes/Home'));
 const Calendar = lazy(() => import('./routes/Calendar'));
+const Pulse = lazy(() => import('./routes/Pulse'));
 const Search = lazy(() => import('./routes/Search'));
 const Browse = lazy(() => import('./routes/Browse'));
 const TitleDetail = lazy(() => import('./routes/TitleDetail'));
@@ -53,6 +54,7 @@ const App = () => (
                   <Route element={<AppShell />}>
                     <Route path="/" element={<Home />} />
                     <Route path="/calendar" element={<Calendar />} />
+                    <Route path="/pulse" element={<Pulse />} />
                     <Route path="/search" element={<Search />} />
                     <Route path="/browse" element={<Browse />} />
                     <Route path="/duel" element={<Duel />} />
