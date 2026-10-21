@@ -379,3 +379,34 @@ describe('streamChat (SSE)', () => {
     await expect(run).rejects.toMatchObject({ name: 'AbortError' });
   });
 });
+
+describe('fetchTitleLocations and fetchPlanNight', () => {
+  it('fetchTitleLocations GETs /title-locations with the title only', async () => {
+    const api = await loadApi();
+    fetchMock.mockResolvedValue(jsonResponse([{ city_slug: 'delhi', cityName: 'Delhi', kind: 'filmed', landmark_label: null, source: 'both' }]));
+    const rows = await api.fetchTitleLocations('tv', 77);
+    expect(rows).toHaveLength(1);
+    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(url.origin + url.pathname).toBe('http://pulse.test/title-locations');
+    expect(Object.fromEntries(url.searchParams)).toEqual({ mediaType: 'tv', tmdbId: '77' });
+    expect(fetchMock.mock.calls[0][1].method).toBe('GET');
+  });
+
+  it('fetchPlanNight GETs /plan-night with city and title', async () => {
+    const api = await loadApi();
+    fetchMock.mockResolvedValue(jsonResponse({ title: 'T', cityName: 'Delhi', places: { status: 'empty', data: null, provenance: [] }, artists: { status: 'empty', data: null, provenance: [] } }));
+    const out = await api.fetchPlanNight({ city: 'delhi', mediaType: 'movie', tmdbId: 5 });
+    expect(out.cityName).toBe('Delhi');
+    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(url.pathname).toBe('/plan-night');
+    expect(Object.fromEntries(url.searchParams)).toEqual({ city: 'delhi', mediaType: 'movie', tmdbId: '5' });
+  });
+
+  it('surfaces the service error code and Retry-After for plan-night', async () => {
+    const api = await loadApi();
+    fetchMock.mockResolvedValue(jsonResponse({ error: 'rate_limited' }, 429, { 'Retry-After': '12' }));
+    await expect(api.fetchPlanNight({ city: 'delhi', mediaType: 'movie', tmdbId: 5 })).rejects.toMatchObject({ status: 429, code: 'rate_limited', retryAfterSeconds: 12 });
+    fetchMock.mockResolvedValue(jsonResponse({ error: 'unknown_title' }, 404));
+    await expect(api.fetchPlanNight({ city: 'delhi', mediaType: 'movie', tmdbId: 5 })).rejects.toMatchObject({ status: 404, code: 'unknown_title' });
+  });
+});

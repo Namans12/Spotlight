@@ -8,7 +8,7 @@
  * "rate_limited" should say how long to wait, and a dropped connection should
  * offer a retry — three different screens from three different failures.
  */
-import type { AgentEvent, BoardResponse, BriefEvent, BusinessType, Campaign } from '../../shared/types/pulse';
+import type { AgentEvent, BoardResponse, BriefEvent, BusinessType, Campaign, PlanNightResponse, TitleLocationEntry } from '../../shared/types/pulse';
 import { HttpError, TimeoutError } from './http';
 import { isBusinessType, isPulseCitySlug } from './pulseCities';
 
@@ -215,6 +215,27 @@ export async function fetchBoard(city: string, type: BusinessType, signal?: Abor
 export async function fetchGuess(params: TitleParams, signal?: AbortSignal): Promise<Campaign> {
   const res = await pulseFetch('/guess', { query: titleQuery(params), signal, timeoutMs: JSON_TIMEOUT_MS });
   return (await res.json()) as Campaign;
+}
+
+/** Where a title was filmed or set, among the launch cities. A database-only
+ *  read on the service, so it is cheap; `[]` for a title with no record. */
+export async function fetchTitleLocations(mediaType: 'movie' | 'tv', tmdbId: number, signal?: AbortSignal): Promise<TitleLocationEntry[]> {
+  const res = await pulseFetch('/title-locations', { query: { mediaType, tmdbId }, signal, timeoutMs: JSON_TIMEOUT_MS });
+  return (await res.json()) as TitleLocationEntry[];
+}
+
+/** The places and artists fans of a title over-index on in one city. Spends
+ *  the service's Qloo budget, so it is only called on an explicit request. */
+export async function fetchPlanNight(
+  params: { city: string; mediaType: 'movie' | 'tv'; tmdbId: number },
+  signal?: AbortSignal,
+): Promise<PlanNightResponse> {
+  const res = await pulseFetch('/plan-night', {
+    query: { city: params.city, mediaType: params.mediaType, tmdbId: params.tmdbId },
+    signal,
+    timeoutMs: JSON_TIMEOUT_MS,
+  });
+  return (await res.json()) as PlanNightResponse;
 }
 
 // ---------------------------------------------------------------------------

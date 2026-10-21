@@ -22,6 +22,8 @@ import { tmdbBackdrop, tmdbPoster, tmdbLogo } from '@/lib/tmdbImage';
 import { formatRuntime, formatRuntimeLong } from '@/lib/format';
 import { CastRow } from '@/components/title/CastRow';
 import { FactsPanel } from '@/components/title/FactsPanel';
+import { LocationsPanel } from '@/components/title/LocationsPanel';
+import { PlanNightCard } from '@/components/title/PlanNightCard';
 import { SeasonProgress } from '@/components/title/SeasonProgress';
 import { TrailerCard } from '@/components/title/TrailerCard';
 import {
@@ -411,6 +413,11 @@ export default function TitleDetail() {
       )}
 
       <FactsPanel detail={data} />
+
+      {/* Release Pulse extras: both render nothing unless the Pulse service is
+          configured, and the first renders nothing when it has no record. */}
+      <LocationsPanel mediaType={mediaType} tmdbId={tmdbId} />
+      <PlanNightCard mediaType={mediaType} tmdbId={tmdbId} title={data.title} />
 
       {data.trailer && <TrailerCard trailer={data.trailer} />}
 
