@@ -37,14 +37,18 @@ export interface TitleCityLocation extends TitleLocation { citySlug: string }
 /** Every launch city one title is tied to, for the title page's "Filmed in"
  *  panel. A plain read of title_locations: no Qloo, no TMDB. Rows with no
  *  source are skipped for the same reason as above. The order here is only
- *  stable; the caller sorts by city name, which lives in cities.json. */
+ *  stable; the caller sorts by city name, which lives in cities.json. The
+ *  LIMIT is defence in depth on a public endpoint: the primary key already
+ *  allows at most two rows per city, but a read that is meant to be small
+ *  should say so in the statement rather than rely on the data staying tidy. */
 export async function getLocationsForTitle(sql: LocationsSql, key: EntityKey): Promise<TitleCityLocation[]> {
   const rows = await sql`
     SELECT city_slug, kind, source, landmark_label
     FROM title_locations
     WHERE tmdb_id = ${key.tmdbId} AND media_type = ${key.mediaType}
       AND source IS NOT NULL
-    ORDER BY kind, city_slug`;
+    ORDER BY kind, city_slug
+    LIMIT 40`;
   return rows.map((r) => ({
     citySlug: String(r.city_slug),
     kind: r.kind as TitleLocation["kind"],

@@ -417,7 +417,7 @@ export default function TitleDetail() {
       {/* Release Pulse extras: both render nothing unless the Pulse service is
           configured, and the first renders nothing when it has no record. */}
       <LocationsPanel mediaType={mediaType} tmdbId={tmdbId} />
-      <PlanNightCard mediaType={mediaType} tmdbId={tmdbId} title={data.title} />
+      <PlanNightCard key={`${mediaType}-${tmdbId}`} mediaType={mediaType} tmdbId={tmdbId} title={data.title} />
 
       {data.trailer && <TrailerCard trailer={data.trailer} />}
 

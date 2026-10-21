@@ -1,6 +1,6 @@
 import type { TitleLocationEntry } from "../../../../shared/types/pulse.js";
 import { getCity } from "../cities.js";
-import { getLocationsForTitle, type LocationsSql } from "../db/locations.js";
+import { getLocationsForTitle, type LocationsSql, type TitleCityLocation } from "../db/locations.js";
 import { clientAddress, type RateLimiter } from "../http/rateLimit.js";
 import type { Handler } from "../http/router.js";
 import { json, parseTitleKey } from "./params.js";
@@ -14,6 +14,19 @@ export interface TitleLocationsRouteDeps {
 
 /** The most rows one title can return; the launch list is shorter than this. */
 const MAX_ROWS = 20;
+
+/** Rows to the response shape: launch cities only, filmed before set, then by
+ *  city name (then slug, then the order the database gave), capped at `limit`. */
+export function shapeTitleLocations(rows: TitleCityLocation[], limit = MAX_ROWS): TitleLocationEntry[] {
+  const out: TitleLocationEntry[] = [];
+  for (const r of rows) {
+    const city = getCity(r.citySlug);
+    if (city) out.push({ city_slug: city.slug, cityName: city.name, kind: r.kind, landmark_label: r.landmark, source: r.source });
+  }
+  const rank = (k: string) => (k === "filmed" ? 0 : 1);
+  out.sort((a, b) => rank(a.kind) - rank(b.kind) || a.cityName.localeCompare(b.cityName) || a.city_slug.localeCompare(b.city_slug));
+  return out.slice(0, limit);
+}
 
 /** GET /title-locations?mediaType=&tmdbId=. A database-only read: no Qloo, no
  *  TMDB, so there is no known-title gate and an unknown title is simply `[]`.
@@ -30,14 +43,7 @@ export function titleLocationsHandler(deps: TitleLocationsRouteDeps): Handler {
 
     try {
       const rows = await getLocationsForTitle(deps.sql, params.key);
-      const out: TitleLocationEntry[] = [];
-      for (const r of rows) {
-        const city = getCity(r.citySlug);
-        if (city) out.push({ city_slug: city.slug, cityName: city.name, kind: r.kind, landmark_label: r.landmark, source: r.source });
-      }
-      const rank = (k: string) => (k === "filmed" ? 0 : 1);
-      out.sort((a, b) => rank(a.kind) - rank(b.kind) || a.cityName.localeCompare(b.cityName) || a.city_slug.localeCompare(b.city_slug));
-      json(res, 200, out.slice(0, MAX_ROWS));
+      json(res, 200, shapeTitleLocations(rows));
     } catch (err) {
       try { deps.onError?.("title-locations", err); } catch { /* a broken logger must not break the response */ }
       json(res, 503, { error: "unavailable" });

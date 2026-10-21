@@ -188,16 +188,45 @@ describe('PlanNightCard states', () => {
     expect(fetchPlanNight).toHaveBeenCalledTimes(2);
   });
 
-  it('shows an empty section note instead of a list, with no retry', async () => {
+  it('shows only the note, and no copy-rule heading, for sections with no rows', async () => {
     const empty: EvidenceSection<Venue[]> = { status: 'empty', data: null, provenance: [], note: 'Qloo has no entity for this title yet, so there is no taste data for it.' };
     vi.mocked(fetchPlanNight).mockResolvedValue(response({ places: empty, artists: { ...empty } as EvidenceSection<NamedEntity[]> }));
     renderCard();
     await plan();
     expect((await screen.findAllByText('Qloo has no entity for this title yet, so there is no taste data for it.')).length).toBe(2);
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
-    // The heading is still the copy-rule sentence, and the invite still works without places.
-    expect(screen.getByRole('heading', { name: 'Fans of Saffron Nights in Delhi over-index on these spots' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /over-index on these spots/ })).toBeNull();
+    expect(screen.queryByRole('heading', { name: '…and these artists' })).toBeNull();
+    // The invite still works without places.
     expect(screen.getByLabelText('Invite text')).toHaveValue('Movie night? Saffron Nights. Want to go?');
+  });
+
+  it('falls back to a plain line when a section with no rows has no note, per section', async () => {
+    const none = <T,>(): EvidenceSection<T> => ({ status: 'empty', data: null, provenance: [] });
+    vi.mocked(fetchPlanNight).mockResolvedValue(response({ places: none<Venue[]>(), artists: ok([artist(1)]) }));
+    renderCard();
+    await plan();
+    expect(await screen.findByText('No places to show for this one.')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /over-index on these spots/ })).toBeNull();
+    // The artists section has rows, so its heading is drawn.
+    expect(screen.getByRole('heading', { name: '…and these artists' })).toBeInTheDocument();
+  });
+
+  it('treats a degraded section with no data like an empty one: its note, no heading', async () => {
+    const degraded: EvidenceSection<Venue[]> = { status: 'degraded', data: null, provenance: [], note: 'Qloo answered only part of this.' };
+    vi.mocked(fetchPlanNight).mockResolvedValue(response({ places: degraded }));
+    renderCard();
+    await plan();
+    expect(await screen.findByText('Qloo answered only part of this.')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /over-index on these spots/ })).toBeNull();
+  });
+
+  it('treats an empty data array like no rows', async () => {
+    vi.mocked(fetchPlanNight).mockResolvedValue(response({ artists: ok<NamedEntity[]>([]) }));
+    renderCard();
+    await plan();
+    expect(await screen.findByText('No artists to show for this one.')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '…and these artists' })).toBeNull();
   });
 
   it('shows a degraded note alongside the data', async () => {
@@ -213,8 +242,8 @@ describe('PlanNightCard states', () => {
     vi.mocked(fetchPlanNight).mockResolvedValueOnce(response({ places: err })).mockResolvedValueOnce(response());
     renderCard();
     const user = await plan();
-    expect(await screen.findByText("Qloo didn't answer this part.")).toBeInTheDocument();
-    expect(screen.getByText('This section could not be loaded just now. Try again shortly.')).toBeInTheDocument();
+    expect(await screen.findByText('This section could not be loaded just now. Try again shortly.')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /over-index on these spots/ })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('Cafe 1')).toBeInTheDocument();
     expect(fetchPlanNight).toHaveBeenCalledTimes(2);
@@ -222,15 +251,119 @@ describe('PlanNightCard states', () => {
 });
 
 describe('inviteText', () => {
-  it('names the title, the city and the first two places only', () => {
-    expect(inviteText('Saffron Nights', 'Delhi', [venue(1), venue(2), venue(3)])).toBe(
+  const two = [venue(1), venue(2), venue(3)];
+
+  it('with a title: names the title, the city and the first two places only', () => {
+    expect(inviteText('Saffron Nights', 'Delhi', two)).toBe(
       'Movie night? Saffron Nights — fans of it in Delhi love spots like Cafe 1 and Cafe 2. Want to go?',
     );
     expect(inviteText('Saffron Nights', 'Delhi', [venue(1)])).toBe('Movie night? Saffron Nights — fans of it in Delhi love spots like Cafe 1. Want to go?');
+    expect(inviteText('Saffron Nights', 'Delhi', [])).toBe('Movie night? Saffron Nights. Want to go?');
   });
 
-  it('drops the places part when there are none', () => {
-    expect(inviteText('Saffron Nights', 'Delhi', [])).toBe('Movie night? Saffron Nights. Want to go?');
+  it('with a title the media type does not change the wording', () => {
+    expect(inviteText('Saffron Nights', 'Delhi', two, 'tv')).toBe(inviteText('Saffron Nights', 'Delhi', two, 'movie'));
+  });
+
+  it.each([null, undefined, '', '   '])('without a title (%j): leaves the title out cleanly', (blank) => {
+    expect(inviteText(blank, 'Delhi', two)).toBe('Movie night in Delhi? Fans of this film love spots like Cafe 1 and Cafe 2. Want to go?');
+    expect(inviteText(blank, 'Delhi', two, 'tv')).toBe('Movie night in Delhi? Fans of this show love spots like Cafe 1 and Cafe 2. Want to go?');
+    expect(inviteText(blank, 'Delhi', [venue(1)], 'movie')).toBe('Movie night in Delhi? Fans of this film love spots like Cafe 1. Want to go?');
+    expect(inviteText(blank, 'Delhi', [], 'tv')).toBe('Movie night in Delhi? Want to go?');
+    expect(inviteText(blank, 'Delhi', [], 'movie')).toBe('Movie night in Delhi? Want to go?');
+  });
+
+  it('ignores blank place names', () => {
+    expect(inviteText('T', 'Delhi', [venue(1, { name: ' ' }), venue(2)])).toBe('Movie night? T — fans of it in Delhi love spots like Cafe 2. Want to go?');
+  });
+});
+
+describe('PlanNightCard without a title', () => {
+  it('uses "this title" in the heading but leaves the title out of the invite', async () => {
+    vi.mocked(fetchPlanNight).mockResolvedValue(response({ title: null }));
+    renderCard({ title: null, mediaType: 'tv' });
+    await plan();
+    expect(await screen.findByRole('heading', { name: 'Fans of this title in Delhi over-index on these spots' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Invite text')).toHaveValue('Movie night in Delhi? Fans of this show love spots like Cafe 1 and Cafe 2. Want to go?');
+  });
+});
+
+describe('PlanNightCard controls', () => {
+  it('keeps the select and the invite textarea at 16px below sm, so iOS does not zoom on focus', async () => {
+    vi.mocked(fetchPlanNight).mockResolvedValue(response());
+    renderCard();
+    expect(screen.getByLabelText('City').className).toMatch(/(^|\s)text-base(\s|$)/);
+    expect(screen.getByLabelText('City').className).toContain('sm:text-xs');
+    await plan();
+    const area = await screen.findByLabelText('Invite text');
+    expect(area.className).toMatch(/(^|\s)text-base(\s|$)/);
+    expect(area.className).toContain('sm:text-sm');
+  });
+});
+
+describe('PlanNightCard across titles', () => {
+  function Wrapper({ client, tmdbId, title }: { client: QueryClient; tmdbId: number; title: string }) {
+    // The same element in the same place: a parent that forgets a key.
+    return (
+      <QueryClientProvider client={client}>
+        <PlanNightCard mediaType="movie" tmdbId={tmdbId} title={title} />
+      </QueryClientProvider>
+    );
+  }
+
+  it('after a submit on title A, moving to B (and back) fetches nothing and starts collapsed', async () => {
+    vi.mocked(fetchPlanNight).mockResolvedValue(response({ places: ok([venue(1, { name: 'Title A Cafe' })]) }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { rerender } = render(<Wrapper client={client} tmdbId={1} title="Title A" />);
+    await plan('mumbai');
+    expect(await screen.findByText('Title A Cafe')).toBeInTheDocument();
+    expect(fetchPlanNight).toHaveBeenCalledTimes(1);
+
+    rerender(<Wrapper client={client} tmdbId={2} title="Title B" />);
+    await act(async () => {});
+    expect(fetchPlanNight).toHaveBeenCalledTimes(1);
+    expect((screen.getByLabelText('City') as HTMLSelectElement).value).toBe('');
+    expect(screen.getByRole('button', { name: 'Show me places' })).toBeDisabled();
+    expect(screen.queryByText('Title A Cafe')).toBeNull();
+    expect(screen.queryByRole('heading', { name: /over-index/ })).toBeNull();
+    expect(screen.queryByLabelText('Invite text')).toBeNull();
+
+    rerender(<Wrapper client={client} tmdbId={1} title="Title A" />);
+    await act(async () => {});
+    expect(fetchPlanNight).toHaveBeenCalledTimes(1);
+    expect((screen.getByLabelText('City') as HTMLSelectElement).value).toBe('');
+    expect(screen.queryByText('Title A Cafe')).toBeNull();
+  });
+
+  it('clears the copy message when the title changes', async () => {
+    vi.mocked(fetchPlanNight).mockResolvedValue(response());
+    stubNavigator(undefined, undefined);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { rerender } = render(<Wrapper client={client} tmdbId={1} title="Title A" />);
+    const user = await plan();
+    await screen.findByLabelText('Invite text');
+    stubNavigator(undefined, { writeText: vi.fn().mockResolvedValue(undefined) });
+    await user.click(screen.getByRole('button', { name: /Copy/ }));
+    expect(await screen.findByText('Copied')).toBeInTheDocument();
+    rerender(<Wrapper client={client} tmdbId={2} title="Title B" />);
+    expect(screen.queryByText('Copied')).toBeNull();
+  });
+
+  it('treats the same id with another media type as another title', async () => {
+    vi.mocked(fetchPlanNight).mockResolvedValue(response());
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = (mediaType: 'movie' | 'tv') => (
+      <QueryClientProvider client={client}>
+        <PlanNightCard mediaType={mediaType} tmdbId={5} title="T" />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(tree('movie'));
+    await plan();
+    await screen.findByLabelText('Invite text');
+    rerender(tree('tv'));
+    await act(async () => {});
+    expect(fetchPlanNight).toHaveBeenCalledTimes(1);
+    expect(screen.queryByLabelText('Invite text')).toBeNull();
   });
 });
 

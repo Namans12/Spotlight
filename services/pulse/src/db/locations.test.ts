@@ -81,6 +81,7 @@ describe("getLocationsForTitle", () => {
     expect(calls[0].text).toContain("WHERE tmdb_id = ? AND media_type = ?");
     expect(calls[0].text).toContain("source IS NOT NULL");
     expect(calls[0].text).not.toContain("city_slug =");
+    expect(calls[0].text).toMatch(/ORDER BY kind, city_slug LIMIT 40$/);
     expect(calls[0].values).toEqual([9, "tv"]);
     expect(out).toEqual([
       { citySlug: "delhi", kind: "filmed", source: "both", landmark: "Chandni Chowk" },

@@ -49,15 +49,16 @@ function Sources({ provenance }: { provenance: Provenance[] }) {
 
 const hasRows = (s: EvidenceSection<unknown>) => s.status !== 'error' && Array.isArray(s.data) && s.data.length > 0;
 
-/** What a section says when it has nothing to list: its note, or a plain line. */
+/** What a section says when it has nothing to list: its note, or a plain line
+ *  when it has none. The copy-rule heading is not drawn in that case, because
+ *  it would announce a list that is not there. */
 function Unavailable({ section, what, onRetry, busy }: { section: EvidenceSection<unknown>; what: string; onRetry: () => void; busy: boolean }) {
+  const failed = section.status === 'error';
+  const fallback = failed ? "Qloo didn't answer this part." : `No ${what} to show for this one.`;
   return (
     <div className="space-y-1.5">
-      <p className="text-sm text-muted-foreground">
-        {section.status === 'error' ? `Qloo didn't answer this part.` : `No ${what} to show for this one.`}
-      </p>
-      {section.note && <p className="text-xs text-muted-foreground">{section.note}</p>}
-      {section.status === 'error' && (
+      <p className="text-sm text-muted-foreground">{section.note || fallback}</p>
+      {failed && (
         <button type="button" onClick={onRetry} disabled={busy} className={SECONDARY}>
           <RefreshCw size={13} aria-hidden />
           Try again
@@ -67,19 +68,19 @@ function Unavailable({ section, what, onRetry, busy }: { section: EvidenceSectio
   );
 }
 
-function Results({ data, title, country, onRetry, busy }: { data: PlanNightResponse; title: string; country: string | undefined; onRetry: () => void; busy: boolean }) {
+function Results({ data, title, inviteTitle, mediaType, country, onRetry, busy }: { data: PlanNightResponse; title: string; inviteTitle: string | null; mediaType: 'movie' | 'tv'; country: string | undefined; onRetry: () => void; busy: boolean }) {
   const { places, artists, cityName } = data;
   const symbol = currencyFor(country);
   const venues = hasRows(places) ? (places.data as Venue[]) : [];
   const names = hasRows(artists) ? (artists.data as NamedEntity[]) : [];
-  const text = inviteText(title, cityName, venues);
+  const text = inviteText(inviteTitle, cityName, venues, mediaType);
 
   return (
     <div className="space-y-5">
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-foreground">{`Fans of ${title} in ${cityName} over-index on these spots`}</h3>
         {venues.length > 0 ? (
           <>
+            <h3 className="mb-2 text-sm font-semibold text-foreground">{`Fans of ${title} in ${cityName} over-index on these spots`}</h3>
             <ul className="divide-y divide-border">
               {venues.map((v, i) => (
                 <li key={`${v.entityId}-${i}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2 first:pt-0 last:pb-0">
@@ -98,9 +99,9 @@ function Results({ data, title, country, onRetry, busy }: { data: PlanNightRespo
       </div>
 
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-foreground">…and these artists</h3>
         {names.length > 0 ? (
           <>
+            <h3 className="mb-2 text-sm font-semibold text-foreground">…and these artists</h3>
             <ul aria-label={`Artists fans of ${title} over-index on`} className="flex flex-wrap gap-2">
               {names.map((a, i) => (
                 <li key={`${a.entityId}-${i}`} className="rounded-full border border-border bg-secondary px-3 py-1 text-xs font-medium text-foreground">
@@ -162,7 +163,7 @@ function Invite({ text }: { text: string }) {
         readOnly
         rows={3}
         value={text}
-        className="w-full resize-none rounded-lg border border-border bg-secondary p-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="w-full resize-none rounded-lg border border-border bg-secondary p-3 text-base text-foreground sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
       <div className="flex flex-wrap gap-2">
         {canShare && (
@@ -226,7 +227,16 @@ function Failure({ error, onRetry, busy }: { error: unknown; onRetry: () => void
  * Statements are about audiences in aggregate ("fans of ⟨title⟩ in ⟨City⟩
  * over-index on…"), never about individuals. Everything is rendered as text.
  */
-export function PlanNightCard({ mediaType, tmdbId, title }: PlanNightCardProps) {
+export function PlanNightCard(props: PlanNightCardProps) {
+  if (!pulseConfigured()) return null;
+  // Keyed by the title: the picked city, the request it made and any copy
+  // message belong to one title, so a different title starts from a collapsed
+  // card even if a parent keeps this element mounted across navigations. Without
+  // it, the old city would be fetched for the new title with no click.
+  return <PlanNightCardForTitle key={`${props.mediaType}-${props.tmdbId}`} {...props} />;
+}
+
+function PlanNightCardForTitle({ mediaType, tmdbId, title }: PlanNightCardProps) {
   const configured = pulseConfigured();
   const selectId = useId();
   const [draft, setDraft] = useState('');
@@ -254,7 +264,7 @@ export function PlanNightCard({ mediaType, tmdbId, title }: PlanNightCardProps) 
       setRequested(draft);
     }
   };
-  const shownTitle = title?.trim() || query.data?.title?.trim() || 'this title';
+  const knownTitle = title?.trim() || query.data?.title?.trim() || null;
 
   return (
     <section className="px-1" aria-labelledby={`${selectId}-heading`}>
@@ -272,7 +282,7 @@ export function PlanNightCard({ mediaType, tmdbId, title }: PlanNightCardProps) 
                 id={selectId}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                className="min-h-11 w-full appearance-none rounded-lg border border-border bg-secondary pl-3 pr-9 text-xs font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="min-h-11 w-full appearance-none rounded-lg border border-border bg-secondary pl-3 pr-9 text-base font-semibold text-foreground sm:text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="" disabled>
                   Choose a city
@@ -307,7 +317,7 @@ export function PlanNightCard({ mediaType, tmdbId, title }: PlanNightCardProps) 
             ) : query.isError ? (
               <Failure error={query.error} onRetry={() => void query.refetch()} busy={busy} />
             ) : query.data ? (
-              <Results data={query.data} title={shownTitle} country={getPulseCity(requested)?.country} onRetry={() => void query.refetch()} busy={busy} />
+              <Results data={query.data} title={knownTitle ?? 'this title'} inviteTitle={knownTitle} mediaType={mediaType} country={getPulseCity(requested)?.country} onRetry={() => void query.refetch()} busy={busy} />
             ) : null}
           </div>
         )}

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRateLimiter } from "../http/rateLimit.js";
 import { createRouter } from "../http/router.js";
 import type { LocationsSql } from "../db/locations.js";
-import { titleLocationsHandler } from "./titleLocations.js";
+import { shapeTitleLocations, titleLocationsHandler } from "./titleLocations.js";
 
 let server: Server | null = null;
 afterEach(async () => {
@@ -116,12 +116,38 @@ describe("GET /title-locations answers", () => {
     ]);
   });
 
-  it("drops rows whose city is not a launch city and caps the list at 20", async () => {
-    const many = Array.from({ length: 30 }, (_, i) => ({ city_slug: i === 0 ? "atlantis" : "delhi", kind: i % 2 ? "filmed" : "set", source: "both", landmark_label: `L${i}` }));
-    const { get } = await start(many);
+  // 10 launch cities x 2 kinds = 20 distinct rows, plus 5 repeats of Delhi/set
+  // (the fake database may return what the real primary key never would), and
+  // one row for a city that is not a launch city: 26 rows, 25 of them valid.
+  const NAMES = ["Bengaluru", "Chennai", "Delhi", "Goa", "Hyderabad", "Kolkata", "London", "Mumbai", "New York City", "Pune"];
+  const SLUGS: Record<string, string> = { Bengaluru: "bengaluru", Chennai: "chennai", Delhi: "delhi", Goa: "goa", Hyderabad: "hyderabad", Kolkata: "kolkata", London: "london", Mumbai: "mumbai", "New York City": "new-york", Pune: "pune" };
+  const twentyFive = () => [
+    { city_slug: "atlantis", kind: "filmed", source: "both", landmark_label: "nowhere" },
+    ...[...NAMES].reverse().flatMap((n) => (["set", "filmed"] as const).map((kind) => ({ city_slug: SLUGS[n], kind, source: "both", landmark_label: null as string | null }))),
+    ...[1, 2, 3, 4, 5].map((i) => ({ city_slug: "delhi", kind: "set", source: "wikipedia", landmark_label: `dup${i}` })),
+  ];
+  // Filmed in city-name order, then set in city-name order with Delhi's five repeats after its own row (stable); cut at 20.
+  const expectedPrefix = () => [
+    ...NAMES.map((n) => ({ city_slug: SLUGS[n], cityName: n, kind: "filmed", landmark_label: null, source: "both" })),
+    ...NAMES.flatMap((n) => [
+      { city_slug: SLUGS[n], cityName: n, kind: "set", landmark_label: null, source: "both" },
+      ...(n === "Delhi" ? [1, 2, 3, 4, 5].map((i) => ({ city_slug: "delhi", cityName: "Delhi", kind: "set", landmark_label: `dup${i}`, source: "wikipedia" })) : []),
+    ]),
+  ].slice(0, 20);
+
+  it("drops non-launch cities and caps the list at exactly 20, keeping the first 20 in order", async () => {
+    const { get } = await start(twentyFive());
     const body = await (await get(GOOD)).json() as { city_slug: string }[];
-    expect(body.length).toBeLessThanOrEqual(20);
+    expect(body).toHaveLength(20);
+    expect(body).toEqual(expectedPrefix());
     expect(body.some((r) => r.city_slug === "atlantis")).toBe(false);
+  });
+
+  it("shapeTitleLocations cuts at the given limit and defaults to 20", () => {
+    const rows = twentyFive().map((r) => ({ citySlug: r.city_slug, kind: r.kind as "filmed" | "set", source: r.source as "both", landmark: r.landmark_label }));
+    expect(shapeTitleLocations(rows)).toHaveLength(20);
+    expect(shapeTitleLocations(rows, 3).map((r) => r.cityName)).toEqual(["Bengaluru", "Chennai", "Delhi"]);
+    expect(shapeTitleLocations(rows, 100)).toHaveLength(25);
   });
 
   it("answers 503 unavailable when the database fails, logging the real cause", async () => {
