@@ -3,8 +3,10 @@ import { cleanText } from "../../campaign.js";
 import { businessTypeArg, businessTypeSchema, cityArg, citySchema } from "./args.js";
 import type { AgentTool, AgentToolDeps } from "./types.js";
 
-const TOP = 8;
-const WHY_MAX = 240;
+/** Top of the board shown to the model; a result is re-sent on every later round, so it is kept small (free-tier token budget). */
+const TOP = 5;
+const WHY_MAX = 200;
+const TITLE_MAX = 80;
 
 export function pulseBoardTool(deps: AgentToolDeps): AgentTool {
   return {
@@ -12,7 +14,7 @@ export function pulseBoardTool(deps: AgentToolDeps): AgentTool {
       type: "function",
       function: {
         name: "pulse_board",
-        description: "Rank this week's film and TV releases for one city and business type by how closely each release's audience lines up with the city, from Qloo evidence Spotlight has already cached. Returns the top 8 with a score and a one-line reason. Releases still being loaded are counted as pending.",
+        description: "Rank this week's film and TV releases for one city and business type by how closely each release's audience lines up with the city, from Qloo evidence Spotlight has already cached. Returns the top 5 with a score and a one-line reason. Releases still being loaded are counted as pending.",
         parameters: { type: "object", properties: { city: citySchema(), business_type: businessTypeSchema() }, required: ["city", "business_type"], additionalProperties: false },
       },
     },
@@ -31,8 +33,8 @@ export function pulseBoardTool(deps: AgentToolDeps): AgentTool {
         board.ranked.length === 0
           ? "No release is ranked yet for this city and business type."
           : `Ranked by how closely each release's audience lines up with ${board.cityName} (the score is relative, not a probability).`,
-        "Pending means a release's data is still loading, so it has no rank yet; say that, and do not guess where it would rank.",
-        ...(unresolved > 0 ? [`${unresolved} release(s) could not be found in Qloo and are left out.`] : []),
+        "Pending means still loading, so no rank yet; say that, never guess a rank.",
+        ...(unresolved > 0 ? [`${unresolved} not found in Qloo, left out.`] : []),
       ];
       return {
         summary: `${board.ranked.length} ranked and ${pending} pending for ${board.cityName} (${type.businessType}).`,
@@ -40,7 +42,7 @@ export function pulseBoardTool(deps: AgentToolDeps): AgentTool {
         cityName: board.cityName,
         businessType: board.businessType,
         ranked: board.ranked.slice(0, TOP).map((c) => ({
-          title: cleanText(c.title, 100),
+          title: cleanText(c.title, TITLE_MAX),
           tmdbId: c.tmdbId,
           mediaType: c.mediaType,
           releaseDate: c.releaseDate,
@@ -50,7 +52,7 @@ export function pulseBoardTool(deps: AgentToolDeps): AgentTool {
         })),
         rankedCount: board.ranked.length,
         pendingCount: pending,
-        pendingTitles: board.pending.slice(0, 5).map((c) => cleanText(c.title, 100)),
+        pendingTitles: board.pending.slice(0, 3).map((c) => cleanText(c.title, 50)),
         unresolvedCount: unresolved,
         note: notes.join(" "),
       };

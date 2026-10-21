@@ -4,6 +4,8 @@ import type { AgentTool, AgentToolDeps } from "./types.js";
 
 const MAX_QUERY = 80;
 const LIMIT = 10;
+/** How many hits the model is shown (the brief tool still searches the wider 10 to pick a media type). */
+const SHOWN = 6;
 
 export interface ReleaseHit { tmdbId: number; mediaType: "movie" | "tv"; title: string; date: string | null; platform: string | null }
 
@@ -60,14 +62,14 @@ export function searchReleasesTool(deps: AgentToolDeps): AgentTool {
       type: "function",
       function: {
         name: "search_releases",
-        description: "Find releases Spotlight knows by part of the title (case-insensitive). Returns up to 10 with tmdbId, mediaType, title, date and platform. Use it to turn a title the user names into a tmdbId before release_brief.",
+        description: "Find releases Spotlight knows by part of the title (case-insensitive). Returns up to 6 with tmdbId, mediaType, title, date and platform. Use it to turn a title the user names into a tmdbId before release_brief.",
         parameters: { type: "object", properties: { query: { type: "string", description: "Part of a title, at most 80 characters." } }, required: ["query"], additionalProperties: false },
       },
     },
     async run(args) {
       const query = queryArg(args.query);
       if (query === null) return { error: "empty_query", hint: "Pass part of a release title." };
-      const results = await searchReleases(deps.sql, query);
+      const results = (await searchReleases(deps.sql, query)).slice(0, SHOWN);
       return {
         summary: `${results.length} release(s) match "${query}".`,
         query,

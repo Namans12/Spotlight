@@ -2,7 +2,7 @@ import { cleanText } from "../../campaign.js";
 import { cityArg, citySchema } from "./args.js";
 import type { AgentTool, AgentToolDeps } from "./types.js";
 
-const LIMIT = 20;
+const LIMIT = 10;
 
 export function titlesShotInTool(deps: AgentToolDeps): AgentTool {
   return {
@@ -10,7 +10,7 @@ export function titlesShotInTool(deps: AgentToolDeps): AgentTool {
       type: "function",
       function: {
         name: "titles_shot_in",
-        description: "List releases Spotlight knows that are recorded as filmed or set in a launch city, with the kind (filmed or set) and a landmark when one is known. Up to 20.",
+        description: "List releases Spotlight knows that are recorded as filmed or set in a launch city, with the kind (filmed or set) and a landmark when one is known. Up to 10.",
         parameters: { type: "object", properties: { city: citySchema() }, required: ["city"], additionalProperties: false },
       },
     },
@@ -41,7 +41,7 @@ export function titlesShotInTool(deps: AgentToolDeps): AgentTool {
         JOIN known k ON k.tmdb_id = tl.tmdb_id AND k.media_type = tl.media_type
         WHERE tl.city_slug = ${city.slug} AND tl.source IS NOT NULL
         ORDER BY (tl.landmark_label IS NOT NULL) DESC, k.release_date DESC NULLS LAST, k.tmdb_id, tl.kind
-        LIMIT 20`;
+        LIMIT 10`;
       const titles = rows.slice(0, LIMIT).map((r) => ({
         tmdbId: Number(r.tmdb_id),
         mediaType: r.media_type as "movie" | "tv",

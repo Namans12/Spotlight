@@ -73,7 +73,7 @@ describe("runAgent", () => {
     const tool = fakeTool("t", { rows: Array.from({ length: 5000 }, (_, i) => `row number ${i}`) });
     await collect(runAgent(llm, [tool], [user("hi")]));
     const content = llm.calls[1].at(-1)!.content!;
-    expect(content.length).toBeLessThanOrEqual(6000);
+    expect(content.length).toBeLessThanOrEqual(2800);
     expect(content).toContain("…truncated");
   });
 

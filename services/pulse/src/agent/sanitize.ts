@@ -9,7 +9,8 @@ export const MAX_ARRAY = 10;
 /** Containers may nest this deep inside the arguments object (which is level 0). */
 export const MAX_DEPTH = 2;
 const MAX_KEYS = 20;
-export const MAX_RESULT_CHARS = 6000;
+/** Characters of a tool result the model receives. Every result is re-sent on each later round, and Groq's free tier allows 8,000 tokens a minute. */
+export const MAX_RESULT_CHARS = 2800;
 export const MAX_SUMMARY_CHARS = 200;
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -63,7 +64,7 @@ export function sanitiseArgs(args: Record<string, unknown>, schema?: unknown): R
   return cleanObject(args, 0, closed ? new Set(props) : null);
 }
 
-/** A tool result as the text the model receives: its JSON, at most 6000
+/** A tool result as the text the model receives: its JSON, at most 2800
  *  characters. Over the limit it becomes a valid JSON object that says so and
  *  carries the start of the data, so the model is never shown a cut-off
  *  result as if it were complete. */

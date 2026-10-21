@@ -89,9 +89,9 @@ describe.skipIf(!url)("agent SQL tools against Postgres", () => {
     });
   });
 
-  it("returns at most 10, and a quote in the query is only text", async () => {
+  it("returns at most 6, and a quote in the query is only text", async () => {
     for (let i = 0; i < 14; i++) await release(BASE + 60 + i, `Plmn Bulk ${i}`);
-    expect(await search("plmn bulk")).toHaveLength(10);
+    expect(await search("plmn bulk")).toHaveLength(6);
     expect(await search("'; DROP TABLE release_items; --")).toEqual([]);
     const [{ n }] = await sql`SELECT count(*)::int AS n FROM release_items WHERE tmdb_id BETWEEN ${BASE} AND ${LAST}`;
     expect(n).toBeGreaterThan(0); // the table is still there
@@ -135,10 +135,10 @@ describe.skipIf(!url)("agent SQL tools against Postgres", () => {
       expect(out.titles.filter((t) => t.tmdbId >= BASE)).toEqual([]);
       if (out.titles.length === 0) expect(out.note).toMatch(/no title/i);
     });
-    it("is capped at 20", async () => {
+    it("is capped at 10", async () => {
       for (let i = 0; i < 25; i++) { await release(BASE + 100 + i, `Shot Cap ${i}`); await location(BASE + 100 + i, "delhi", "filmed", "both", null); }
       const out = await shot("delhi");
-      expect(out.titles.length).toBeLessThanOrEqual(20);
+      expect(out.titles.length).toBe(10);
     });
   });
 });

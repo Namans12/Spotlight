@@ -67,6 +67,10 @@ describe("sanitiseArgs", () => {
 });
 
 describe("truncateResult", () => {
+  it("the model-facing limit is 2,800 characters", () => {
+    expect(MAX_RESULT_CHARS).toBe(2800);
+  });
+
   it("passes a small result through as its JSON text", () => {
     expect(truncateResult({ a: 1 })).toBe('{"a":1}');
   });

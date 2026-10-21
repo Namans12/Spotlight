@@ -18,23 +18,38 @@ export const noopDrafter: DraftCampaign = async () => ({ status: "empty", data: 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const arrayOf = <T>(s: EvidenceSection<unknown>): T[] => (Array.isArray(s.data) ? (s.data.filter((x) => x && typeof x === "object") as T[]) : []);
-const names = (rows: { name?: unknown }[], n: number) => rows.map((r) => cleanText(r.name, 60)).filter(Boolean).slice(0, n);
+
+/** How much of a section the model is shown. The tool's whole result is held
+ *  to MAX_BRIEF_CHARS (Groq's free tier budgets 8,000 tokens a minute, and
+ *  every result is re-sent on each later round), so `fitBrief` tries these
+ *  from the roomiest down and keeps the first that fits. */
+interface Profile { age: number; hoods: number; venues: number; themes: number; people: number; hooks: number; calls: number; name: number; note: number }
+const PROFILES: Profile[] = [
+  { age: 3, hoods: 4, venues: 4, themes: 5, people: 4, hooks: 3, calls: 3, name: 50, note: 120 },
+  { age: 3, hoods: 3, venues: 3, themes: 4, people: 3, hooks: 2, calls: 2, name: 36, note: 60 },
+  { age: 2, hoods: 2, venues: 2, themes: 3, people: 2, hooks: 1, calls: 1, name: 28, note: 0 },
+  { age: 1, hoods: 1, venues: 1, themes: 1, people: 1, hooks: 1, calls: 1, name: 20, note: 0 },
+];
+/** The serialised brief the model receives is at most this long. */
+export const MAX_BRIEF_CHARS = 1800;
+
+const names = (rows: { name?: unknown }[], n: number, len: number) => rows.map((r) => cleanText(r.name, len)).filter(Boolean).slice(0, n);
 
 /** One section as a few bounded facts: its status and note, the Qloo calls
  *  behind it (so the model can name them), and a short rendering of the data
  *  (never the cells or payload themselves). Third-party text is cleaned. */
-function summariseSection(key: BriefSectionKey, section: EvidenceSection<unknown>): Record<string, unknown> {
+function summariseSection(key: BriefSectionKey, section: EvidenceSection<unknown>, p: Profile): Record<string, unknown> {
   const base: Record<string, unknown> = {
     status: section.status,
-    ...(section.note ? { note: cleanText(section.note, 200) } : {}),
-    calls: [...new Set(section.provenance.map((p) => cleanText(p.call, 60)))].slice(0, 4),
+    ...(section.note && p.note > 0 ? { note: cleanText(section.note, p.note) } : {}),
+    calls: [...new Set(section.provenance.map((x) => cleanText(x.call, 40)))].slice(0, p.calls),
   };
   if (section.data === null || section.data === undefined) return base;
 
   switch (key) {
     case "who": {
       const d = section.data as { age?: Record<string, number>; gender?: { male?: number; female?: number } };
-      const topAge = Object.entries(d.age ?? {}).filter(([, v]) => isNum(v)).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([bucket, affinity]) => ({ bucket, affinity: round2(affinity) }));
+      const topAge = Object.entries(d.age ?? {}).filter(([, v]) => isNum(v)).sort((a, b) => b[1] - a[1]).slice(0, p.age).map(([bucket, affinity]) => ({ bucket, affinity: round2(affinity) }));
       const g = d.gender;
       return { ...base, topAge, ...(g && isNum(g.male) && isNum(g.female) ? { gender: { male: round2(g.male), female: round2(g.female) } } : {}) };
     }
@@ -44,23 +59,23 @@ function summariseSection(key: BriefSectionKey, section: EvidenceSection<unknown
       let unlabelled = 0;
       for (const c of cells) {
         if (!c.neighbourhood) { unlabelled++; continue; }
-        const name = cleanText(c.neighbourhood, 60);
+        const name = cleanText(c.neighbourhood, p.name);
         if (isNum(c.affinity) && c.affinity > (best.get(name) ?? -Infinity)) best.set(name, c.affinity);
       }
-      const top = [...best].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, affinity]) => ({ name, affinity: round2(affinity) }));
+      const top = [...best].sort((a, b) => b[1] - a[1]).slice(0, p.hoods).map(([name, affinity]) => ({ name, affinity: round2(affinity) }));
       return { ...base, cells: cells.length, top, unlabelledCells: unlabelled };
     }
-    case "venues": return { ...base, names: names(arrayOf<Venue>(section), 5) };
-    case "themes": return { ...base, names: names(arrayOf<TagAffinity>(section), 6) };
+    case "venues": return { ...base, names: names(arrayOf<Venue>(section), p.venues, p.name) };
+    case "themes": return { ...base, names: names(arrayOf<TagAffinity>(section), p.themes, p.name) };
     case "artists":
-    case "brands": return { ...base, names: names(arrayOf<NamedEntity>(section), 5) };
-    case "hook": return { ...base, rows: arrayOf<LocalHook>(section).slice(0, 5).map((h) => ({ kind: h.kind, landmark: h.landmark ? cleanText(h.landmark, 60) : null })) };
-    case "trend": { const n = arrayOf<unknown>(section).length; return { ...base, present: n > 0, points: n }; }
+    case "brands": return { ...base, names: names(arrayOf<NamedEntity>(section), p.people, p.name) };
+    case "hook": return { ...base, rows: arrayOf<LocalHook>(section).slice(0, p.hooks).map((h) => ({ kind: h.kind, landmark: h.landmark ? cleanText(h.landmark, p.name) : null })) };
+    case "trend": return { ...base, present: arrayOf<unknown>(section).length > 0 };
     default: return base;
   }
 }
 
-const NOTE = "Numbers are Qloo's relative affinity scores, not percentages of people. 'calls' names the Qloo call behind each section; name it when you cite a number.";
+const NOTE = "Numbers are Qloo's relative affinity scores, not shares of people. Name a section's 'calls' when you cite it.";
 
 type KeyResult = { ok: true; key: TitleKey } | { ok: false; error: Record<string, unknown> };
 
@@ -136,28 +151,38 @@ export function releaseBriefTool(deps: AgentToolDeps): AgentTool {
         else done = true;
       }
 
-      // In the business type's own order, and never the (no-op) campaign.
-      const ordered: Record<string, unknown> = {};
-      for (const k of BUSINESS_TYPES[type.businessType].sections) {
-        const s = sections[k];
-        if (k !== "campaign" && s) ordered[k] = summariseSection(k, s);
-      }
-      const counts = new Map<string, number>();
-      for (const v of Object.values(ordered)) counts.set((v as { status: string }).status, (counts.get((v as { status: string }).status) ?? 0) + 1);
-      return {
-        summary: `Brief for "${title}" in ${city.city.name}: ${Object.keys(ordered).length} sections (${[...counts].map(([k, n]) => `${n} ${k}`).join(", ")}).`,
-        title,
-        releaseDate,
-        tmdbId: key.key.tmdbId,
-        mediaType: key.key.mediaType,
-        city: city.city.slug,
-        cityName: city.city.name,
-        businessType: type.businessType,
-        hasQlooEntity: hasEntity,
-        ...(done ? {} : { incomplete: true }),
-        note: NOTE,
-        sections: ordered,
+      // In the business type's own order, and never the (no-op) campaign. The
+      // roomiest profile whose whole result fits MAX_BRIEF_CHARS wins; the
+      // last one is small enough that it always does.
+      const compose = (p: Profile): Record<string, unknown> => {
+        const ordered: Record<string, unknown> = {};
+        for (const k of BUSINESS_TYPES[type.businessType].sections) {
+          const sec = sections[k];
+          if (k !== "campaign" && sec) ordered[k] = summariseSection(k, sec, p);
+        }
+        const counts = new Map<string, number>();
+        for (const v of Object.values(ordered)) counts.set((v as { status: string }).status, (counts.get((v as { status: string }).status) ?? 0) + 1);
+        return {
+          summary: `Brief for "${cleanText(title, 50)}" in ${city.city.name}: ${Object.keys(ordered).length} sections (${[...counts].map(([k, n]) => `${n} ${k}`).join(", ")}).`,
+          title: cleanText(title, 50),
+          releaseDate,
+          tmdbId: key.key.tmdbId,
+          mediaType: key.key.mediaType,
+          city: city.city.slug,
+          cityName: city.city.name,
+          businessType: type.businessType,
+          hasQlooEntity: hasEntity,
+          ...(done ? {} : { incomplete: true }),
+          note: NOTE,
+          sections: ordered,
+        };
       };
+      let out = compose(PROFILES[0]);
+      for (const p of PROFILES) {
+        out = compose(p);
+        if (JSON.stringify(out).length <= MAX_BRIEF_CHARS) break;
+      }
+      return out;
     },
   };
 }
