@@ -99,6 +99,12 @@ async function placeTagIds(qloo: QlooClient, queries: string[], onError: (c: str
   return { ids: [...new Set(perQuery.flat())], failed };
 }
 
+/** The Qloo calls behind the heatmap and place-tag sections. The board's
+ *  background warming fetches exactly these, so what it caches is what a brief
+ *  for the same title and city will read, with no second copy of the call. */
+export const fetchHeatmap = (qloo: QlooClient, city: City, entityId: string) => qloo.heatmap(entityId, city);
+export const fetchPlaceTags = (qloo: QlooClient, city: City, entityId: string) => qloo.placeTags(entityId, city);
+
 type Hood = Awaited<ReturnType<typeof getNeighbourhoods>>[number];
 type RawCell = Omit<HeatCell, "neighbourhood">;
 
@@ -158,7 +164,7 @@ export async function* streamBrief(deps: BriefDeps, req: BriefRequest): AsyncGen
     who: cachedQloo("demographics", false, (id) => qloo.demographics(id)),
 
     where: async () => {
-      const raw = await cachedQloo<RawCell[]>("heatmap", true, (id) => qloo.heatmap(id, city))();
+      const raw = await cachedQloo<RawCell[]>("heatmap", true, (id) => fetchHeatmap(qloo, city, id))();
       const cells = raw.data as RawCell[] | null;
       if (!cells) return raw;
       // Labels are applied here, not before caching, so improving the
@@ -192,7 +198,7 @@ export async function* streamBrief(deps: BriefDeps, req: BriefRequest): AsyncGen
       return { ...raw, data: kept };
     },
 
-    themes: cachedQloo("place_tags", true, (id) => qloo.placeTags(id, city)),
+    themes: cachedQloo("place_tags", true, (id) => fetchPlaceTags(qloo, city, id)),
     artists: cachedQloo("artists", false, (id) => qloo.artists(id)),
     brands: cachedQloo("brands", false, (id) => qloo.brands(id)),
     trend: cachedQloo("trends", false, (id) => qloo.trends(id)),

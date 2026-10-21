@@ -32,6 +32,34 @@ export async function getTitleLocations(sql: LocationsSql, key: EntityKey, cityS
   }));
 }
 
+export interface TitleLocationRow extends TitleLocation { tmdbId: number; mediaType: "movie" | "tv" }
+
+/** The same read for many titles in one statement, for the board: twenty
+ *  candidates must not cost twenty queries on every poll. Keyed by
+ *  `<mediaType>:<tmdbId>`, in the same kind order as getTitleLocations.
+ *  tmdb_id is BIGINT, which the driver may return as a string, so it is
+ *  coerced here because this one is compared. */
+export async function getTitleLocationsBatch(sql: LocationsSql, keys: EntityKey[], citySlug: string): Promise<Map<string, TitleLocation[]>> {
+  const out = new Map<string, TitleLocation[]>();
+  if (keys.length === 0) return out;
+  const ids = [...new Set(keys.map((k) => k.tmdbId))];
+  const wanted = new Set(keys.map((k) => `${k.mediaType}:${k.tmdbId}`));
+  const rows = await sql`
+    SELECT tmdb_id, media_type, kind, source, landmark_label
+    FROM title_locations
+    WHERE city_slug = ${citySlug} AND tmdb_id = ANY(${ids})
+      AND source IS NOT NULL
+    ORDER BY kind`;
+  for (const r of rows) {
+    const key = `${String(r.media_type)}:${Number(r.tmdb_id)}`;
+    if (!wanted.has(key)) continue; // same id, other media type
+    const list = out.get(key) ?? [];
+    list.push({ kind: r.kind as TitleLocation["kind"], source: r.source as TitleLocation["source"], landmark: (r.landmark_label as string | null) ?? null });
+    out.set(key, list);
+  }
+  return out;
+}
+
 export interface Neighbourhood { name: string; lat: number; lon: number }
 
 /** Centroids for one city. DOUBLE PRECISION arrives as a number, but a

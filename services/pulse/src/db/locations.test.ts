@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getNeighbourhoods, getTitleLocations, type LocationsSql } from "./locations.js";
+import { getNeighbourhoods, getTitleLocations, getTitleLocationsBatch, type LocationsSql } from "./locations.js";
 
 function recorder(rows: Record<string, unknown>[]) {
   const calls: { text: string; values: unknown[] }[] = [];
@@ -38,5 +38,33 @@ describe("getNeighbourhoods", () => {
     expect(calls[0].text).toContain("SELECT name, lat, lon FROM neighbourhoods WHERE city_slug =");
     expect(calls[0].values).toEqual(["delhi"]);
     expect(out).toEqual([{ name: "Hauz Khas", lat: 28.5494, lon: 77.2001 }, { name: "String Coords", lat: 28.6, lon: 77.2 }]);
+  });
+});
+
+describe("getTitleLocationsBatch", () => {
+  it("reads every title in one parameterized statement and groups rows by media type and id", async () => {
+    const { sql, calls } = recorder([
+      { tmdb_id: "7", media_type: "movie", kind: "filmed", source: "both", landmark_label: "India Gate" },
+      { tmdb_id: "7", media_type: "movie", kind: "set", source: "wikipedia", landmark_label: null },
+      { tmdb_id: "7", media_type: "tv", kind: "set", source: "wikipedia", landmark_label: "Other Kind" }, // same id, not asked for
+      { tmdb_id: "8", media_type: "tv", kind: "set", source: "wikidata", landmark_label: null },
+    ]);
+    const out = await getTitleLocationsBatch(sql, [{ tmdbId: 7, mediaType: "movie" }, { tmdbId: 8, mediaType: "tv" }], "delhi");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].text).toContain("FROM title_locations WHERE city_slug = ? AND tmdb_id = ANY(?)");
+    expect(calls[0].text).toContain("source IS NOT NULL");
+    expect(calls[0].values).toEqual(["delhi", [7, 8]]);
+    expect(out.get("movie:7")).toEqual([
+      { kind: "filmed", source: "both", landmark: "India Gate" },
+      { kind: "set", source: "wikipedia", landmark: null },
+    ]);
+    expect(out.get("tv:8")).toEqual([{ kind: "set", source: "wikidata", landmark: null }]);
+    expect(out.has("tv:7")).toBe(false);
+  });
+
+  it("issues no statement for no titles", async () => {
+    const { sql, calls } = recorder([]);
+    expect((await getTitleLocationsBatch(sql, [], "delhi")).size).toBe(0);
+    expect(calls).toHaveLength(0);
   });
 });

@@ -24,3 +24,25 @@ export async function isKnownTitle(sql: TitlesSql, key: EntityKey): Promise<bool
     ) AS known`;
   return rows[0]?.known === true;
 }
+
+/** TMDB popularity per title, from release_items, in one statement. The
+ *  calendar merge in lib/calendarDb.ts does not carry popularity, and the
+ *  board needs it to pick which twenty releases to show. A title with no
+ *  release_items row is simply absent (the caller counts it as 0). Keyed by
+ *  `<mediaType>:<tmdbId>`; the highest value wins across a title's rows. */
+export async function getPopularity(sql: TitlesSql, keys: EntityKey[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (keys.length === 0) return out;
+  const wanted = new Set(keys.map((k) => `${k.mediaType}:${k.tmdbId}`));
+  const rows = await sql`
+    SELECT tmdb_id, media_type, MAX(popularity) AS popularity
+    FROM release_items
+    WHERE tmdb_id = ANY(${[...new Set(keys.map((k) => k.tmdbId))]})
+    GROUP BY tmdb_id, media_type`;
+  for (const r of rows) {
+    const key = `${String(r.media_type)}:${Number(r.tmdb_id)}`;
+    const value = Number(r.popularity);
+    if (wanted.has(key) && Number.isFinite(value)) out.set(key, value);
+  }
+  return out;
+}

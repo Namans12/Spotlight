@@ -49,6 +49,31 @@ export async function getCachedEntity(sql: EntitySql, key: EntityKey): Promise<C
   };
 }
 
+/** qloo_entities for many titles in one statement, cache only: the board
+ *  reads what resolution already recorded and never triggers a resolution.
+ *  Keyed by `<mediaType>:<tmdbId>`; a title with no row is absent. tmdb_id is
+ *  BIGINT and may arrive as a string, so it is coerced for the key. */
+export async function getCachedEntities(sql: EntitySql, keys: EntityKey[]): Promise<Map<string, CachedEntity>> {
+  const out = new Map<string, CachedEntity>();
+  if (keys.length === 0) return out;
+  const wanted = new Set(keys.map((k) => `${k.mediaType}:${k.tmdbId}`));
+  const rows = await sql`
+    SELECT tmdb_id, media_type, qloo_entity_id, method, not_found, resolved_at
+    FROM qloo_entities
+    WHERE tmdb_id = ANY(${[...new Set(keys.map((k) => k.tmdbId))]})`;
+  for (const r of rows) {
+    const key = `${String(r.media_type)}:${Number(r.tmdb_id)}`;
+    if (!wanted.has(key)) continue;
+    out.set(key, {
+      entityId: (r.qloo_entity_id as string | null) ?? null,
+      method: (r.method as "imdb" | "search" | null) ?? null,
+      notFound: r.not_found === true,
+      resolvedAt: r.resolved_at as Date,
+    });
+  }
+  return out;
+}
+
 /** The IMDb id the ratings backfill already found, if any. A title_ratings row
  *  that is a tombstone (not_found) or has no id yields null, the same as no row. */
 export async function getImdbId(sql: EntitySql, key: EntityKey): Promise<string | null> {

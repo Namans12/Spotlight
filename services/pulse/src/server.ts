@@ -8,7 +8,10 @@ import { getPool } from "./db/pool.js";
 import { isKnownTitle } from "./db/titles.js";
 import { createRateLimiter } from "./http/rateLimit.js";
 import { resolveTitle } from "./resolve.js";
+import { boardHandler } from "./routes/board.js";
 import { briefHandler } from "./routes/brief.js";
+import { warmHandler } from "./routes/warm.js";
+import { createBackgroundWarmer, createWarmQueue, warmCities, type WarmDeps } from "./warm.js";
 import { createTitleLookup } from "./titleHeader.js";
 
 const config = loadConfig(process.env);
@@ -31,6 +34,26 @@ const briefRoute = briefHandler({
   onError: (context, err) => console.error(`brief: ${context} failed:`, err instanceof Error ? err.message : String(err)),
 });
 
+const logError = (context: string, err: unknown) => console.error(`${context} failed:`, err instanceof Error ? err.message : String(err));
+
+// Everything warming needs, shared by the board's background queue and POST /warm.
+const warmDeps: WarmDeps = { sql, qloo, resolve: (key) => resolveTitle(sql, qloo, key), onError: logError };
+const warmQueue = createWarmQueue({ onError: (key, err) => logError(`warm ${key}`, err) });
+
+const boardRoute = boardHandler({
+  sql,
+  enqueueWarm: createBackgroundWarmer(warmDeps, warmQueue),
+  // Its own limiter: polling the board must not spend a client's brief budget.
+  rateLimiter: createRateLimiter({ max: 30, windowMs: 60_000 }),
+  onError: logError,
+});
+
+const warmRoute = warmHandler({
+  secret: config.warmSecret,
+  warm: (city) => warmCities(warmDeps, city ? [city] : undefined),
+  onError: logError,
+});
+
 const healthz: Handler = async (_req, res) => {
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ ok: true }));
@@ -39,6 +62,8 @@ const healthz: Handler = async (_req, res) => {
 const route = createRouter({
   "GET /healthz": healthz,
   "GET /brief": briefRoute,
+  "GET /board": boardRoute,
+  "POST /warm": warmRoute,
 });
 
 const server = createServer(async (req, res) => {
