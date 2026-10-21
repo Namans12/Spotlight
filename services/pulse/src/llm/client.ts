@@ -30,8 +30,15 @@ export interface ChatMessage {
   /** The provider's stop reason on a reply ("stop", "length", ...), when it sent one. */
   finish_reason?: string;
 }
+export interface LlmChatOptions {
+  tools?: ToolSpec[];
+  json?: boolean;
+  /** Aborts the request (the chat agent passes the client's disconnect), so a
+   *  reader who has gone does not keep a paid-for model call running. */
+  signal?: AbortSignal;
+}
 export interface LlmClient {
-  chat(messages: ChatMessage[], opts?: { tools?: ToolSpec[]; json?: boolean }): Promise<ChatMessage>;
+  chat(messages: ChatMessage[], opts?: LlmChatOptions): Promise<ChatMessage>;
 }
 
 export type LlmErrorKind = "rate_limited" | "unavailable" | "bad_response";
@@ -80,7 +87,7 @@ export function createGroqClient(cfg: GroqConfig, fetchImpl: typeof fetch = fetc
   const key = cfg.groqApiKey;
   if (!key) throw new Error("GROQ_API_KEY is required to create the Groq client");
 
-  async function post(messages: ChatMessage[], opts: { tools?: ToolSpec[]; json?: boolean } | undefined, withJsonFormat: boolean): Promise<Response> {
+  async function post(messages: ChatMessage[], opts: LlmChatOptions | undefined, withJsonFormat: boolean): Promise<Response> {
     const body: Record<string, unknown> = { model: cfg.groqModel, messages, temperature: TEMPERATURE, max_tokens: MAX_TOKENS };
     if (withJsonFormat) body.response_format = { type: "json_object" };
     if (opts?.tools?.length) body.tools = opts.tools;
@@ -89,7 +96,7 @@ export function createGroqClient(cfg: GroqConfig, fetchImpl: typeof fetch = fetc
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: opts?.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(TIMEOUT_MS)]) : AbortSignal.timeout(TIMEOUT_MS),
       });
     } catch (err) {
       // The underlying error can carry the URL or headers, so none of it is kept.

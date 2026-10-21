@@ -3,6 +3,7 @@ import { tmdbDetail } from "../../../lib/tmdbProxy.js";
 import { assertTmdbConfigured, loadConfig } from "./config.js";
 import { corsHeaders } from "./http/cors.js";
 import { createRouter, type Handler } from "./http/router.js";
+import { createToolProvider } from "./agent/tools.js";
 import { createGroqClient } from "./llm/client.js";
 import { createQlooClient } from "./qloo/client.js";
 import { getPool } from "./db/pool.js";
@@ -12,6 +13,7 @@ import { makeDraftCampaign } from "./campaignSection.js";
 import { resolveTitle } from "./resolve.js";
 import { boardHandler } from "./routes/board.js";
 import { briefHandler } from "./routes/brief.js";
+import { chatHandler } from "./routes/chat.js";
 import { guessHandler } from "./routes/guess.js";
 import { warmHandler } from "./routes/warm.js";
 import { createBackgroundWarmer, createWarmQueue, warmCities, type WarmDeps } from "./warm.js";
@@ -47,6 +49,7 @@ const briefRoute = briefHandler({
 // Everything warming needs, shared by the board's background queue and POST /warm.
 const warmDeps: WarmDeps = { sql, qloo, resolve: (key) => resolveTitle(sql, qloo, key), onError: logError };
 const warmQueue = createWarmQueue({ onError: (key, err) => logError(`warm ${key}`, err) });
+const enqueueWarm = createBackgroundWarmer(warmDeps, warmQueue);
 
 const guessRoute = guessHandler({
   // Its own, stricter limiter than the brief's: every guess is a model call.
@@ -57,9 +60,32 @@ const guessRoute = guessHandler({
   takeUsage: takeCampaignUsage,
 });
 
+// The chat agent. Its tools read the same tables and call the same Qloo client
+// as the routes above, so it can show nothing a brief could not. One usage slot
+// is taken per chat turn, however many model rounds it takes.
+const takeChatUsage = (session: string) =>
+  takeUsage(sql, session, "chat", { session: config.sessionDailyChat, global: config.globalDailyLlm });
+const chatRoute = chatHandler({
+  // Its own, strictest limiter: one chat is up to six model calls and a handful of Qloo lookups.
+  rateLimiter: createRateLimiter({ max: 10, windowMs: 60_000 }),
+  llm,
+  takeUsage: takeChatUsage,
+  getTools: createToolProvider({
+    sql,
+    qloo,
+    resolve: (key) => resolveTitle(sql, qloo, key),
+    header: titleHeader,
+    isKnown: (key) => isKnownTitle(sql, key),
+    enqueueWarm,
+    fixtures: config.qlooFixtures,
+    onError: logError,
+  }),
+  onError: logError,
+});
+
 const boardRoute = boardHandler({
   sql,
-  enqueueWarm: createBackgroundWarmer(warmDeps, warmQueue),
+  enqueueWarm,
   // Its own limiter: polling the board must not spend a client's brief budget.
   rateLimiter: createRateLimiter({ max: 30, windowMs: 60_000 }),
   onError: logError,
@@ -82,6 +108,7 @@ const route = createRouter({
   "GET /guess": guessRoute,
   "GET /board": boardRoute,
   "POST /warm": warmRoute,
+  "POST /chat": chatRoute,
 });
 
 const server = createServer(async (req, res) => {

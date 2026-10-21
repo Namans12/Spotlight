@@ -4,11 +4,13 @@
 
 import type { ChatMessage, LlmClient } from "../llm/client.js";
 
+type ChatOpts = Parameters<LlmClient["chat"]>[1];
+
 export interface FakeLlm extends LlmClient {
   /** A snapshot of the messages passed to each chat() call, in order. */
   calls: ChatMessage[][];
   /** The options passed to each chat() call. */
-  opts: ({ json?: boolean } | undefined)[];
+  opts: ChatOpts[];
 }
 
 /** Replies are returned in order; the last one repeats if the script runs out.

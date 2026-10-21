@@ -42,6 +42,17 @@ describe("createGroqClient request", () => {
     expect(body(calls[0])).toMatchObject({ response_format: { type: "json_object" }, tools });
   });
 
+  it("the signal sent follows a caller's abort (a client that has left must not keep a model call running), as well as the timeout", async () => {
+    const { llm, calls } = client([ok({ role: "assistant", content: "x" })]);
+    const ac = new AbortController();
+    await llm.chat(MSGS, { signal: ac.signal });
+    const sent = calls[0].init.signal as AbortSignal;
+    expect(sent).not.toBe(ac.signal); // combined with the timeout
+    expect(sent.aborted).toBe(false);
+    ac.abort();
+    expect(sent.aborted).toBe(true);
+  });
+
   it("omits response_format and tools when not asked for", async () => {
     const { llm, calls } = client([ok({ role: "assistant", content: "x" })]);
     await llm.chat(MSGS, {});
