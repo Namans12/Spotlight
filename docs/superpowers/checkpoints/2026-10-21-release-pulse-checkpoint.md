@@ -29,19 +29,31 @@ not captured. 11 later plain runs and the Postgres run were all green. Hunt it f
 resume: loop the suite with `--reporter=verbose` until it fails (suspects: tests that use
 real timers, ports or clock windows).
 
-## What I need from you to continue
+## Keys: now in place
 
-1. **Qloo hackathon API key** (applied for). Unblocks Task 1, the live spike: ~20 real
-   calls that decide go/no-go on Delhi place quality, the heatmap, and IMDb→Qloo entity
-   resolution, and lock `services/pulse/src/qloo/recipes.ts` to what the real API returns.
-   Key goes in `QLOO_API_KEY` (env only, never committed). Base URL is
-   `https://hackathon.api.qloo.com`. If it hasn't arrived by 25 Oct, ask in the Qloo
-   Discord (#api-help).
-2. **Groq API key** (free tier is fine) for `GROQ_API_KEY`.
-3. **TMDB API key** for `TMDB_API_KEY` (the service refuses to start without it unless
-   `QLOO_FIXTURES=1`, and it seeds the release data).
-4. **Deployment accounts/decisions** (I cannot deploy from this machine; it has no Docker
-   or deploy CLIs):
+As of the end of 2026-10-21 the user has put the **Qloo hackathon key, the Groq key and the
+TMDB key** in `services/pulse/.env` (gitignored; template: `services/pulse/.env.example`;
+run the service with `npm --prefix services/pulse run start:local`). A minimal check
+(never printing values) showed: all variables set, `QLOO_FIXTURES` not set, and one
+authenticated call each returned 200 (Qloo `/search` found "Friends"; Groq `/models`
+lists the default `openai/gpt-oss-120b`; TMDB `/configuration`). The file mode was 644;
+`chmod 600 services/pulse/.env` is advisable. Claude should never need to print the
+values: scripts read them from the file at run time.
+
+**Next step is Task 1, the live Qloo spike:** ~20 real calls that decide go/no-go on Delhi
+place quality, the heatmap, and IMDb→Qloo entity resolution, and lock
+`services/pulse/src/qloo/recipes.ts` to what the real API returns. Needs the local
+Postgres recreated (below) and real current Indian releases loaded with the TMDB key
+(`python releasebot.py` with `DATABASE_URL` pointing at the local DB, then
+`scripts/backfill_calendar_tmdb.py`, `scripts/sync_calendar_tmdb.py` and
+`scripts/sync_title_locations.py`). Base URL is `https://hackathon.api.qloo.com` (the
+default); a first live Groq run (campaign + chat) should follow.
+
+## What I still need from you
+
+1. **Deployment accounts/decisions**, only when we are ready to go live (not needed for
+   the spike, cleanup or ship prep; I cannot deploy from this machine: no Docker or deploy
+   CLIs):
    - a **separate Neon database/branch** for the hackathon deployment (apply migrations
      0001–0016 by hand, then seed release data; commands go in the Task 15 runbook),
    - a container host for `services/pulse` (Railway or Render; **run exactly one
@@ -49,9 +61,9 @@ real timers, ports or clock windows).
    - a **separate Vercel project** for the SPA (env: existing vars + `DEMO_GUEST=1`,
      `VITE_DEMO_GUEST=1`, `VITE_PULSE_URL=<service url>`),
    - GitHub: secret `PULSE_WARM_SECRET`, variable `PULSE_URL`.
-5. **Repo/submission facts:** the repo sits under `Namans12`, so whoever submits on Devpost
+2. **Repo/submission facts:** the repo sits under `Namans12`, so whoever submits on Devpost
    must own it or be on the team; the repo must be public with the MIT licence visible in
-   the About sidebar.
+   the About sidebar. (The user said they will say which repo at the end.)
 
 ## How to resume (suggested order)
 
@@ -60,7 +72,7 @@ real timers, ports or clock windows).
 2. Recreate the local test database (below), run all suites, hunt the flaky test.
 3. Review the service cleanup commit (`4042016`) with a scoped reviewer.
 4. Run the SPA cleanup pass (list below), then review it.
-5. When the key arrives, run **Task 1** (live spike), then fix whatever the real responses
+5. The keys are in: run **Task 1** (live spike) next, then fix whatever the real responses
    change (expected: `recipes.ts`, fixture shapes, venue tags/coords, `parseImdbMatch`
    tightening, trend shapes).
 6. Task 15: Dockerfile + `.dockerignore`, README rewrite (Qloo submission section on top,
