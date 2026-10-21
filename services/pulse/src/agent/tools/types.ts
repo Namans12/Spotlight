@@ -12,6 +12,8 @@ import type { TitleKey } from "../../resolve.js";
  *  a fixed "the tool failed" result. */
 export interface AgentTool {
   spec: ToolSpec;
+  /** "harness" marks a call that goes to Qloo uncached; the loop caps those per chat. */
+  budget?: "harness";
   run(args: Record<string, unknown>, ctx?: { signal: AbortSignal }): Promise<unknown>;
 }
 

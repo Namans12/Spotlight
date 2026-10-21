@@ -5,9 +5,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentEvent } from "../../../../shared/types/pulse.js";
 import type { AgentTool } from "../agent/tools.js";
 import { createRateLimiter } from "../http/rateLimit.js";
+import { createStreamCounter } from "../http/streamCap.js";
 import { createRouter } from "../http/router.js";
 import { LlmError } from "../llm/client.js";
-import { assistant, call, fakeTool, toolCallMsg } from "../testing/agent.js";
+import { assistant, call, fakeTool, manualTimers, toolCallMsg } from "../testing/agent.js";
 import { fakeLlm, type FakeLlm } from "../testing/llm.js";
 import { takeUsage, type UsageSql, type UsageTx } from "../usage.js";
 import { chatHandler, type ChatRouteDeps } from "./chat.js";
@@ -35,7 +36,8 @@ async function start(over: Partial<ChatRouteDeps> = {}, llm: FakeLlm | null = fa
     ...over,
   };
   const route = createRouter({ "POST /chat": chatHandler(deps) });
-  server = createServer((req, res) => { void route(req, res, new URL(req.url ?? "/", "http://pulse.local")); });
+  // A handler that throws must not become an unhandled rejection in the test process; the real server answers 500.
+  server = createServer((req, res) => { route(req, res, new URL(req.url ?? "/", "http://pulse.local")).catch(() => res.destroy()); });
   await new Promise<void>((r) => server!.listen(0, "127.0.0.1", r));
   const port = (server.address() as AddressInfo).port;
   const base = `http://127.0.0.1:${port}`;
@@ -295,5 +297,120 @@ describe("POST /chat order: validation, rate limit, llm configured, usage cap, t
     // Another session is not affected.
     expect((await post(ask(), { "x-pulse-session": "v2" })).status).toBe(200);
     expect([...rows.keys()].every((k) => !k.includes("v1"))).toBe(true); // stored hashed
+  });
+});
+
+describe("POST /chat open-stream cap: 2 per client address", () => {
+  /** A chat that stays open until `release()`: its tool never answers. */
+  function hanging() {
+    let started = 0;
+    const tool = fakeTool("pulse_board", () => { started++; return new Promise(() => {}); });
+    return { tool, started: () => started };
+  }
+  const chatting = () => fakeLlm([toolCallMsg(call("pulse_board"))]);
+
+  it("answers a third concurrent stream with 429 too_many_streams and Retry-After 5, taking no usage slot", async () => {
+    const h = hanging();
+    const { post, deps } = await start({}, chatting(), [h.tool]);
+    const acs = [new AbortController(), new AbortController()];
+    const open = acs.map((ac) => post(ask(), {}, ac.signal).then((r) => r.text()).catch(() => "closed"));
+    await vi.waitFor(() => expect(h.started()).toBe(2));
+    expect(deps.takeUsage).toHaveBeenCalledTimes(2);
+
+    const third = await post(ask());
+    expect(third.status).toBe(429);
+    expect(third.headers.get("retry-after")).toBe("5");
+    expect(await third.json()).toEqual({ error: "too_many_streams" });
+    expect(deps.takeUsage).toHaveBeenCalledTimes(2); // still two: the refused one took no slot
+    expect(deps.getTools).toHaveBeenCalledTimes(2);
+
+    acs.forEach((ac) => ac.abort());
+    await Promise.all(open);
+  });
+
+  it("another client address has its own two", async () => {
+    const h = hanging();
+    const { post } = await start({}, chatting(), [h.tool]);
+    const acs = [new AbortController(), new AbortController(), new AbortController()];
+    const open = [
+      post(ask(), { "x-forwarded-for": "203.0.113.1" }, acs[0].signal),
+      post(ask(), { "x-forwarded-for": "203.0.113.1" }, acs[1].signal),
+      post(ask(), { "x-forwarded-for": "203.0.113.2" }, acs[2].signal),
+    ].map((p) => p.then((r) => r.text()).catch(() => "closed"));
+    await vi.waitFor(() => expect(h.started()).toBe(3));
+    expect((await post(ask(), { "x-forwarded-for": "203.0.113.1" })).status).toBe(429);
+    acs.forEach((ac) => ac.abort());
+    await Promise.all(open);
+  });
+
+  it("frees the slot when the client disconnects, with nothing left over", async () => {
+    const h = hanging();
+    const streams = createStreamCounter(2);
+    const { post } = await start({ streams }, chatting(), [h.tool]);
+    const acs = [new AbortController(), new AbortController()];
+    const open = acs.map((ac) => post(ask(), {}, ac.signal).then((r) => r.text()).catch(() => "closed"));
+    await vi.waitFor(() => expect(h.started()).toBe(2));
+    expect(streams.size()).toBe(1); // one client address, two streams
+    acs.forEach((ac) => ac.abort());
+    await Promise.all(open);
+    await vi.waitFor(() => expect(streams.size()).toBe(0));
+    // And both slots really are free again.
+    const again = [new AbortController(), new AbortController()];
+    const reopened = again.map((ac) => post(ask(), {}, ac.signal).then((r) => r.status).catch(() => 0));
+    await vi.waitFor(() => expect(h.started()).toBe(4));
+    again.forEach((ac) => ac.abort());
+    await Promise.all(reopened);
+    await vi.waitFor(() => expect(streams.size()).toBe(0));
+  });
+
+  it("frees the slot when a request finishes normally, or ends early with 503 (no model key)", async () => {
+    const streams = createStreamCounter(2);
+    const ok = await start({ streams });
+    for (let i = 0; i < 5; i++) await events(await ok.post(ask()));
+    await vi.waitFor(() => expect(streams.size()).toBe(0));
+    await new Promise<void>((r) => server!.close(() => r()));
+    server = null;
+
+    const noKey = await start({ streams }, null);
+    for (let i = 0; i < 5; i++) expect((await noKey.post(ask())).status).toBe(503); // never 429 too_many_streams
+    await vi.waitFor(() => expect(streams.size()).toBe(0));
+  });
+
+  it("frees the slot when the handler throws", async () => {
+    const streams = createStreamCounter(2);
+    const boom = { ...manualTimers(), setInterval: () => { throw new Error("timer broke"); } };
+    const { post } = await start({ streams, timers: boom });
+    for (let i = 0; i < 4; i++) await post(ask()).then((r) => r.text()).catch(() => "reset");
+    await vi.waitFor(() => expect(streams.size()).toBe(0));
+    // The slots are usable: with working timers the same address is not refused.
+    const ok = await start({ streams });
+    expect((await ok.post(ask())).status).toBe(200);
+  });
+
+  it("is checked after the rate limit and the body checks", async () => {
+    const streams = createStreamCounter(0); // no streams at all
+    const limiter = createRateLimiter({ max: 1, windowMs: 60_000 });
+    const { post } = await start({ streams, rateLimiter: limiter });
+    expect((await post("{nope")).status).toBe(400); // validation first, and it does not spend the limiter
+    const refused = await post(ask());
+    expect([refused.status, await refused.json()]).toEqual([429, { error: "too_many_streams" }]); // the limiter let it through, the cap did not
+    const limited = await post(ask());
+    expect(await limited.json()).toEqual({ error: "rate_limited" }); // and now the rate limiter answers first
+  });
+});
+
+describe("POST /chat 90 second deadline, end to end", () => {
+  it("tells the user it ran out of time, inside the stream, when the deadline timer fires", async () => {
+    const timers = manualTimers();
+    let started = false;
+    const slow = fakeTool("pulse_board", () => { started = true; return new Promise(() => {}); });
+    const { post } = await start({ timers }, fakeLlm([toolCallMsg(call("pulse_board"))]), [slow]);
+    const res = post(ask()).then((r) => events(r));
+    await vi.waitFor(() => expect(started).toBe(true));
+    timers.fire(90_000);
+    const ev = await res;
+    expect(ev.map((e) => e.type)).toEqual(["tool", "message", "done"]);
+    expect((ev[1] as { text: string }).text).toContain("ran out of time");
+    await vi.waitFor(() => expect(timers.pending()).toBe(0)); // keep-alive and deadline timers both cleared
   });
 });

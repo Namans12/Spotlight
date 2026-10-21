@@ -4,6 +4,7 @@ import { readJsonBody } from "../http/body.js";
 import { clientAddress, type RateLimiter } from "../http/rateLimit.js";
 import type { Handler } from "../http/router.js";
 import { startSse } from "../http/sse.js";
+import { createStreamCounter, type StreamCounter } from "../http/streamCap.js";
 import type { ChatMessage, LlmClient } from "../llm/client.js";
 import type { Timers } from "../timers.js";
 import { sessionKey, type CapDecision } from "../usage.js";
@@ -17,8 +18,11 @@ export interface ChatRouteDeps {
   /** Takes one slot of the session's and the day's budget. Called once per request, however many tool rounds it runs. */
   takeUsage: (session: string) => Promise<CapDecision>;
   getTools: () => Promise<AgentTool[]>;
+  /** Open streams per client address; two by default. One is made if not given. */
+  streams?: StreamCounter;
   maxRounds?: number;
   toolTimeoutMs?: number;
+  deadlineMs?: number;
   timers?: Timers;
   now?: () => Date;
   onError?: (context: string, err: unknown) => void;
@@ -27,6 +31,7 @@ export interface ChatRouteDeps {
 export const MAX_BODY_BYTES = 100 * 1024;
 export const MAX_MESSAGES = 12;
 export const MAX_CONTENT_CHARS = 4000;
+export const MAX_STREAMS_PER_CLIENT = 2;
 
 const bad = (detail: string) => ({ error: "bad_request", detail });
 
@@ -63,6 +68,8 @@ export function chatHandler(deps: ChatRouteDeps): Handler {
     try { deps.onError?.(context, err); } catch { /* a broken logger must not break the request */ }
   };
 
+  const streams = deps.streams ?? createStreamCounter(MAX_STREAMS_PER_CLIENT);
+
   return async (req, res) => {
     const body = await readJsonBody(req, MAX_BODY_BYTES);
     if (!body.ok) {
@@ -73,9 +80,23 @@ export function chatHandler(deps: ChatRouteDeps): Handler {
     const parsed = parseMessages(body.value);
     if (!parsed.ok) return json(res, 400, bad(parsed.detail));
 
-    const decision = deps.rateLimiter.check(clientAddress(req));
+    const address = clientAddress(req);
+    const decision = deps.rateLimiter.check(address);
     if (!decision.allowed) return json(res, 429, { error: "rate_limited" }, { "Retry-After": String(decision.retryAfterSec) });
 
+    // Right after the rate limit and before anything is spent: no usage slot is taken for a refused stream.
+    const release = streams.tryAcquire(address);
+    if (!release) return json(res, 429, { error: "too_many_streams" }, { "Retry-After": "5" });
+    // Freed once, whichever of these happens first: the handler ending (including by throwing) or the connection closing.
+    res.once("close", release);
+    try {
+      await serve(req, res, parsed.history);
+    } finally {
+      release();
+    }
+  };
+
+  async function serve(req: Parameters<Handler>[0], res: Parameters<Handler>[1], history: ChatMessage[]): Promise<void> {
     const { llm } = deps;
     if (!llm) return json(res, 503, { error: "llm_unavailable" });
 
@@ -98,7 +119,7 @@ export function chatHandler(deps: ChatRouteDeps): Handler {
         stream.write({ type: "done" });
         return;
       }
-      const events = runAgent(llm, tools, parsed.history, deps.maxRounds, { signal: stream.signal, toolTimeoutMs: deps.toolTimeoutMs, timers: deps.timers, onError: report });
+      const events = runAgent(llm, tools, history, deps.maxRounds, { signal: stream.signal, toolTimeoutMs: deps.toolTimeoutMs, deadlineMs: deps.deadlineMs, timers: deps.timers, onError: report });
       for await (const event of events) {
         if (!stream.write(event)) break; // the client is gone; leaving the loop also stops the generator
       }
@@ -111,5 +132,5 @@ export function chatHandler(deps: ChatRouteDeps): Handler {
     } finally {
       stream.end();
     }
-  };
+  }
 }

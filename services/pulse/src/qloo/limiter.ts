@@ -22,19 +22,41 @@ export interface LimiterOptions {
 
 const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-export function createLimiter(opts: LimiterOptions): <T>(fn: () => Promise<T>) => Promise<T> {
+export interface RunOptions {
+  /** A job whose signal is aborted before it starts is rejected with an
+   *  AbortError and never reaches the harness: a chat that was cut off, or
+   *  whose client left, must not spend queued Qloo calls. A call already
+   *  running is not interrupted (the slot stays held until it ends). */
+  signal?: AbortSignal;
+}
+
+export type Limited = <T>(fn: () => Promise<T>, opts?: RunOptions) => Promise<T>;
+
+const abortError = () => new DOMException("The Qloo call was cancelled before it started.", "AbortError");
+
+export function createLimiter(opts: LimiterOptions): Limited {
   const sleep = opts.sleep ?? realSleep;
   let live = 0;
   const waiting: (() => void)[] = [];
 
-  const acquire = async (): Promise<void> => {
+  const acquire = async (signal?: AbortSignal): Promise<void> => {
+    if (signal?.aborted) throw abortError();
     if (live < opts.concurrency) {
       live++;
       return;
     }
     // The releasing call hands its slot straight to the next waiter, so
     // `live` never dips below the cap while work is queued.
-    await new Promise<void>((resolve) => waiting.push(resolve));
+    await new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        const i = waiting.indexOf(grant);
+        if (i >= 0) waiting.splice(i, 1);
+        reject(abortError());
+      };
+      const grant = () => { signal?.removeEventListener("abort", onAbort); resolve(); };
+      waiting.push(grant);
+      signal?.addEventListener("abort", onAbort, { once: true });
+    });
   };
   const release = (): void => {
     const next = waiting.shift();
@@ -42,10 +64,12 @@ export function createLimiter(opts: LimiterOptions): <T>(fn: () => Promise<T>) =
     else live--;
   };
 
-  return async <T>(fn: () => Promise<T>): Promise<T> => {
-    await acquire();
+  return async <T>(fn: () => Promise<T>, run: RunOptions = {}): Promise<T> => {
+    await acquire(run.signal);
     try {
       for (let attempt = 0; ; attempt++) {
+        // Checked before every attempt, so a call cancelled during a 429 backoff is not retried.
+        if (run.signal?.aborted) throw abortError();
         try {
           return await fn();
         } catch (err) {

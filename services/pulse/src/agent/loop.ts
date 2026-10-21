@@ -15,6 +15,13 @@
 // unknown tool or bad arguments become a tool error it can recover from, and an
 // empty or failed reply ends the stream with a fixed sentence.
 //
+// Budgets. One /chat takes ONE usage slot (R32) but may make up to six model
+// calls, so the daily global cap undercounts real provider calls; that is a
+// known, accepted looseness. What bounds a single chat instead: at most 8
+// uncached Qloo harness calls and 12 tool calls in total, at most 4 calls per
+// round, 6 rounds, 25 s per tool, and a 90 s deadline for the whole chat. A tool
+// over budget is not run: the model is told so and answers with what it has.
+//
 // Nothing in a model reply, tool error or exception reaches the user as text of
 // its own: the user sees the model's final message, short summaries built from
 // tool results (sanitize.ts), and fixed sentences for failures. The real cause
@@ -32,13 +39,20 @@ export interface AgentOptions {
   signal?: AbortSignal;
   /** Per tool call; 25 s unless a test says otherwise. */
   toolTimeoutMs?: number;
+  /** For the whole chat; 90 s unless a test says otherwise. */
+  deadlineMs?: number;
   /** Injectable so tests fire the timeout by hand. */
   timers?: Timers;
   onError?: (context: string, err: unknown) => void;
 }
 
 export const MAX_TOOL_CALLS_PER_ROUND = 4;
+/** Uncached Qloo harness calls (`budget: "harness"` tools) per chat. */
+export const MAX_HARNESS_CALLS_PER_CHAT = 8;
+/** Every tool call that actually runs, Pulse's own included. */
+export const MAX_TOOL_CALLS_PER_CHAT = 12;
 export const TOOL_TIMEOUT_MS = 25_000;
+export const CHAT_DEADLINE_MS = 90_000;
 const MAX_NAME = 64;
 const MAX_SHOWN_ARGS = 300;
 
@@ -48,9 +62,13 @@ const LLM_SENTENCES: Record<LlmErrorKind, string> = {
   bad_response: "The AI service returned something I couldn't use. Please try again.",
 };
 const GENERIC_FAILURE = "Something went wrong on my side. Please try again.";
+const OUT_OF_TIME = "I ran out of time before finishing — here is what I found so far";
+const CUT_OFF = " … (my answer was cut off; ask me to continue)";
+const BUDGET_EXHAUSTED = { error: "budget_exhausted", note: "This chat has used its lookup budget; answer with what you have." };
 
 const TIMEOUT = Symbol("timeout");
 const CANCELLED = Symbol("cancelled");
+const ABORTED = Symbol("aborted");
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 
 /** Only entries that look like function calls; a provider's odd entry is ignored, not trusted. */
@@ -110,22 +128,43 @@ export async function* runAgent(llm: LlmClient, tools: AgentTool[], history: Cha
   const onCallerAbort = () => ac.abort();
   if (opts.signal?.aborted) ac.abort(); else opts.signal?.addEventListener("abort", onCallerAbort, { once: true });
 
+  // The whole chat has a deadline, enforced through the same signal as a
+  // disconnect: what differs is that the user is still there, so they are told.
+  let timedOut = false;
+  const deadline = timers.setTimeout(() => { timedOut = true; ac.abort(); }, opts.deadlineMs ?? CHAT_DEADLINE_MS);
+  // Raced against the model call and the tools, so one that ignores its signal cannot hold the loop.
+  const aborted = new Promise<typeof ABORTED>((resolve) => {
+    if (ac.signal.aborted) resolve(ABORTED); else ac.signal.addEventListener("abort", () => resolve(ABORTED), { once: true });
+  });
+  function* stopped(): Generator<AgentEvent> {
+    if (!timedOut) return; // the client left: nobody to tell
+    yield { type: "message", text: `${OUT_OF_TIME}: ${usedSummary()}.` };
+    yield { type: "done" };
+  }
   const used: string[] = [];
+  let harnessCalls = 0;
+  let totalCalls = 0;
+  const usedSummary = () => {
+    const steps = used.length === 1 ? "1 lookup" : `${used.length} lookups`;
+    return `I ran ${steps} (${[...new Set(used)].join(", ") || "none"}) but did not get to a final answer`;
+  };
   try {
     for (let round = 0; round < maxRounds; round++) {
-      if (ac.signal.aborted) return;
+      if (ac.signal.aborted) { yield* stopped(); return; }
 
       let reply: ChatMessage;
       try {
-        reply = await llm.chat(messages, { tools: specs, signal: ac.signal });
+        const got = await Promise.race([llm.chat(messages, { tools: specs, signal: ac.signal }), aborted]);
+        if (got === ABORTED) { yield* stopped(); return; }
+        reply = got;
       } catch (err) {
-        if (ac.signal.aborted) return; // the client left; there is nobody to tell
+        if (ac.signal.aborted) { yield* stopped(); return; } // the client left, or time ran out
         report("model call", err);
         yield { type: "error", text: err instanceof LlmError ? LLM_SENTENCES[err.kind] : GENERIC_FAILURE };
         yield { type: "done" };
         return;
       }
-      if (ac.signal.aborted) return;
+      if (ac.signal.aborted) { yield* stopped(); return; }
 
       const calls = usableCalls(reply.tool_calls);
       if (calls.length === 0) {
@@ -134,7 +173,8 @@ export async function* runAgent(llm: LlmClient, tools: AgentTool[], history: Cha
           // A model that spent its budget thinking: not an answer.
           yield { type: "error", text: LLM_SENTENCES.bad_response };
         } else {
-          yield { type: "message", text };
+          // A reply the provider stopped at its token limit is not a finished answer.
+          yield { type: "message", text: reply.finish_reason === "length" ? `${text}${CUT_OFF}` : text };
         }
         yield { type: "done" };
         return;
@@ -167,14 +207,19 @@ export async function* runAgent(llm: LlmClient, tools: AgentTool[], history: Cha
           continue;
         }
         yield { type: "tool", name: p.name, args: p.argsJson.length > MAX_SHOWN_ARGS ? `${p.argsJson.slice(0, MAX_SHOWN_ARGS - 1)}…` : p.argsJson };
-        if (ac.signal.aborted) return;
+        if (ac.signal.aborted) { yield* stopped(); return; }
 
-        used.push(p.name);
         let result: unknown;
         if (!p.tool) result = { error: "unknown tool", name: p.name, available: [...byName.keys()].slice(0, 20) };
         else if (!p.validArgs) result = { error: "The tool arguments were not a valid JSON object." };
-        else result = await runTool(p.tool, p.args, p.name, ac.signal, toolTimeout, timers, report);
-        if (ac.signal.aborted) return;
+        else if (totalCalls >= MAX_TOOL_CALLS_PER_CHAT || (p.tool.budget === "harness" && harnessCalls >= MAX_HARNESS_CALLS_PER_CHAT)) result = BUDGET_EXHAUSTED;
+        else {
+          totalCalls++;
+          if (p.tool.budget === "harness") harnessCalls++;
+          used.push(p.name);
+          result = await runTool(p.tool, p.args, p.name, ac.signal, toolTimeout, timers, report);
+        }
+        if (ac.signal.aborted) { yield* stopped(); return; }
 
         yield { type: "tool_result", name: p.name, summary: summarise(result) };
         messages.push({ role: "tool", tool_call_id: p.id, content: truncateResult(result) });
@@ -182,13 +227,13 @@ export async function* runAgent(llm: LlmClient, tools: AgentTool[], history: Cha
     }
 
     // No seventh, paid-for model call: say plainly what happened, using only what was actually done.
-    const steps = used.length === 1 ? "1 lookup" : `${used.length} lookups`;
     yield {
       type: "message",
-      text: `I hit my step limit before finishing — here is what I found so far: I ran ${steps} (${[...new Set(used)].join(", ") || "none"}) but did not get to a final answer. Try a narrower question, for example one city, one business type and one release.`,
+      text: `I hit my step limit before finishing — here is what I found so far: ${usedSummary()}. Try a narrower question, for example one city, one business type and one release.`,
     };
     yield { type: "done" };
   } finally {
+    timers.clearTimeout(deadline);
     opts.signal?.removeEventListener("abort", onCallerAbort);
     ac.abort();
   }

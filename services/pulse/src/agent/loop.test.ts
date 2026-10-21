@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AgentEvent } from "../../../../shared/types/pulse.js";
 import { LlmError, type ChatMessage } from "../llm/client.js";
-import { assistant, call, collect, fakeTool, manualTimers, toolCallMsg, user } from "../testing/agent.js";
+import { assistant, call, collect, fakeTool, manualTimers, toolCallMsg, user, type FakeTool } from "../testing/agent.js";
 import { fakeLlm } from "../testing/llm.js";
-import { runAgent } from "./loop.js";
+import { CHAT_DEADLINE_MS, MAX_HARNESS_CALLS_PER_CHAT, MAX_TOOL_CALLS_PER_CHAT, runAgent } from "./loop.js";
 import type { AgentTool } from "./tools.js";
 
 const text = (content: string): ChatMessage => assistant(content);
@@ -137,9 +137,9 @@ describe("runAgent", () => {
       const llm = fakeLlm([toolCallMsg(call("slow", {}, "c1")), text("It timed out.")]);
       const tool = fakeTool("slow", (_args, signal) => new Promise(() => { void signal; /* never settles */ }));
       const events = collect(runAgent(llm, [tool], [user("hi")], 6, { timers }));
-      await vi.waitFor(() => expect(timers.pending()).toBe(1));
+      await vi.waitFor(() => expect(timers.pending()).toBe(2)); // the chat deadline and this tool's cut-off
       expect(timers.intervalMs).toEqual([]);
-      timers.fire();
+      timers.fire(25_000);
       const ev = await events;
       expect(ev.map((e) => e.type)).toEqual(["tool", "tool_result", "message", "done"]);
       expect(JSON.parse(llm.calls[1].at(-1)!.content!)).toEqual({ error: "The tool timed out after 25 seconds." });
@@ -152,7 +152,7 @@ describe("runAgent", () => {
       const spy = { ...timers, setTimeout: (fn: () => void, ms: number) => { asked.push(ms); return timers.setTimeout(fn, ms); } };
       const llm = fakeLlm([toolCallMsg(call("t")), text("ok")]);
       await collect(runAgent(llm, [fakeTool("t", { ok: true })], [user("hi")], 6, { timers: spy }));
-      expect(asked).toEqual([25_000]);
+      expect(asked).toEqual([90_000, 25_000]); // the chat deadline, then the tool's cut-off
       expect(timers.pending()).toBe(0);
     });
   });
@@ -267,5 +267,125 @@ describe("runAgent", () => {
   it("works with the type's AgentTool shape", () => {
     const t: AgentTool = fakeTool("t", {});
     expect(t.spec.function.name).toBe("t");
+  });
+
+  describe("per-chat budgets: 8 harness calls, 12 tool calls in all", () => {
+    const harness = (name: string): FakeTool => ({ ...fakeTool(name, { status: "ok" }), budget: "harness" });
+    const four = (name: string) => toolCallMsg(...Array.from({ length: 4 }, (_, i) => call(name, { n: i })));
+    const toolMessages = (llm: { calls: ChatMessage[][] }, n: number) => llm.calls[n].filter((m) => m.role === "tool");
+
+    it("the limits are the named constants", () => {
+      expect([MAX_HARNESS_CALLS_PER_CHAT, MAX_TOOL_CALLS_PER_CHAT]).toEqual([8, 12]);
+    });
+
+    it("stops running tools at 12 in total, tells the model, and the model still answers", async () => {
+      const t = fakeTool("t", { ok: true });
+      const llm = fakeLlm([four("t"), four("t"), four("t"), four("t"), text("Answer from what I have.")]);
+      const ev = await collect(runAgent(llm, [t], [user("hi")]));
+      expect(t.calls).toHaveLength(12);
+      const exhausted = toolMessages(llm, 4).slice(-4).map((m) => JSON.parse(m.content!));
+      expect(exhausted).toEqual(Array(4).fill({ error: "budget_exhausted", note: "This chat has used its lookup budget; answer with what you have." }));
+      // Every call id is still answered, and the user sees a matching, short tool_result.
+      expect(toolMessages(llm, 4)).toHaveLength(16);
+      const results = ev.filter((e) => e.type === "tool_result") as { summary: string }[];
+      expect(results.slice(-4).map((r) => r.summary)).toEqual(Array(4).fill("error: budget_exhausted"));
+      expect(ev.at(-2)).toEqual({ type: "message", text: "Answer from what I have." });
+    });
+
+    it("counts harness calls separately: the 9th is refused while Pulse tools still run", async () => {
+      const q = harness("qloo_x");
+      const p = fakeTool("p", { ok: true });
+      const llm = fakeLlm([four("qloo_x"), four("qloo_x"), toolCallMsg(call("qloo_x"), call("qloo_x"), call("p"), call("p")), text("done")]);
+      const ev = await collect(runAgent(llm, [q, p], [user("hi")]));
+      expect(q.calls).toHaveLength(8);
+      expect(p.calls).toHaveLength(2);
+      const third = toolMessages(llm, 3).slice(-4).map((m) => JSON.parse(m.content!));
+      expect(third.map((r) => r.error ?? "ok")).toEqual(["budget_exhausted", "budget_exhausted", "ok", "ok"]);
+      expect(ev.at(-1)).toEqual({ type: "done" });
+    });
+
+    it("Pulse tools count toward the 12 but not the 8: after 8 Pulse calls, 4 harness calls still run", async () => {
+      const q = harness("qloo_x");
+      const p = fakeTool("p", { ok: true });
+      const llm = fakeLlm([four("p"), four("p"), four("qloo_x"), four("qloo_x"), text("done")]);
+      await collect(runAgent(llm, [q, p], [user("hi")]));
+      expect(p.calls).toHaveLength(8);
+      expect(q.calls).toHaveLength(4); // total reached 12; the next four harness calls were refused
+      expect(toolMessages(llm, 4).slice(-4).every((m) => JSON.parse(m.content!).error === "budget_exhausted")).toBe(true);
+    });
+
+    it("a refused call is not run and does not use up budget", async () => {
+      const t = fakeTool("t", { ok: true });
+      const llm = fakeLlm([four("t"), four("t"), four("t"), four("t"), four("t"), text("done")]);
+      await collect(runAgent(llm, [t], [user("hi")], 8));
+      expect(t.calls).toHaveLength(12);
+    });
+  });
+
+  describe("the 90 second deadline for the whole chat", () => {
+    it("is 90 s, set once and cleared when the chat ends", async () => {
+      expect(CHAT_DEADLINE_MS).toBe(90_000);
+      const timers = manualTimers();
+      await collect(runAgent(fakeLlm([text("ok")]), [], [user("hi")], 6, { timers }));
+      expect(timers.timeoutMs).toEqual([90_000]);
+      expect(timers.pending()).toBe(0);
+    });
+
+    it("when it fires during a tool: aborts the tool, says it ran out of time, and ends (a tool that ignores its signal does not hold the loop)", async () => {
+      const timers = manualTimers();
+      const llm = fakeLlm([toolCallMsg(call("slow")), text("never")]);
+      const tool = fakeTool("slow", () => new Promise(() => {})); // never settles and never looks at its signal
+      const events = collect(runAgent(llm, [tool], [user("hi")], 6, { timers }));
+      await vi.waitFor(() => expect(tool.calls).toHaveLength(1));
+      timers.fire(90_000);
+      const ev = await events;
+      expect(ev.map((e) => e.type)).toEqual(["tool", "message", "done"]);
+      expect((ev[1] as { text: string }).text).toContain("ran out of time");
+      expect((ev[1] as { text: string }).text).toContain("slow"); // only what was actually done
+      expect(tool.signals[0]?.aborted).toBe(true);
+      expect(llm.calls).toHaveLength(1);
+      expect(timers.pending()).toBe(0);
+    });
+
+    it("when it fires during a model call: aborts the call, even one that ignores its signal", async () => {
+      const timers = manualTimers();
+      let seen: AbortSignal | undefined;
+      const llm = { chat: (_m: ChatMessage[], o?: { signal?: AbortSignal }) => { seen = o?.signal; return new Promise<ChatMessage>(() => {}); } };
+      const events = collect(runAgent(llm, [], [user("hi")], 6, { timers }));
+      await vi.waitFor(() => expect(seen).toBeDefined());
+      timers.fire(90_000);
+      const ev = await events;
+      expect(ev.map((e) => e.type)).toEqual(["message", "done"]);
+      expect((ev[0] as { text: string }).text).toContain("ran out of time");
+      expect(seen?.aborted).toBe(true);
+    });
+
+    it("does not start another round once it has fired", async () => {
+      const timers = manualTimers();
+      const llm = fakeLlm([toolCallMsg(call("t")), text("never")]);
+      const tool = fakeTool("t", () => { timers.fire(90_000); return { ok: true }; });
+      const ev = await collect(runAgent(llm, [tool], [user("hi")], 6, { timers }));
+      expect(llm.calls).toHaveLength(1);
+      expect(ev.at(-2)).toMatchObject({ type: "message", text: expect.stringContaining("ran out of time") });
+      expect(ev.at(-1)).toEqual({ type: "done" });
+    });
+
+    it("a client that has gone is not told anything", async () => {
+      const ac = new AbortController();
+      const llm = fakeLlm([toolCallMsg(call("t")), text("never")]);
+      const ev = await collect(runAgent(llm, [fakeTool("t", () => { ac.abort(); return {}; })], [user("hi")], 6, { signal: ac.signal, timers: manualTimers() }));
+      expect(ev.some((e) => e.type === "message")).toBe(false);
+    });
+  });
+
+  describe("a final answer the provider cut off at its token limit", () => {
+    it("is marked as cut off, and the stream still ends with done", async () => {
+      const ev = await collect(runAgent(fakeLlm([{ role: "assistant", content: "First half of the", finish_reason: "length" }]), [], [user("hi")]));
+      expect(ev).toEqual([{ type: "message", text: "First half of the … (my answer was cut off; ask me to continue)" }, { type: "done" }]);
+    });
+    it("is left alone when the provider finished normally", async () => {
+      const ev = await collect(runAgent(fakeLlm([{ role: "assistant", content: "Whole answer.", finish_reason: "stop" }]), [], [user("hi")]));
+      expect(ev[0]).toEqual({ type: "message", text: "Whole answer." });
+    });
   });
 });

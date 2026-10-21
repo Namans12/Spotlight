@@ -7,6 +7,7 @@
 import { cleanText } from "../../campaign.js";
 import type { ToolSpec } from "../../llm/client.js";
 import { boundValue } from "../sanitize.js";
+import { normaliseToolSchema } from "./schema.js";
 import type { AgentTool, AgentToolDeps } from "./types.js";
 
 /** The exact tool names from the harness's own tool list. */
@@ -47,9 +48,9 @@ export function compactHarnessResult(tool: string, raw: unknown): Record<string,
 }
 
 function asSpec(name: string, description: string, inputSchema: unknown): ToolSpec {
-  const schema: Record<string, unknown> = isRecord(inputSchema) && inputSchema.type === "object" ? { ...inputSchema } : { type: "object", properties: {} };
-  delete schema.$schema;
-  return { type: "function", function: { name, description: cleanText(description, 400), parameters: schema } };
+  // A conservative subset (see schema.ts); a non-object schema becomes an empty parameter list.
+  const normalised = isRecord(inputSchema) && inputSchema.type === "object" ? normaliseToolSchema(inputSchema) : { type: "object", properties: {} };
+  return { type: "function", function: { name, description: cleanText(description, 400), parameters: normalised } };
 }
 
 /** An allowlisted tool the harness does not list is simply absent. A harness
@@ -68,6 +69,8 @@ export async function harnessTools(deps: AgentToolDeps): Promise<AgentTool[]> {
     .filter((t) => allowed.has(t.name))
     .map((t): AgentTool => ({
       spec: asSpec(t.name, t.description, t.inputSchema),
-      run: async (args) => compactHarnessResult(t.name, await deps.qloo.callTool(t.name, args)),
+      // Counted against the chat's Qloo budget, and cancellable while it waits in the limiter.
+      budget: "harness",
+      run: async (args, ctx) => compactHarnessResult(t.name, await deps.qloo.callTool(t.name, args, { signal: ctx?.signal })),
     }));
 }

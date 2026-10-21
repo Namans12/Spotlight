@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { PulseConfig } from "../config.js";
 import { getCity } from "../cities.js";
 import { createHarnessQlooClient, createQlooClient, mapHarnessResult } from "./client.js";
@@ -347,6 +347,25 @@ describe("the harness-backed client", () => {
     const s = await q.artists("ent-1");
     expect(s.status).toBe("error");
     expect(s.note).toContain("Invalid arguments for qloo_recommend");
+  });
+
+  it("an agent call whose signal is aborted while queued behind the limiter never reaches the harness", async () => {
+    const started: string[] = [];
+    const gates: (() => void)[] = [];
+    const t: HarnessTransport = {
+      ...fakeTransport({}).t,
+      async callTool(name) { started.push(name); await new Promise<void>((r) => gates.push(r)); return { status: "ok", results: [] }; },
+    };
+    const q = createHarnessQlooClient(t, { sleep: noSleep });
+    const running = [q.callTool("qloo_a", {}), q.callTool("qloo_b", {})]; // the limiter's two slots
+    const ac = new AbortController();
+    const queued = q.callTool("qloo_c", {}, { signal: ac.signal });
+    await vi.waitFor(() => expect(started).toEqual(["qloo_a", "qloo_b"]));
+    ac.abort();
+    await expect(queued).rejects.toMatchObject({ name: "AbortError" });
+    gates.forEach((g) => g());
+    await Promise.all(running);
+    expect(started).toEqual(["qloo_a", "qloo_b"]); // qloo_c was never sent
   });
 
   it("passes agent tool calls straight through, behind the limiter", async () => {

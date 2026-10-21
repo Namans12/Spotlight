@@ -84,6 +84,24 @@ describe("buildTools: which tools the model gets", () => {
     expect(fixtures).toContain("qloo_fixture_echo");
   });
 
+  it("the Pulse tools are not counted against the Qloo budget", async () => {
+    const tools = await buildTools(toolDeps());
+    for (const n of ["pulse_board", "release_brief", "search_releases", "titles_shot_in"]) expect(find(tools, n).budget).toBeUndefined();
+  });
+
+  it("sends the provider a conservative schema: no examples, defaults or uniqueItems, but type and required kept", async () => {
+    const inputSchema = {
+      $schema: "http://json-schema.org/draft-07/schema#", type: "object", required: ["entity"], additionalProperties: false,
+      properties: { entity: { type: "string", minLength: 1, examples: ["x"] }, limit: { type: "integer", default: 10, minimum: 1 }, tags: { type: "array", uniqueItems: true, items: { type: "string" } } },
+    };
+    const qloo = { ...toolDeps().qloo, listTools: async () => [{ name: "qloo_describe", description: "d", inputSchema }] } as QlooClient;
+    const params = find(await buildTools(toolDeps({ qloo })), "qloo_describe").spec.function.parameters;
+    expect(params).toEqual({
+      type: "object", required: ["entity"], additionalProperties: false,
+      properties: { entity: { type: "string", minLength: 1 }, limit: { type: "integer", minimum: 1 }, tags: { type: "array", items: { type: "string" } } },
+    });
+  });
+
   it("uses the harness's own schema as the tool's parameters", async () => {
     const qloo = { ...toolDeps().qloo, listTools: async () => harnessTools("qloo_describe") } as QlooClient;
     const tool = find(await buildTools(toolDeps({ qloo })), "qloo_describe");
@@ -108,8 +126,11 @@ describe("buildTools: which tools the model gets", () => {
     }));
     const qloo = { ...toolDeps().qloo, listTools: async () => harnessTools("qloo_describe"), callTool } as unknown as QlooClient;
     const tool = find(await buildTools(toolDeps({ qloo })), "qloo_describe");
-    const out = (await tool.run({ entity: "Fake Place" })) as Record<string, unknown>;
-    expect(callTool).toHaveBeenCalledWith("qloo_describe", { entity: "Fake Place" });
+    const ac = new AbortController();
+    const out = (await tool.run({ entity: "Fake Place" }, { signal: ac.signal })) as Record<string, unknown>;
+    // The call's signal travels to the client, so a queued call can be dropped.
+    expect(callTool).toHaveBeenCalledWith("qloo_describe", { entity: "Fake Place" }, { signal: ac.signal });
+    expect(tool.budget).toBe("harness");
     expect(out).toMatchObject({ tool: "qloo_describe", status: "ok", summary: "Found it.", result_count: 1 });
     expect(out).not.toHaveProperty("execution");
     expect(out).not.toHaveProperty("query_intent");

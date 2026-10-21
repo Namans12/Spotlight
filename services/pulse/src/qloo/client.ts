@@ -27,7 +27,8 @@ export interface QlooClient {
   trends(entityId: string): Promise<EvidenceSection<{ date: string; percentile: number }[]>>;
   findTags(query: string, parentType: "place" | "brand"): Promise<{ tagId: string; name: string }[]>;
   listTools(): Promise<{ name: string; description: string; inputSchema: unknown }[]>; // for the agent
-  callTool(name: string, args: Record<string, unknown>): Promise<unknown>;            // for the agent
+  /** For the agent. An aborted `signal` stops a call that is still queued behind the limiter. */
+  callTool(name: string, args: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<unknown>;
   /** Stops the harness process, if one was started. Optional because the
    *  fixture client has nothing to stop. */
   close?(): Promise<void>;
@@ -110,12 +111,12 @@ export function createHarnessQlooClient(transport: HarnessTransport, opts: Harne
   const typeOf = new Map<string, "movie" | "tv_show">();
   const remember = (refs: QlooEntityRef[]) => { for (const r of refs) typeOf.set(r.entityId, r.type); return refs; };
 
-  const callTool = (name: string, args: Record<string, unknown>) =>
+  const callTool = (name: string, args: Record<string, unknown>, callOpts: { signal?: AbortSignal } = {}) =>
     limited(async () => {
       const raw = await transport.callTool(name, args);
       throwIfRateLimited(raw);
       return raw;
-    });
+    }, { signal: callOpts.signal });
 
   async function section<T>(r: recipes.ToolRecipe<T>): Promise<EvidenceSection<T>> {
     try {

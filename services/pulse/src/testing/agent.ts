@@ -52,27 +52,35 @@ export function fakeTool(
 export interface ManualTimers extends Timers {
   /** Timeouts and intervals not yet cleared (or fired, for timeouts). */
   pending(): number;
-  /** Runs every pending callback once; timeouts are then gone, intervals stay. */
-  fire(): void;
+  /** Runs the pending callbacks once (only those set with `ms`, when given); timeouts are then gone, intervals stay. */
+  fire(ms?: number): void;
   cleared: number;
   readonly intervalMs: number[];
+  /** The delay of every setTimeout, in order. */
+  readonly timeoutMs: number[];
 }
 
 export function manualTimers(): ManualTimers {
   let id = 0;
-  const live = new Map<number, { fn: () => void; interval: boolean }>();
+  const live = new Map<number, { fn: () => void; interval: boolean; ms: number }>();
   const intervalMs: number[] = [];
+  const timeoutMs: number[] = [];
   const t: ManualTimers = {
-    setTimeout: (fn) => { live.set(++id, { fn, interval: false }); return id; },
+    setTimeout: (fn, ms) => { timeoutMs.push(ms); live.set(++id, { fn, interval: false, ms }); return id; },
     clearTimeout: (h) => { if (live.delete(h as number)) t.cleared++; },
-    setInterval: (fn, ms) => { intervalMs.push(ms); live.set(++id, { fn, interval: true }); return id; },
+    setInterval: (fn, ms) => { intervalMs.push(ms); live.set(++id, { fn, interval: true, ms }); return id; },
     clearInterval: (h) => { if (live.delete(h as number)) t.cleared++; },
     pending: () => live.size,
-    fire() {
-      for (const [k, v] of [...live]) { if (!v.interval) live.delete(k); v.fn(); }
+    fire(ms) {
+      for (const [k, v] of [...live]) {
+        if (ms !== undefined && v.ms !== ms) continue;
+        if (!v.interval) live.delete(k);
+        v.fn();
+      }
     },
     cleared: 0,
     intervalMs,
+    timeoutMs,
   };
   return t;
 }
