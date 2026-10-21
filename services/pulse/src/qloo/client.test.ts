@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PulseConfig } from "../config.js";
 import { getCity } from "../cities.js";
+import { getEvidence } from "../evidence.js";
+import { fakeSql, newDb } from "../testing/fakes.js";
 import { createHarnessQlooClient, createQlooClient, mapHarnessResult } from "./client.js";
+import { RateLimitedError } from "./limiter.js";
 import type { HarnessTransport } from "./harness.js";
 
 const baseConfig: PulseConfig = {
@@ -623,5 +626,118 @@ describe("duplicate venues (L6)", () => {
   it("dedupes before any cap: 20 rows with a duplicate yield 19", async () => {
     const rows = Array.from({ length: 20 }, (_, i) => v(`id${i}`, i === 19 ? "Fixture Cafe 0" : `Fixture Cafe ${i}`, i === 19 ? "0 Road" : `${i} Road`, 0.9 - i * 0.01));
     expect((await placesFor(rows)).data).toHaveLength(19);
+  });
+});
+
+
+describe("every entity-signal call maps a contract rejection to empty (follow-up)", () => {
+  const contract = { status: "error", results: [], summary: "Qloo rejected the request.", error: { code: "QLOO_CONTRACT", layer: "qloo", retryable: false, recovery: "Check the arguments." } };
+  const auth = { status: "error", results: [], error: { code: "QLOO_AUTH", layer: "qloo", retryable: false, recovery: "Set QLOO_API_KEY." } };
+  const rateLimited = { status: "error", results: [], error: { code: "QLOO_RATE_LIMIT", layer: "qloo", retryable: true, recovery: "wait" } };
+  const THIN = "Qloo doesn't have enough taste data on this title yet to suggest this.";
+  const THIN_LOCAL = "Qloo doesn't have enough local taste data on this title yet to map where its fans are.";
+  type Client = ReturnType<typeof createHarnessQlooClient>;
+
+  // Each case scripts the one harness tool the call under test depends on; the
+  // setup replies are what earlier steps of that call need to get that far.
+  const cases: { name: string; call: string; note: string; tool: string; setup?: Record<string, unknown[]>; run: (q: Client) => Promise<{ status: string; data: unknown; note?: string; provenance: { call: string }[] }> }[] = [
+    { name: "heatmap", call: "where_popular", note: THIN_LOCAL, tool: "qloo_where_popular", run: (q) => q.heatmap("ent-1", delhi) },
+    { name: "demographics", call: "audience_demographics", note: THIN, tool: "qloo_audience_demographics", run: (q) => q.demographics("ent-1") },
+    {
+      name: "trends", call: "trends", note: THIN, tool: "qloo_trends",
+      setup: { qloo_describe: [{ status: "ok", result_count: 1, results: [{ entity_id: "ent-1", name: "Fixture Title", type: "urn:entity:movie" }] }] },
+      run: (q) => q.trends("ent-1"),
+    },
+    {
+      name: "placeTags (entity_tags step)", call: "entity_tags", note: THIN, tool: "qloo_entity_tags",
+      setup: { qloo_recommend: [{ status: "ok", result_count: 1, results: [{ entity_id: "v-1", name: "Fixture Cafe 1" }] }] },
+      run: (q) => q.placeTags("ent-1", delhi),
+    },
+    { name: "artists", call: "recommend_artists", note: THIN, tool: "qloo_recommend", run: (q) => q.artists("ent-1") },
+    { name: "brands", call: "recommend_brands", note: THIN, tool: "qloo_recommend", run: (q) => q.brands("ent-1") },
+    { name: "places", call: "recommend_places", note: THIN, tool: "qloo_recommend", run: (q) => q.places("ent-1", delhi, []) },
+  ];
+
+  async function withWarn<T>(fn: (warn: ReturnType<typeof vi.spyOn>) => Promise<T>): Promise<T> {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try { return await fn(warn); } finally { warn.mockRestore(); }
+  }
+
+  it.each(cases)("$name: QLOO_CONTRACT becomes empty with the right note, one warning, no retry", async (c) => {
+    await withWarn(async (warn) => {
+      const { t, calls } = fakeTransport({ ...c.setup, [c.tool]: [contract] });
+      const s = await c.run(createHarnessQlooClient(t, { sleep: noSleep }));
+      expect(calls.filter((x) => x.name === c.tool)).toHaveLength(1);
+      expect(s.status).toBe("empty");
+      expect(s.data).toBeNull();
+      expect(s.note).toBe(c.note);
+      expect(s.provenance.at(-1)?.call).toBe(c.call);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(`qloo contract rejection (${c.call}): QLOO_CONTRACT`);
+    });
+  });
+
+  it.each(cases)("$name: QLOO_AUTH is still an error and does not warn", async (c) => {
+    await withWarn(async (warn) => {
+      const { t } = fakeTransport({ ...c.setup, [c.tool]: [auth] });
+      const s = await c.run(createHarnessQlooClient(t, { sleep: noSleep }));
+      expect(s.status).toBe("error");
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
+  it.each(cases)("$name: a rate limit is still retried, then an error section (never empty)", async (c) => {
+    await withWarn(async (warn) => {
+      const { t, calls } = fakeTransport({ ...c.setup, [c.tool]: [rateLimited] });
+      const s = await c.run(createHarnessQlooClient(t, { sleep: noSleep }));
+      expect(calls.filter((x) => x.name === c.tool)).toHaveLength(3);
+      expect(s.status).toBe("error");
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
+  it("a rate limit on the agent's raw callTool still raises RateLimitedError", async () => {
+    const { t } = fakeTransport({ qloo_where_popular: [rateLimited] });
+    await expect(createHarnessQlooClient(t, { sleep: noSleep }).callTool("qloo_where_popular", {})).rejects.toBeInstanceOf(RateLimitedError);
+  });
+
+  it("demographics keeps its own wording when it is simply empty", async () => {
+    const { t } = fakeTransport({ qloo_audience_demographics: [{ status: "ok", result_count: 0, results: [] }] });
+    const s = await createHarnessQlooClient(t, { sleep: noSleep }).demographics("ent-1");
+    expect(s.note).toBe("Qloo doesn't have an audience profile for this title yet \u2014 common for releases that haven't been out long.");
+  });
+
+  it("a heatmap that is simply empty keeps the harness's own words, not the thin-signal note", async () => {
+    const { t } = fakeTransport({ qloo_where_popular: [{ status: "empty", summary: "No cells.", results: [] }] });
+    const s = await createHarnessQlooClient(t, { sleep: noSleep }).heatmap("ent-1", delhi);
+    expect(s.status).toBe("empty");
+    expect(s.note).toBe("No cells.");
+  });
+
+  it("findTags, entityByImdb and searchTitles are not entity-signal calls: a failure still throws", async () => {
+    await withWarn(async (warn) => {
+      const { t } = fakeTransport({ qloo_find_tags: [contract] });
+      await expect(createHarnessQlooClient(t, { sleep: noSleep }).findTags("cafe", "place")).rejects.toThrow();
+      const failing: HarnessTransport = { ...fakeTransport({}).t, async getJson() { throw new Error("boom"); } };
+      const q = createHarnessQlooClient(failing, { sleep: noSleep });
+      await expect(q.entityByImdb("tt0000001")).rejects.toThrow("boom");
+      await expect(q.searchTitles("x", "movie")).rejects.toThrow("boom");
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
+  it("a thin-signal heatmap is cached as empty: the second request is served from the cache with no Qloo call", async () => {
+    await withWarn(async (warn) => {
+      const { t, calls } = fakeTransport({ qloo_where_popular: [contract] });
+      const q = createHarnessQlooClient(t, { sleep: noSleep });
+      const sql = fakeSql(newDb());
+      const fetchIt = () => q.heatmap("ent-1", delhi);
+      const first = await getEvidence(sql, "heatmap", "ent-1", delhi, fetchIt);
+      const second = await getEvidence(sql, "heatmap", "ent-1", delhi, fetchIt);
+      expect(first.status).toBe("empty");
+      expect(second).toMatchObject({ status: "empty", note: THIN_LOCAL });
+      expect(calls).toHaveLength(1);
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
   });
 });

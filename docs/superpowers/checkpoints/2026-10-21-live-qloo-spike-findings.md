@@ -67,6 +67,18 @@ One run of `spike/spike.ts` (about 70 live calls):
   succeeded (7 tag ids) and the list was no longer dominated by landmarks, but a museum
   still appeared and a banquet hall (dropped on read by the lodging filter).
 
+## Follow-up: thin-signal titles broke the board
+
+A live end-to-end warm of the Delhi board left half of its 20 candidates pending forever
+(and counted as failed). Obscure series and regional films make `qloo_where_popular` answer
+HTTP 400 `QLOO_CONTRACT` (non-retryable), the same thin-signal rejection already mapped
+for artists, brands and places. The heatmap was not covered, so it stayed an uncached
+`error`, the card stayed `pending`, and every poll re-enqueued it. The mapping is now one
+shared path for every call keyed on a title (heatmap, demographics, trends, venue and tag
+steps of place themes, artists, brands, places): `empty`, cached for 3 days, one warning
+line. The board ranks such a title with no local signal. A live check of the heatmap for
+five obscure titles in Delhi: all five now come back `empty` with the thin-signal note.
+
 ## Still unverified / known gaps
 
 - **Trends are empty for every title tried.** The recipe's point shape and field names are

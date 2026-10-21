@@ -5,6 +5,8 @@ import { buildBoard } from "./board.js";
 import type { Resolution } from "./resolve.js";
 import { boardSql, newBoardDb, seedEvidence, type BoardDb } from "./testing/boardFakes.js";
 import { fixtureDeps } from "./testing/fakes.js";
+import { createHarnessQlooClient } from "./qloo/client.js";
+import type { HarnessTransport } from "./qloo/harness.js";
 import { createBackgroundWarmer, createWarmQueue, warmCities, warmCity, warmTitle, type WarmDeps } from "./warm.js";
 
 const delhi = getCity("delhi")!;
@@ -181,6 +183,50 @@ describe("warmCity", () => {
     await expect(warmCity(broken, delhi, "cafe")).rejects.toThrow("db down");
     expect(await warmCities(broken, [delhi])).toEqual({ warmed: 0, failed: 2 }); // once per business type
     expect(s.onError).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("a thin-signal title (Qloo's QLOO_CONTRACT rejection) through the real client", () => {
+  const contract = { status: "error", results: [], error: { code: "QLOO_CONTRACT", layer: "qloo", retryable: false, recovery: "Check the arguments." } };
+
+  it("is warmed, not failed, leaves pending, and is ranked with no local signal", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const sent: string[] = [];
+      const transport: HarnessTransport = {
+        async listTools() { return []; },
+        async callTool(name) { sent.push(name); return contract; },
+        async getJson() { throw new Error("not used"); },
+        async close() {},
+      };
+      const db = newBoardDb({ releases: [rel(1, 9)] });
+      db.entities.push({ tmdb_id: 1, media_type: "movie", qloo_entity_id: "q-thin", method: "imdb", not_found: false, resolved_at: NOW });
+      const deps: WarmDeps = {
+        sql: boardSql(db),
+        qloo: createHarnessQlooClient(transport, { sleep: async () => {} }),
+        resolve: async () => ({ entityId: "q-thin", method: "imdb" as const }),
+        now: () => NOW,
+      };
+      const enqueueWarm = vi.fn();
+      const before = await buildBoard({ sql: deps.sql, enqueueWarm }, delhi, "cafe", NOW);
+      expect(before.pending).toHaveLength(1);
+
+      expect(await warmCity(deps, delhi, "cafe")).toEqual({ warmed: 1, failed: 0 });
+      expect(db.evidence.get("q-thin|delhi|heatmap")?.status).toBe("empty");
+      expect(db.evidence.get("q-thin|delhi|place_tags")?.status).toBe("empty");
+
+      enqueueWarm.mockClear();
+      const callsBefore = sent.length;
+      const after = await buildBoard({ sql: deps.sql, enqueueWarm }, delhi, "cafe", NOW);
+      expect(after.pending).toHaveLength(0);
+      expect(after.ranked).toHaveLength(1);
+      expect(after.ranked[0].why).toContain("no local signal yet");
+      expect(enqueueWarm).not.toHaveBeenCalled(); // not re-enqueued on every poll
+      expect(sent.length).toBe(callsBefore);
+      // A second warm run is all cache hits.
+      expect(await warmCity(deps, delhi, "cafe")).toEqual({ warmed: 1, failed: 0 });
+      expect(sent.length).toBe(callsBefore);
+    } finally { warn.mockRestore(); }
   });
 });
 

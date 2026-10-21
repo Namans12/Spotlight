@@ -34,9 +34,6 @@ export interface QlooClient {
   close?(): Promise<void>;
 }
 
-export const DEMOGRAPHICS_EMPTY_NOTE =
-  "Qloo doesn't have an audience profile for this title yet \u2014 common for releases that haven't been out long.";
-export const THIN_SIGNAL_NOTE = "Qloo doesn't have enough taste data on this title yet to suggest this.";
 export const NO_FOOD_THEMES_NOTE = "No food or drink themes stood out for this audience in this city.";
 
 const STATUSES: readonly EvidenceStatus[] = ["ok", "empty", "needs_input", "partial", "degraded", "error"];
@@ -130,20 +127,23 @@ export function createHarnessQlooClient(transport: HarnessTransport, opts: Harne
       return raw;
     }, { signal: callOpts.signal });
 
-  /** `thinSignal` is for the recommend calls keyed on one title: a contract
-   *  rejection there means "too little taste data on this title", which is an
-   *  answer (empty, so it caches for 3 days) rather than a failure to retry on
-   *  every request. It is still logged, with no params or keys, so a genuine
-   *  recipe bug stays visible in the server log instead of hiding as "empty". */
+  /** Every call keyed on one title goes through here, and a contract
+   *  rejection of it means "too little taste data on this title": an answer
+   *  (empty, so it caches for 3 days and the board stops waiting on it) rather
+   *  than a failure that re-fails on every request. It is still logged, with
+   *  no params or keys, so a genuine recipe bug stays visible in the server log
+   *  instead of hiding as "empty". `thinSignal: false` is for lookups that are
+   *  not entity-signal calls (the type lookup behind trends). */
   async function section<T>(r: recipes.ToolRecipe<T>, opts: { thinSignal?: boolean } = {}): Promise<EvidenceSection<T>> {
     try {
       const raw = await callTool(r.tool, r.args);
-      const rejected = opts.thinSignal ? contractRejection(raw) : null;
+      const rejected = opts.thinSignal === false ? null : contractRejection(raw);
       if (rejected) {
         console.warn(`qloo contract rejection (${r.call}): ${rejected}`);
-        return { status: "empty", data: null, provenance: provenance(r.call, r.params), note: THIN_SIGNAL_NOTE };
+        return { status: "empty", data: null, provenance: provenance(r.call, r.params), note: r.thinSignalNote ?? recipes.THIN_SIGNAL_NOTE };
       }
-      return mapHarnessResult(r.envelope ? r.envelope(raw) : raw, r.call, r.params, r.pick);
+      const mapped = mapHarnessResult(r.envelope ? r.envelope(raw) : raw, r.call, r.params, r.pick);
+      return r.emptyNote && mapped.status === "empty" ? { ...mapped, note: r.emptyNote } : mapped;
     } catch (err) {
       return failed(r.call, r.params, `Qloo call failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -153,7 +153,7 @@ export function createHarnessQlooClient(transport: HarnessTransport, opts: Harne
     const known = typeOf.get(entityId);
     if (known) return known;
     const d = recipes.describeType(entityId);
-    const s = await section(d);
+    const s = await section(d, { thinSignal: false });
     if (s.data) typeOf.set(entityId, s.data);
     return s.data;
   }
@@ -171,16 +171,11 @@ export function createHarnessQlooClient(transport: HarnessTransport, opts: Harne
       const body = await limited(() => transport.getJson(req.path, req.params));
       return remember(recipes.parseEntityRefs(body));
     },
-    async demographics(entityId) {
-      const s = await section(recipes.demographics(entityId));
-      // Live, brand-new releases come back ok with no rows. Say why, rather
-      // than pass on whatever generic summary the harness wrote.
-      return s.status === "empty" ? { ...s, note: DEMOGRAPHICS_EMPTY_NOTE } : s;
-    },
+    demographics: (entityId) => section(recipes.demographics(entityId)),
     heatmap: (entityId, city) => section(recipes.heatmap(entityId, city)),
-    places: (entityId, city, includeTagIds) => section(recipes.places(entityId, city, includeTagIds), { thinSignal: true }),
+    places: (entityId, city, includeTagIds) => section(recipes.places(entityId, city, includeTagIds)),
     async placeTags(entityId, city) {
-      const venues = await section(recipes.venuesToTag(entityId, city), { thinSignal: true });
+      const venues = await section(recipes.venuesToTag(entityId, city));
       if (!venues.data || venues.data.length === 0) {
         return { status: venues.status, data: null, provenance: venues.provenance, ...(venues.note ? { note: venues.note } : {}) };
       }
@@ -195,8 +190,8 @@ export function createHarnessQlooClient(transport: HarnessTransport, opts: Harne
       if (themes.length === 0) return { status: "empty", data: null, provenance: provenanceOf, note: NO_FOOD_THEMES_NOTE };
       return { ...tags, data: themes, provenance: provenanceOf };
     },
-    artists: (entityId) => section(recipes.artists(entityId), { thinSignal: true }),
-    brands: (entityId) => section(recipes.brands(entityId), { thinSignal: true }),
+    artists: (entityId) => section(recipes.artists(entityId)),
+    brands: (entityId) => section(recipes.brands(entityId)),
     async trends(entityId) {
       const type = await titleType(entityId);
       if (!type) return failed("trends", { entity_id: entityId }, "Could not work out whether this title is a movie or a show, which Qloo's trends need.");

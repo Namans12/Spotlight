@@ -77,6 +77,13 @@ const str = (v: unknown): string | null => (typeof v === "string" && v !== "" ? 
 
 // ---- harness tool recipes ------------------------------------------------
 
+export const THIN_SIGNAL_NOTE = "Qloo doesn't have enough taste data on this title yet to suggest this.";
+export const HEATMAP_THIN_SIGNAL_NOTE = "Qloo doesn't have enough local taste data on this title yet to map where its fans are.";
+
+/** Brand-new releases come back ok with no rows; say why. */
+export const DEMOGRAPHICS_EMPTY_NOTE =
+  "Qloo doesn't have an audience profile for this title yet \u2014 common for releases that haven't been out long.";
+
 export interface ToolRecipe<T> {
   /** Provenance name; also selects the limits text. */
   call: string;
@@ -85,6 +92,11 @@ export interface ToolRecipe<T> {
   /** Shown to the user as provenance; no names, emails or personal ids. */
   params: Record<string, string>;
   pick: (results: unknown[]) => T;
+  /** What a QLOO_CONTRACT rejection of this call means to a reader; the client
+   *  falls back to THIN_SIGNAL_NOTE. */
+  thinSignalNote?: string;
+  /** Replaces the harness's own words when the call is simply empty. */
+  emptyNote?: string;
   /** For tools whose rows are not under `results` (trends puts them in `series`). */
   envelope?: (raw: unknown) => unknown;
 }
@@ -99,6 +111,7 @@ export function demographics(entityId: string): ToolRecipe<DemographicsData> {
     // title's type need not be known here.
     args: { entity: entityId },
     params: { entity_id: entityId },
+    emptyNote: DEMOGRAPHICS_EMPTY_NOTE,
     pick(results) {
       for (const item of results) {
         const q = rec(rec(item).query);
@@ -123,6 +136,7 @@ export function heatmap(entityId: string, city: City): ToolRecipe<Omit<HeatCell,
     // The harness keeps 20 cells at most, whatever `limit` says.
     args: { entity: entityId, within: city.qlooLocationQuery, limit: 20 },
     params: { entity_id: entityId, within: city.qlooLocationQuery },
+    thinSignalNote: HEATMAP_THIN_SIGNAL_NOTE,
     pick(results) {
       const cells = results.flatMap((point) => {
         const p = rec(point);
