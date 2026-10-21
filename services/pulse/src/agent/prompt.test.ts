@@ -30,4 +30,13 @@ describe("systemPrompt", () => {
     expect(text).toMatch(/recommendation first/i);
     expect(text).toMatch(/never claim .*verified/i);
   });
+  it("is short: at most 1,700 characters (about 450 tokens), because it is sent on every model round on the free tier", () => {
+    expect(text.length).toBeLessThanOrEqual(1700);
+  });
+  it("keeps the gap rule, the no-invention rule and the cached-data caveat after shortening", () => {
+    expect(text).toMatch(/never invent a title, number, venue or date/i);
+    expect(text).toMatch(/cached data can be days old/i);
+    expect(text).toMatch(/ask for a city or business type/i);
+    expect(text).toMatch(/pending = still loading/i);
+  });
 });
