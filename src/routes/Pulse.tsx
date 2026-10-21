@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { Activity, AlertCircle, Clapperboard, Loader2, RefreshCw, WifiOff } from 'lucide-react';
+import { Activity, AlertCircle, Clapperboard, RefreshCw, WifiOff } from 'lucide-react';
 import type { BoardCard, BusinessType } from '../../shared/types/pulse';
 import { CityTypePicker } from '@/components/pulse/CityTypePicker';
 import { PendingBoardCard, RankedBoardCard } from '@/components/pulse/BoardCard';
 import { UnresolvedStrip } from '@/components/pulse/UnresolvedStrip';
+import { Notice, RetryButton } from '@/components/pulse/Notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { shouldRetry } from '@/lib/http';
 import { PulseApiError, fetchBoard, pulseConfigured, readProfile, saveProfile } from '@/lib/pulseApi';
@@ -47,30 +48,6 @@ function BoardSkeleton() {
         </div>
       ))}
     </div>
-  );
-}
-
-function Notice({ icon, title, children }: { icon: React.ReactNode; title: string; children?: React.ReactNode }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
-      <span className="opacity-40">{icon}</span>
-      <p className="text-sm font-medium text-foreground">{title}</p>
-      {children}
-    </div>
-  );
-}
-
-function RetryButton({ onClick, busy }: { onClick: () => void; busy?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={busy}
-      className="mt-1 inline-flex h-control items-center gap-1.5 rounded-lg bg-secondary px-3 text-xs font-semibold text-foreground hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-    >
-      {busy ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-      Try again
-    </button>
   );
 }
 

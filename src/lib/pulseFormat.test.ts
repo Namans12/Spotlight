@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatReleaseDate, splitWhy } from './pulseFormat';
+import { formatReleaseDate, formatReleaseDateFull, splitWhy } from './pulseFormat';
 
 describe('splitWhy', () => {
   it('splits the rank sentence from its reasons', () => {
@@ -26,5 +26,15 @@ describe('formatReleaseDate', () => {
 
   it('returns an unparseable value as-is', () => {
     expect(formatReleaseDate('soon')).toBe('soon');
+  });
+});
+
+describe('formatReleaseDateFull', () => {
+  it('reads the calendar day, with the year, whatever the timezone', () => {
+    expect(formatReleaseDateFull('2026-10-24')).toBe('24 Oct 2026');
+    expect(formatReleaseDateFull('2026-10-24T18:30:00Z')).toBe('24 Oct 2026');
+  });
+  it('hands back what it cannot read', () => {
+    expect(formatReleaseDateFull('soon')).toBe('soon');
   });
 });
