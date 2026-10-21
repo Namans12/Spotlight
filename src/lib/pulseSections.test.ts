@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BriefHeader, BriefSectionKey, EvidenceSection } from '../../shared/types/pulse';
-import { BRIEF_SECTIONS, initialBriefState, briefReducer, sectionView } from './pulseSections';
+import { BRIEF_SECTIONS, initialBriefState, briefReducer, isGroundedCampaign, sectionView } from './pulseSections';
 
 const header: BriefHeader = { tmdbId: 1, mediaType: 'movie', title: 'Saffron Nights', posterUrl: null, releaseDate: '2026-10-24', city: 'delhi', cityName: 'Delhi', businessType: 'cafe', qlooEntityId: 'e1' };
 const sec = (note = 'x'): EvidenceSection<unknown> => ({ status: 'ok', data: [note], provenance: [] });
@@ -63,5 +63,22 @@ describe('briefReducer', () => {
     let s = briefReducer(initialBriefState, { type: 'event', event: { type: 'done' } });
     s = briefReducer(s, { type: 'ended' });
     expect(s.interrupted).toBe(false);
+  });
+});
+
+describe('isGroundedCampaign', () => {
+  const campaign = (data: unknown, status: EvidenceSection<unknown>['status'] = 'ok'): EvidenceSection<unknown> => ({ status, data, provenance: [] });
+  const idea = (title: string) => ({ kind: 'special', title, timing: '', clauses: [] });
+
+  it('is true only for an ok, qloo-grounded, real draft', () => {
+    expect(isGroundedCampaign(campaign({ groundedBy: 'qloo', ideas: [idea('a'), idea('b'), idea('c')] }))).toBe(true);
+  });
+  it('is false for the fallback placeholder, an ungrounded draft, a non-ok status or nothing', () => {
+    expect(isGroundedCampaign(campaign({ groundedBy: 'qloo', ideas: [idea('Campaign draft unavailable')] }))).toBe(false);
+    expect(isGroundedCampaign(campaign({ groundedBy: 'none', ideas: [idea('a')] }))).toBe(false);
+    expect(isGroundedCampaign(campaign({ groundedBy: 'qloo', ideas: [idea('a')] }, 'degraded'))).toBe(false);
+    expect(isGroundedCampaign(campaign(null, 'empty'))).toBe(false);
+    expect(isGroundedCampaign(campaign({ groundedBy: 'qloo', ideas: [] }))).toBe(false);
+    expect(isGroundedCampaign(undefined)).toBe(false);
   });
 });

@@ -15,6 +15,11 @@ interface BriefSectionProps {
   errorText?: string;
   /** Rendered for a section that has data. */
   children: (data: unknown, section: EvidenceSection<unknown>) => React.ReactNode;
+  /** The stream will send nothing more (it dropped or failed): a section still
+   *  waiting says so, statically, instead of shimmering for ever. */
+  stalled?: boolean;
+  /** Replaces the status-driven body, keeping the frame and heading. */
+  body?: React.ReactNode;
   /** Height of the skeleton, so a section does not jump when it arrives. */
   skeletonClass?: string;
 }
@@ -26,10 +31,25 @@ const MUTED = 'text-sm text-muted-foreground';
  * "No data returned" if the stream finished without it, the note for an empty
  * or degraded one, a Retry for one that errored.
  */
-export function BriefSection({ title, lede, view, onRetry, errorText = 'Qloo didn’t answer this part', children, skeletonClass }: BriefSectionProps) {
+export function BriefSection({ title, lede, view, onRetry, errorText = 'Qloo didn’t answer this part', children, skeletonClass, stalled, body: bodyOverride }: BriefSectionProps) {
   let body: React.ReactNode;
 
-  if (view.kind === 'loading') {
+  if (bodyOverride) {
+    body = bodyOverride;
+  } else if (view.kind === 'loading' && stalled) {
+    body = (
+      <p className="text-sm text-foreground">
+        Didn’t load —{' '}
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded font-semibold text-accent underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Try again
+        </button>
+      </p>
+    );
+  } else if (view.kind === 'loading') {
     body = (
       <div role="status" aria-busy="true">
         <span className="sr-only">Loading {title.toLowerCase()}…</span>
@@ -83,11 +103,11 @@ export function BriefSection({ title, lede, view, onRetry, errorText = 'Qloo did
   const stale = view.kind === 'section' && view.stale;
   return (
     <section
-      aria-busy={stale || view.kind === 'loading' ? true : undefined}
+      aria-busy={stale || (view.kind === 'loading' && !stalled) ? true : undefined}
       className={cn('space-y-2.5 rounded-xl border border-border bg-card/40 p-4 transition-opacity', stale && 'opacity-60')}
     >
       <header>
-        <h3 className="font-display text-base font-semibold text-foreground">{title}</h3>
+        <h2 className="font-display text-base font-semibold text-foreground">{title}</h2>
       </header>
       {body}
     </section>

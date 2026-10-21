@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useId, useMemo, useReducer, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Activity, AlertCircle, ArrowLeft, Clapperboard, ImageOff, WifiOff } from 'lucide-react';
 import type { BriefHeader, BriefSectionKey, BusinessType, Campaign, DemographicsData, HeatCell } from '../../shared/types/pulse';
@@ -6,12 +6,13 @@ import { AgeBars } from '@/components/pulse/AgeBars';
 import { BriefSection } from '@/components/pulse/BriefSection';
 import { CampaignView } from '@/components/pulse/CampaignView';
 import { CityTypePicker } from '@/components/pulse/CityTypePicker';
-import { GuessPanel } from '@/components/pulse/GuessPanel';
+import { CampaignCompare, CompareToggle } from '@/components/pulse/CampaignCompare';
 import { Notice, RetryButton } from '@/components/pulse/Notice';
 import { ProvenanceDrawer } from '@/components/pulse/ProvenanceDrawer';
 import { HookList, NameChips, TrendLine, VenueList } from '@/components/pulse/SectionBodies';
 import { WhereSection } from '@/components/pulse/WhereSection';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePulseGuess } from '@/hooks/usePulseGuess';
 import { HttpError } from '@/lib/http';
 import { PulseApiError, pulseConfigured, readProfile, saveProfile, streamBrief, type TitleParams } from '@/lib/pulseApi';
 import { businessTypeLabel, getPulseCity } from '@/lib/pulseCities';
@@ -19,6 +20,7 @@ import { SECTION_TITLES } from '@/lib/pulseCopy';
 import { formatReleaseDateFull } from '@/lib/pulseFormat';
 import { BRIEF_SECTIONS, briefReducer, initialBriefState, sectionView } from '@/lib/pulseSections';
 import { tmdbPoster } from '@/lib/tmdbImage';
+import { cn } from '@/lib/utils';
 
 const boardHref = (city: string | null, type: BusinessType | null) => {
   const q = new URLSearchParams();
@@ -32,7 +34,7 @@ function BackLink({ href }: { href: string }) {
   return (
     <Link
       to={href}
-      className="inline-flex items-center gap-1.5 rounded text-xs font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="inline-flex min-h-11 items-center gap-1.5 rounded pr-2 text-xs font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <ArrowLeft size={13} aria-hidden />
       Back to board
@@ -99,7 +101,7 @@ function BriefPicker({ city, type, notice }: { city: string | null; type: Busine
 // The brief
 // ---------------------------------------------------------------------------
 
-function HeaderBlock({ header, cityName, type }: { header: BriefHeader | null; cityName: string; type: BusinessType }) {
+function HeaderBlock({ header, cityName, type, stalled }: { header: BriefHeader | null; cityName: string; type: BusinessType; stalled: boolean }) {
   const poster = header ? tmdbPoster(header.posterUrl, 96) : undefined;
   const meta = [
     header?.mediaType === 'tv' ? 'TV' : header ? 'Film' : null,
@@ -112,7 +114,7 @@ function HeaderBlock({ header, cityName, type }: { header: BriefHeader | null; c
     <div className="flex items-start gap-4">
       <div className="h-[8.5rem] w-24 shrink-0 overflow-hidden rounded-lg bg-secondary">
         {!header ? (
-          <Skeleton className="h-full w-full rounded-lg" />
+          <Skeleton className={cn('h-full w-full rounded-lg', stalled && 'animate-none')} />
         ) : poster ? (
           <img src={poster.src} srcSet={poster.srcSet} alt="" decoding="async" className="h-full w-full object-cover" />
         ) : (
@@ -124,6 +126,8 @@ function HeaderBlock({ header, cityName, type }: { header: BriefHeader | null; c
       <div className="min-w-0 flex-1 space-y-2 pt-1">
         {header ? (
           <h1 className="break-words font-display text-xl font-semibold leading-tight text-foreground sm:text-2xl">{header.title}</h1>
+        ) : stalled ? (
+          <p className="text-sm text-muted-foreground">The title didn’t load.</p>
         ) : (
           <Skeleton className="h-7 w-3/4" />
         )}
@@ -139,6 +143,10 @@ function BriefStream({ city, type, mediaType, tmdbId }: TitleParams) {
   const [state, dispatch] = useReducer(briefReducer, initialBriefState);
   const [fatal, setFatal] = useState<unknown>(null);
   const [attempt, setAttempt] = useState(0);
+  // Lifted here (not in the compare panel) so the guess survives hiding the panel.
+  const [compareOpen, setCompareOpen] = useState(false);
+  const guess = usePulseGuess(params);
+  const compareRegion = useId();
 
   // One effect owns the stream. Its cleanup aborts it: on leaving the page, on
   // a Retry (which starts over) and on a change of title.
@@ -164,6 +172,11 @@ function BriefStream({ city, type, mediaType, tmdbId }: TitleParams) {
   }, [params, attempt]);
 
   const retry = () => setAttempt((n) => n + 1);
+  const toggleCompare = () => {
+    if (compareOpen) return setCompareOpen(false);
+    setCompareOpen(true);
+    if (guess.state.status === 'idle' || guess.state.status === 'error') guess.load();
+  };
   const failure = fatal ? classify(fatal) : null;
   const back = boardHref(city, type);
 
@@ -199,12 +212,14 @@ function BriefStream({ city, type, mediaType, tmdbId }: TitleParams) {
   const cityName = header?.cityName ?? cityInfo.name;
   const order = BRIEF_SECTIONS[type];
   const streaming = !state.done && !state.interrupted && !failure;
+  // Nothing more is coming: a section still waiting should say so, not shimmer.
+  const stalled = state.interrupted || failure !== null;
   const refreshing = streaming && Object.keys(state.stale).length > 0;
   const currency = cityInfo.country === 'IN' ? '₹' : '$';
 
   const render = (key: BriefSectionKey) => {
     const view = sectionView(state, key);
-    const common = { title: SECTION_TITLES[key], view, onRetry: retry };
+    const common = { title: SECTION_TITLES[key], view, onRetry: retry, stalled };
 
     switch (key) {
       case 'who':
@@ -264,7 +279,16 @@ function BriefStream({ city, type, mediaType, tmdbId }: TitleParams) {
       case 'campaign': {
         const bundle = sections;
         return (
-          <BriefSection {...common} errorText="The campaign writer didn’t answer" skeletonClass="h-64">
+          <BriefSection
+            {...common}
+            errorText="The campaign writer didn’t answer"
+            skeletonClass="h-64"
+            body={
+              compareOpen && !(view.kind === 'loading' && stalled) ? (
+                <CampaignCompare view={view} guess={guess.state} onRetryGuess={guess.load} bundle={bundle} cityName={cityName} />
+              ) : undefined
+            }
+          >
             {(data, section) => {
               const c = data as Campaign;
               if (!Array.isArray(c.ideas) || c.ideas.length === 0) return <p className="text-sm text-muted-foreground">No data returned</p>;
@@ -290,7 +314,7 @@ function BriefStream({ city, type, mediaType, tmdbId }: TitleParams) {
         {hasContent && <ProvenanceDrawer order={order} sections={sections} />}
       </div>
 
-      <HeaderBlock header={header} cityName={cityName} type={type} />
+      <HeaderBlock header={header} cityName={cityName} type={type} stalled={stalled} />
 
       {refreshing && (
         <p role="status" className="text-xs text-muted-foreground">
@@ -310,7 +334,7 @@ function BriefStream({ city, type, mediaType, tmdbId }: TitleParams) {
           <button
             type="button"
             onClick={retry}
-            className="rounded text-xs font-semibold text-accent underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex min-h-11 items-center rounded px-1 text-xs font-semibold text-accent underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Try again
           </button>
@@ -323,10 +347,11 @@ function BriefStream({ city, type, mediaType, tmdbId }: TitleParams) {
           if (!node) return null;
           return (
             <div key={key}>
-              {node}
+              {/* The compare panel, when open, takes the campaign's place inside this region. */}
+              <div id={key === 'campaign' ? compareRegion : undefined}>{node}</div>
               {key === 'campaign' && header && (
                 <div className="mt-3">
-                  <GuessPanel params={params} campaign={sections.campaign} bundle={sections} cityName={cityName} />
+                  <CompareToggle open={compareOpen} onToggle={toggleCompare} controls={compareRegion} />
                 </div>
               )}
             </div>

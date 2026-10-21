@@ -95,7 +95,7 @@ function renderBrief(url = '/pulse/delhi/movie/999700001?type=cafe') {
   );
 }
 
-const sectionTitles = () => screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+const sectionTitles = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -152,7 +152,7 @@ describe('Pulse brief: streaming', () => {
     await s.emit(header$(header({ businessType: 'd2c_food' })), section('brands', ok([{ entityId: 'b1', name: 'Blue Tokai', affinity: 0.4 }])));
     expect(sectionTitles()).toEqual(['Who', 'Where', 'Themes', 'Brands', 'Artists', 'Local hook', 'Campaign ideas']);
     expect(screen.getByText('Blue Tokai')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { level: 3, name: 'Venues' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Venues' })).not.toBeInTheDocument();
   });
 
   it('turns a section the stream never sent into "No data returned" once done arrives', async () => {
@@ -170,7 +170,7 @@ describe('Pulse brief: streaming', () => {
     renderBrief();
     const points = [{ date: '2026-01-05', percentile: 0.4 }, { date: '2026-01-12', percentile: 0.6 }];
     await s.emit(header$(), section('trend', ok(points)));
-    expect(screen.getByRole('heading', { level: 3, name: 'Trend' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Trend' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /Popularity percentile from 0.40 on 2026-01-05 to 0.60 on 2026-01-12/ })).toBeInTheDocument();
   });
 
@@ -178,7 +178,7 @@ describe('Pulse brief: streaming', () => {
     const s = controlledStream();
     renderBrief();
     await s.emit(header$(), section('trend', withStatus(status, 'a note')), done);
-    expect(screen.queryByRole('heading', { level: 3, name: 'Trend' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Trend' })).not.toBeInTheDocument();
     expect(screen.queryByText('a note')).not.toBeInTheDocument();
   });
 
@@ -265,6 +265,30 @@ describe('Pulse brief: hook', () => {
   });
 });
 
+describe('Pulse brief: touch targets', () => {
+  it('gives the page-level controls a 44 px (min-h-11) hit area', async () => {
+    const s = controlledStream();
+    renderBrief();
+    await s.emit(header$(), section('who', who), section('campaign', ok(campaign)), done);
+    await s.end();
+    for (const el of [
+      screen.getByRole('link', { name: /Back to board/ }),
+      screen.getByRole('button', { name: 'How this was made' }),
+      screen.getByRole('button', { name: 'Compare without Qloo' }),
+    ]) {
+      expect(el).toHaveClass('min-h-11');
+    }
+  });
+
+  it('and so does the banner Try again', async () => {
+    const s = controlledStream();
+    renderBrief();
+    await s.emit(header$());
+    await s.end();
+    expect(screen.getAllByRole('button', { name: 'Try again' })[0]).toHaveClass('min-h-11');
+  });
+});
+
 describe('Pulse brief: section statuses', () => {
   it('an empty section shows its note; a degraded one shows its note above the data', async () => {
     const s = controlledStream();
@@ -319,7 +343,42 @@ describe('Pulse brief: section statuses', () => {
     await s.end();
     expect(screen.getByRole('alert')).toHaveTextContent('The connection dropped before the brief finished.');
     expect(screen.getByText('Skew relative to average — not a share of people')).toBeInTheDocument();
+  });
+
+  it('once the stream has ended without done, waiting sections stop shimmering and offer the same whole-brief retry', async () => {
+    const user = userEvent.setup();
+    const s = controlledStream();
+    renderBrief();
+    await s.emit(header$(), section('who', who));
     expect(screen.getByText('Loading venues…')).toBeInTheDocument();
+    await s.end();
+
+    expect(screen.queryByText('Loading venues…')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+    // venues, themes, artists, hook, campaign (and where) never came; trend is simply absent.
+    expect(screen.getAllByText(/Didn’t load —/)).toHaveLength(6);
+
+    const before = vi.mocked(streamBrief).mock.calls.length;
+    await user.click(screen.getAllByRole('button', { name: 'Try again' }).at(-1)!);
+    expect(streamBrief).toHaveBeenCalledTimes(before + 1);
+  });
+
+  it('after a failure with sections on screen, waiting sections say they did not load too', async () => {
+    const s = controlledStream();
+    renderBrief();
+    await s.emit(header$(), section('who', who));
+    await s.fail(new TypeError('network'));
+    expect(screen.queryByText('Loading venues…')).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Didn’t load —/).length).toBeGreaterThan(0);
+  });
+
+  it('a stream that ends having sent nothing at all does not leave a shimmering header', async () => {
+    const s = controlledStream();
+    renderBrief();
+    await s.end();
+    expect(screen.getByText('The title didn’t load.')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });
 
@@ -483,7 +542,7 @@ describe('Pulse brief: without Qloo', () => {
     vi.mocked(fetchGuess).mockRejectedValue(error);
     await ready();
     await user.click(screen.getByRole('button', { name: 'Compare without Qloo' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(await screen.findByText(message)).toBeInTheDocument();
   });
 
   it('offers Try again after a failure, and that retries the guess', async () => {
@@ -491,10 +550,82 @@ describe('Pulse brief: without Qloo', () => {
     vi.mocked(fetchGuess).mockRejectedValueOnce(new PulseApiError(503, 'unavailable')).mockResolvedValueOnce(guess);
     await ready();
     await user.click(screen.getByRole('button', { name: 'Compare without Qloo' }));
-    await screen.findByRole('alert');
+    await screen.findByText(/Couldn’t get the comparison/);
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('Guessed special')).toBeInTheDocument();
     expect(fetchGuess).toHaveBeenCalledTimes(2);
+  });
+
+  it('while the comparison is open the grounded campaign is on the page once, in place of the original; closing restores it', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchGuess).mockResolvedValue(guess);
+    await ready();
+    expect(screen.getAllByText('Serve a saffron latte')).toHaveLength(1);
+
+    const toggle = screen.getByRole('button', { name: 'Compare without Qloo' });
+    await user.click(toggle);
+    await screen.findByText('Guessed special');
+    expect(screen.getAllByText('Serve a saffron latte')).toHaveLength(1);
+    expect(screen.getAllByText('Campaign ideas')).toHaveLength(1);
+
+    // The toggle controls the region the comparison lives in.
+    const region = document.getElementById(toggle.getAttribute('aria-controls')!) as HTMLElement;
+    expect(region).toContainElement(screen.getByText('What an LLM guesses with no taste data'));
+    expect(region).toContainElement(screen.getByText('Serve a saffron latte'));
+
+    await user.click(screen.getByRole('button', { name: 'Hide comparison' }));
+    expect(screen.queryByText('Guessed special')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Serve a saffron latte')).toHaveLength(1);
+    expect(region).toContainElement(screen.getByText('Serve a saffron latte'));
+  });
+
+  it('labels the left column "Grounded in Qloo taste data" only for a real, ok, qloo-grounded draft', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchGuess).mockResolvedValue(guess);
+    await ready();
+    await user.click(screen.getByRole('button', { name: 'Compare without Qloo' }));
+    expect(await screen.findByRole('heading', { name: 'Grounded in Qloo taste data' })).toBeInTheDocument();
+    expect(screen.queryByText('Qloo-grounded draft')).not.toBeInTheDocument();
+  });
+
+  it('a degraded campaign gets a neutral heading and its note, not the grounded claim', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchGuess).mockResolvedValue(guess);
+    const s = controlledStream();
+    renderBrief();
+    await s.emit(header$(), section('campaign', withStatus('degraded', 'The campaign writer isn’t configured on this deployment.')), done);
+    await s.end();
+    await user.click(screen.getByRole('button', { name: 'Compare without Qloo' }));
+    expect(await screen.findByRole('heading', { name: 'Qloo-grounded draft' })).toBeInTheDocument();
+    expect(screen.queryByText('Grounded in Qloo taste data')).not.toBeInTheDocument();
+    expect(screen.getAllByText('The campaign writer isn’t configured on this deployment.')).toHaveLength(1);
+  });
+
+  it('the placeholder "draft unavailable" campaign and an ungrounded draft are not called grounded either', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchGuess).mockResolvedValue(guess);
+    const placeholder: Campaign = { groundedBy: 'qloo', ideas: [{ kind: 'special', title: 'Campaign draft unavailable', timing: '', clauses: [{ text: 'The writer didn’t return a usable draft.', evidence: [] }] }] };
+    const s = controlledStream();
+    renderBrief();
+    await s.emit(header$(), section('campaign', ok(placeholder)), done);
+    await s.end();
+    await user.click(screen.getByRole('button', { name: 'Compare without Qloo' }));
+    expect(await screen.findByRole('heading', { name: 'Qloo-grounded draft' })).toBeInTheDocument();
+    expect(screen.queryByText('Grounded in Qloo taste data')).not.toBeInTheDocument();
+  });
+
+  it('announces the guess in a polite live region that is on the page before the result arrives', async () => {
+    const user = userEvent.setup();
+    let resolve: (c: Campaign) => void = () => {};
+    vi.mocked(fetchGuess).mockReturnValue(new Promise((r) => (resolve = r)));
+    await ready();
+    await user.click(screen.getByRole('button', { name: 'Compare without Qloo' }));
+    const live = screen.getByText('What an LLM guesses with no taste data').parentElement!.querySelector('[aria-live="polite"]') as HTMLElement;
+    expect(live).toBeInTheDocument();
+    expect(live).toHaveTextContent('Asking the AI writer…');
+    await act(async () => resolve(guess));
+    expect(live).toHaveTextContent('Comparison ready');
+    expect(live).toHaveTextContent('Guessed special');
   });
 
   it('abandons an in-flight guess when the page goes away', async () => {

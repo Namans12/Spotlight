@@ -29,7 +29,7 @@ export function ProvenanceDrawer({ order, sections }: ProvenanceDrawerProps) {
       <SheetTrigger asChild>
         <button
           type="button"
-          className="inline-flex h-control items-center gap-1.5 rounded-lg bg-secondary px-3 text-xs font-semibold text-foreground hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex h-control min-h-11 items-center gap-1.5 rounded-lg bg-secondary px-3 text-xs font-semibold text-foreground hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Info size={13} aria-hidden />
           How this was made

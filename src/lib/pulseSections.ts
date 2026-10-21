@@ -70,3 +70,19 @@ export function sectionView(state: BriefState, key: BriefSectionKey): SectionVie
   if (section) return { kind: 'section', section, stale: state.stale[key] === true };
   return state.done ? { kind: 'missing' } : { kind: 'loading' };
 }
+
+/** The title of the service's placeholder idea (FALLBACK_IDEA in
+ *  services/pulse/src/campaign.ts), sent when no attempt produced a usable draft. */
+const FALLBACK_TITLE = 'Campaign draft unavailable';
+
+/**
+ * Whether the campaign section may be called grounded in Qloo taste data: it
+ * came back ok, says it was grounded, and is a real draft rather than the
+ * placeholder. Anything else gets a neutral heading.
+ */
+export function isGroundedCampaign(section: EvidenceSection<unknown> | undefined): boolean {
+  if (!section || section.status !== 'ok') return false;
+  const c = section.data as { groundedBy?: unknown; ideas?: { title?: unknown }[] } | null;
+  if (!c || c.groundedBy !== 'qloo' || !Array.isArray(c.ideas) || c.ideas.length === 0) return false;
+  return !(c.ideas.length === 1 && c.ideas[0]?.title === FALLBACK_TITLE);
+}

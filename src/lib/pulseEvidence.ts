@@ -8,7 +8,8 @@
  *
  * The SPA has the same sections, so every id can be mapped to its label and,
  * when the section is on hand, to the underlying fact. A clause that cites
- * nothing is the model's own idea and says so.
+ * nothing is the model's own idea and says so; so is a `hook:` id the hook
+ * section cannot confirm.
  */
 import type {
   AgeBucket, BriefSectionKey, EvidenceSection, HeatCell, LocalHook, NamedEntity, TagAffinity, Venue,
@@ -121,12 +122,15 @@ export function chipsForId(id: string, bundle: SectionBundle, cityName: string):
   }
 
   if (prefix === 'hook') {
-    const kind = rest === 'set' ? 'set' : 'filmed';
-    const hook = arrayOf<LocalHook>(bundle.hook).find((h) => h.kind === kind);
-    // No hook on hand: say what the service would have said by default, a
-    // Wikipedia category, rather than claim a Wikidata record that may not exist.
+    // The kind must be one the service writes, and the hook section must hold a
+    // record of it: the source of that record decides the label. Anything else
+    // cannot be checked, so it is not dressed up as Wikipedia or Wikidata
+    // evidence; an unknown kind draws nothing (like an unknown prefix).
+    if (rest !== 'filmed' && rest !== 'set') return [];
+    const hook = arrayOf<LocalHook>(bundle.hook).find((h) => h.kind === rest);
+    if (!hook) return [{ label: AGENT_SUGGESTION, detail: null }];
     const detail = hookDetail(hook, cityName);
-    return hookChips({ kind, source: hook?.source ?? 'wikipedia' }, cityName).map((label) => ({ label, detail }));
+    return hookChips({ kind: rest, source: hook.source }, cityName).map((label) => ({ label, detail }));
   }
 
   const simple = SIMPLE[prefix];

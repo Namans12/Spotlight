@@ -17,7 +17,7 @@ export function RetryButton({ onClick, busy }: { onClick: () => void; busy?: boo
       type="button"
       onClick={onClick}
       disabled={busy}
-      className="mt-1 inline-flex h-control items-center gap-1.5 rounded-lg bg-secondary px-3 text-xs font-semibold text-foreground hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+      className="mt-1 inline-flex h-control min-h-11 items-center gap-1.5 rounded-lg bg-secondary px-3 text-xs font-semibold text-foreground hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
     >
       {busy ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
       Try again

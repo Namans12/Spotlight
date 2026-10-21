@@ -116,8 +116,15 @@ describe('hook chips by source', () => {
     };
     expect(labels('hook:set', b)).toEqual(['Wikipedia · Films set in Delhi']);
   });
-  it('an unresolvable hook id falls back to the Wikipedia label for its kind', () => {
-    expect(labels('hook:filmed', {})).toEqual(['Wikipedia · Films shot in Delhi']);
+  it('a hook id the hook section cannot confirm is an Agent suggestion, not a Wikipedia or Wikidata chip', () => {
+    expect(labels('hook:filmed', {})).toEqual(['Agent suggestion']); // section missing
+    expect(labels('hook:set', hook('filmed', 'both'))).toEqual(['Agent suggestion']); // no row of that kind
+    expect(labels('hook:filmed', { hook: { status: 'empty', data: null, provenance: [] } })).toEqual(['Agent suggestion']);
+  });
+  it('an unknown hook kind is not treated as filmed: it draws no chip of its own', () => {
+    expect(labels('hook:wrote', hook('filmed', 'both'))).toEqual([]);
+    expect(labels('hook:', hook('filmed', 'both'))).toEqual([]);
+    expect(chipsForEvidence(['hook:wrote'], hook('filmed', 'both'), 'Delhi').map((c) => c.label)).toEqual(['Agent suggestion']);
   });
   it('hookChips works straight from a LocalHook', () => {
     expect(hookChips({ kind: 'set', source: 'both' }, 'Delhi')).toEqual([

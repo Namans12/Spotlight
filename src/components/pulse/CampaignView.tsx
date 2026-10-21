@@ -13,6 +13,8 @@ interface CampaignViewProps {
   /** The brief's sections, so evidence ids can be resolved to what they cite. */
   bundle?: SectionBundle;
   cityName?: string;
+  /** Level of each idea's title: h3 under a section's h2, h4 when a column heading sits between. */
+  ideaHeading?: 'h3' | 'h4';
 }
 
 /**
@@ -21,14 +23,14 @@ interface CampaignViewProps {
  * model's own. The chips are the point of the view; a clause with none would
  * read as evidence-backed when it is not.
  */
-export function CampaignView({ campaign, bundle = {}, cityName }: CampaignViewProps) {
+export function CampaignView({ campaign, bundle = {}, cityName, ideaHeading: Heading = 'h3' }: CampaignViewProps) {
   return (
     <div className="space-y-3">
       {(campaign.ideas ?? []).map((idea, i) => (
         <article key={`${idea.kind}-${i}`} className="space-y-2 rounded-xl border border-border bg-card p-3.5">
           <header className="space-y-0.5">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{KIND_LABEL[idea.kind] ?? idea.kind}</p>
-            <h4 className="text-sm font-semibold leading-snug text-foreground">{idea.title}</h4>
+            <Heading className="text-sm font-semibold leading-snug text-foreground">{idea.title}</Heading>
             <p className="text-xs text-muted-foreground">{idea.timing}</p>
           </header>
           <ul className="space-y-2">

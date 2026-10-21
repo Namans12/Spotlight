@@ -3,7 +3,7 @@
  * is only ever reached through React.lazy (see WhereSection), so Leaflet's JS
  * and this CSS import travel in their own chunk instead of the entry bundle.
  */
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import L from 'leaflet';
 import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -13,6 +13,10 @@ import { heatRadii } from '@/lib/pulseCharts';
 /** Same height as the Suspense fallback, so the page does not shift when the map arrives. */
 const HEAT_MAP_HEIGHT = 'h-72 sm:h-80';
 
+/** Fits the view to the cells, and only when the cells themselves change: the
+ *  page re-renders on every streamed section, and a fit on each of those would
+ *  throw away wherever the reader had panned or zoomed to. The caller passes a
+ *  memoised array, so its identity changes only with the data. */
 function FitToCells({ cells }: { cells: HeatCell[] }) {
   const map = useMap();
   useEffect(() => {
@@ -34,8 +38,11 @@ interface HeatMapProps {
 }
 
 export default function HeatMap({ cells, title, cityName }: HeatMapProps) {
-  const drawn = cells.filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lon));
-  const radii = heatRadii(drawn.map((c) => c.affinity));
+  // Keyed on the `cells` prop, which the page keeps reference-stable until the
+  // section is replaced, so neither the fit nor the circles redo on an
+  // unrelated re-render.
+  const drawn = useMemo(() => cells.filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lon)), [cells]);
+  const radii = useMemo(() => heatRadii(drawn.map((c) => c.affinity)), [drawn]);
 
   if (drawn.length === 0) {
     return (
@@ -46,10 +53,13 @@ export default function HeatMap({ cells, title, cityName }: HeatMapProps) {
   }
 
   return (
-    // The map has no accessible structure of its own; the neighbourhood list
-    // beside it (WhereSection) carries the information in text.
+    // A labelled group rather than role="img": the zoom buttons and the
+    // attribution link inside are interactive, and an image role would hide
+    // them from assistive tech. The neighbourhood list beside it (WhereSection)
+    // carries the information in text.
     <div
-      role="img"
+      role="group"
+      aria-roledescription="map"
       aria-label={`Heatmap of where fans of ${title} are concentrated in ${cityName}`}
       className={`isolate ${HEAT_MAP_HEIGHT} overflow-hidden rounded-lg border border-border`}
     >
