@@ -27,3 +27,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Release Pulse live-spike output holds raw Qloo responses, which Qloo's terms forbid publishing
+services/pulse/spike/out/
