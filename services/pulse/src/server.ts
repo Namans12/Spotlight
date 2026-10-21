@@ -1,9 +1,30 @@
 import { createServer } from "node:http";
-import { loadConfig } from "./config.js";
+import { tmdbDetail } from "../../../lib/tmdbProxy.js";
+import { assertTmdbConfigured, loadConfig } from "./config.js";
 import { corsHeaders } from "./http/cors.js";
 import { createRouter, type Handler } from "./http/router.js";
+import { createQlooClient } from "./qloo/client.js";
+import { getPool } from "./db/pool.js";
+import { resolveTitle } from "./resolve.js";
+import { briefHandler } from "./routes/brief.js";
+import { createTitleLookup } from "./titleHeader.js";
 
 const config = loadConfig(process.env);
+assertTmdbConfigured(config, process.env);
+
+const sql = getPool(config);
+const qloo = createQlooClient(config);
+
+const briefRoute = briefHandler({
+  sql,
+  qloo,
+  resolve: (key) => resolveTitle(sql, qloo, key),
+  header: createTitleLookup(sql, (mediaType, id) => tmdbDetail(mediaType, id)),
+  // Replaced by the real drafter in a later task; until then the brief says so
+  // rather than showing an empty box with no explanation.
+  draftCampaign: async () => ({ status: "empty", data: null, provenance: [], note: "Campaign drafting is added in a later task." }),
+  onError: (context, err) => console.error(`brief: ${context} failed:`, err instanceof Error ? err.message : String(err)),
+});
 
 const healthz: Handler = async (_req, res) => {
   res.writeHead(200, { "Content-Type": "application/json" });
@@ -12,6 +33,7 @@ const healthz: Handler = async (_req, res) => {
 
 const route = createRouter({
   "GET /healthz": healthz,
+  "GET /brief": briefRoute,
 });
 
 const server = createServer(async (req, res) => {

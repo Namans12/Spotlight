@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadConfig } from "./config.js";
+import { assertTmdbConfigured, loadConfig } from "./config.js";
 
 describe("loadConfig", () => {
   it("defaults Groq to the spec's endpoint and model", () => {
@@ -30,5 +30,20 @@ describe("loadConfig", () => {
   it("falls back to the default for values that are not plain integers", () => {
     expect(loadConfig({ DATABASE_URL: "postgres://x", PORT: "8787abc" }).port).toBe(8787);
     expect(loadConfig({ DATABASE_URL: "postgres://x", PULSE_GLOBAL_DAILY_LLM: "1e3" }).globalDailyLlm).toBe(800);
+  });
+});
+
+describe("assertTmdbConfigured", () => {
+  const live = loadConfig({ DATABASE_URL: "postgres://x" });
+  const fixtures = loadConfig({ DATABASE_URL: "postgres://x", QLOO_FIXTURES: "1" });
+
+  it("fails fast outside fixtures mode when TMDB_API_KEY is missing or blank", () => {
+    expect(() => assertTmdbConfigured(live, {})).toThrow(/TMDB_API_KEY/);
+    expect(() => assertTmdbConfigured(live, { TMDB_API_KEY: "  " })).toThrow(/TMDB_API_KEY/);
+  });
+
+  it("passes with a key, and in fixtures mode without one", () => {
+    expect(() => assertTmdbConfigured(live, { TMDB_API_KEY: "k" })).not.toThrow();
+    expect(() => assertTmdbConfigured(fixtures, {})).not.toThrow();
   });
 });
