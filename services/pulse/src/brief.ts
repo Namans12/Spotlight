@@ -52,6 +52,8 @@ export const NO_ENTITY_NOTE = "Qloo has no entity for this title yet, so there i
 export const RESOLVE_FAILED_NOTE = "Qloo could not be reached to look this title up, so there is no taste data for it right now. Try again shortly.";
 const RATE_LIMITED_NOTE = "Qloo is busy and rate limiting requests, so this section is missing. Try again in a moment.";
 const GENERIC_ERROR_NOTE = "This section could not be loaded just now. Try again shortly.";
+/** Shared with plan-night, which filters its venues by place tags the same way. */
+export const BROAD_VENUES_NOTE = "Venue category filter was unavailable; results are broader than usual.";
 const HOOK_LIMITS =
   "Built from public Wikipedia categories and Wikidata. Coverage varies by title, and India coverage is partial, so a missing record does not mean the title was not shot or set here.";
 
@@ -80,13 +82,13 @@ export function noteFor(err: unknown): string {
   return err instanceof RateLimitedError ? RATE_LIMITED_NOTE : GENERIC_ERROR_NOTE;
 }
 
-// Tag-id lookups never change within a process's lifetime in practice and cost
+// Tag-id lookups (shared by the brief and plan-night) never change within a process's lifetime in practice and cost
 // a Qloo call each, so they are remembered per client. A failed lookup is not
 // remembered: that would turn one blip into permanently untagged venues.
-const TAGS_PER_QUERY = 2;
+export const TAGS_PER_QUERY = 2;
 const tagMemo = new WeakMap<QlooClient, Map<string, Promise<string[]>>>();
 
-async function placeTagIds(qloo: QlooClient, queries: string[], onError: (c: string, e: unknown) => void): Promise<{ ids: string[]; failed: boolean }> {
+export async function placeTagIds(qloo: QlooClient, queries: string[], onError: (c: string, e: unknown) => void): Promise<{ ids: string[]; failed: boolean }> {
   let memo = tagMemo.get(qloo);
   if (!memo) tagMemo.set(qloo, (memo = new Map()));
   const m = memo;
@@ -191,7 +193,7 @@ export async function* streamBrief(deps: BriefDeps, req: BriefRequest): AsyncGen
         // not cache it: the next brief should retry the tags, not inherit
         // three days of the stopgap.
         unfiltered = true;
-        return { ...section, status: "degraded", note: "Venue category filter was unavailable; results are broader than usual." };
+        return { ...section, status: "degraded", note: BROAD_VENUES_NOTE };
       }, { skipPersist: () => unfiltered })();
       const venues = raw.data as Venue[] | null;
       if (!venues) return raw;

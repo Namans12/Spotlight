@@ -174,15 +174,64 @@ describe("GET /plan-night happy path", () => {
     expect(body.artists.provenance).toEqual(artistsOf(1).provenance);
   });
 
-  it("asks Qloo for places with NO tag filter and for artists once", async () => {
+  it("asks Qloo for places filtered to food-and-drink place tags (never unfiltered) and for artists once", async () => {
     const places = vi.fn(async () => placesOf([venue(1)]));
     const artists = vi.fn(async () => artistsOf(1));
-    const { get, deps } = await start({ places, artists });
+    const findTags = vi.fn(async (q: string) => [1, 2, 3].map((n) => ({ tagId: `t-${q}-${n}`, name: `${q} ${n}` })));
+    const { get } = await start({ places, artists, findTags });
     await (await get(GOOD)).text();
+    expect(findTags.mock.calls.map((c) => [c[0], c[1]])).toEqual([["restaurant", "place"], ["cafe", "place"], ["bar", "place"], ["dessert", "place"]]);
     expect(places).toHaveBeenCalledTimes(1);
-    expect(places.mock.calls[0]).toEqual(["fx-entity-1", expect.objectContaining({ slug: "delhi" }), []]);
+    // The first two tags of each query, in query order.
+    expect(places.mock.calls[0]).toEqual([
+      "fx-entity-1", expect.objectContaining({ slug: "delhi" }),
+      ["t-restaurant-1", "t-restaurant-2", "t-cafe-1", "t-cafe-2", "t-bar-1", "t-bar-2", "t-dessert-1", "t-dessert-2"],
+    ]);
     expect(artists).toHaveBeenCalledTimes(1);
-    expect(deps.qlooCalls.findTags ?? 0).toBe(0);
+  });
+
+  it("dedupes tag ids across queries", async () => {
+    const places = vi.fn(async () => placesOf([venue(1)]));
+    const { get } = await start({ places }); // the fixture's findTags answers the same two ids for every query
+    await (await get(GOOD)).text();
+    expect(places.mock.calls[0][2]).toEqual(["fx-tag-place-1", "fx-tag-place-2"]);
+  });
+
+  it("looks the tag ids up inside the cache fetch: a cache hit costs no findTags call", async () => {
+    const { get, deps } = await start();
+    await (await get(GOOD)).text();
+    const tagCalls = deps.qlooCalls.findTags;
+    expect(tagCalls).toBe(4);
+    await (await get(GOOD)).text();
+    expect(deps.qlooCalls.findTags).toBe(tagCalls);
+    expect(deps.qlooCalls.places).toBe(1);
+  });
+
+  it("shares the brief's per-process tag lookups: the queries both use are asked once", async () => {
+    const { get, brief, deps } = await start();
+    await (await brief("city=delhi&type=cafe&mediaType=movie&tmdbId=1")).text(); // cafe, coffee, bakery, dessert
+    expect(deps.qlooCalls.findTags).toBe(4);
+    await (await get(GOOD)).text(); // restaurant, cafe, bar, dessert: only restaurant and bar are new
+    expect(deps.qlooCalls.findTags).toBe(6);
+  });
+
+  it("when the tag lookup fails the places are degraded, say why, and are NOT cached", async () => {
+    const places = vi.fn(async () => placesOf([venue(1)]));
+    const { get, deps } = await start({ places, findTags: async () => { throw new Error("qloo down"); } });
+    const body = await (await get(GOOD)).json() as { places: EvidenceSection<Venue[]>; artists: EvidenceSection<NamedEntity[]> };
+    expect(places.mock.calls[0][2]).toEqual([]);
+    expect(body.places).toMatchObject({ status: "degraded", note: "Venue category filter was unavailable; results are broader than usual." });
+    expect(body.places.data!.map((v) => v.name)).toEqual(["Spot 1"]);
+    expect(body.artists.status).toBe("ok");
+    expect(deps.db.evidence.has("fx-entity-1|delhi|places_open")).toBe(false);
+    expect(deps.errors.some((e) => e.context.startsWith("findTags("))).toBe(true);
+    // The next request retries the tags and, once they work, caches the proper answer.
+    await new Promise<void>((r) => server!.close(() => r()));
+    server = null;
+    const healthy = await start({ places, db: deps.db });
+    const again = await (await healthy.get(GOOD)).json() as { places: EvidenceSection<Venue[]> };
+    expect(again.places.status).toBe("ok");
+    expect(deps.db.evidence.has("fx-entity-1|delhi|places_open")).toBe(true);
   });
 
   it("goes through the evidence cache with kinds places_open and artists (never places)", async () => {
