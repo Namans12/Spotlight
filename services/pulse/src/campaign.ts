@@ -22,7 +22,7 @@ export interface DraftContext { title: string; cityName: string; businessType: B
 
 const FACT_MAX = 160;
 const FRAGMENT_MAX = 60;
-const INVISIBLE = /[​-‏‪-‮⁠-⁯﻿]/g;
+const INVISIBLE = /[\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g;
 
 /** Third-party text made safe to put in a prompt and on a page: whitespace
  *  collapsed, control and invisible characters dropped, angle brackets
@@ -260,6 +260,9 @@ function parseJson(content: string): { value: unknown } | { error: string } {
 
 const shortId = (id: string) => cleanText(id, 60);
 
+const CUT_OFF = `Your last answer was cut off before it finished. Reply again with a shorter answer: exactly 3 ideas, at most 2 clauses each, short titles. JSON only, matching ${SCHEMA}.`;
+const REJECTED = `The provider rejected your last answer as invalid JSON. Reply again with JSON only, matching ${SCHEMA}.`;
+
 async function run(llm: LlmClient, messages: ChatMessage[], bundleIds: Set<string>): Promise<Campaign> {
   const convo = [...messages];
   let lastParseable: Campaign | null = null;
@@ -268,12 +271,24 @@ async function run(llm: LlmClient, messages: ChatMessage[], bundleIds: Set<strin
     try {
       reply = await llm.chat(convo, { json: true });
     } catch (err) {
-      // A provider failure on a retry should not throw away an answer we
+      if (err instanceof LlmError && err.kind === "bad_response") {
+        // The provider could not produce usable output (for example Groq's
+        // json_validate_failed): that is an unparseable attempt, retried.
+        convo.push({ role: "user", content: REJECTED });
+        continue;
+      }
+      // A rate limit or outage on a retry should not throw away an answer we
       // already have; with nothing usable yet the caller has to hear about it.
       if (err instanceof LlmError && lastParseable) break;
       throw err;
     }
     const content = reply.content ?? "";
+    if (reply.finish_reason === "length") {
+      // Cut off mid-answer: even if the partial text happens to parse, it is
+      // not a finished draft, so it is never accepted (nor kept as a fallback).
+      convo.push({ role: "user", content: CUT_OFF });
+      continue;
+    }
     let feedback: string;
     const parsed = parseJson(content);
     if ("error" in parsed) {

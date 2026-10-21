@@ -4,7 +4,7 @@
 
 import type { Campaign, EvidenceSection } from "../../../shared/types/pulse.js";
 import type { CampaignContext, DraftCampaign } from "./brief.js";
-import { buildBundle, draftCampaign, isFallback } from "./campaign.js";
+import { buildBundle, draftCampaign, isFallback, type EvidenceFact } from "./campaign.js";
 import { createTtlCache, type TtlCache } from "./campaignCache.js";
 import { LlmError, type LlmClient, type LlmErrorKind } from "./llm/client.js";
 import type { CapDecision } from "./usage.js";
@@ -17,6 +17,8 @@ export interface CampaignSectionDeps {
   takeUsage: (session: string) => Promise<CapDecision>;
   /** Drafted sections by (entity, city, business type); one is made if not given. */
   cache?: TtlCache<EvidenceSection<unknown>>;
+  /** Drafts in progress by the cache key; one is made if not given. */
+  inflight?: Map<string, Promise<EvidenceSection<unknown>>>;
   now?: () => number;
   onError?: (context: string, err: unknown) => void;
 }
@@ -49,24 +51,42 @@ const isComplete = (ctx: CampaignContext) => Object.values(ctx.sections).every((
  *  the brief turns it into an error section. */
 export function makeDraftCampaign(deps: CampaignSectionDeps): DraftCampaign {
   const cache = deps.cache ?? createTtlCache<EvidenceSection<unknown>>({ ttlMs: CACHE_TTL_MS, max: CACHE_MAX, now: deps.now });
+  const inflight = deps.inflight ?? new Map<string, Promise<EvidenceSection<unknown>>>();
+  const { llm } = deps;
 
   return async (ctx) => {
     const { header, businessType } = ctx;
     const bundle = buildBundle(ctx.sections, header.cityName, header.title);
     if (bundle.length === 0) return withoutData("empty", NOT_ENOUGH);
-    if (!deps.llm) return withoutData("degraded", NOT_CONFIGURED);
+    if (!llm) return withoutData("degraded", NOT_CONFIGURED);
 
     // Without a Qloo entity the key falls back to the TMDB id, so two titles can never share a slot.
     const key = `${header.qlooEntityId ?? `tmdb:${header.mediaType}:${header.tmdbId}`}|${header.city}|${businessType}`;
     const hit = cache.get(key);
     if (hit) return hit;
 
+    // Two overlapping views of the same brief share one draft, and so one
+    // usage slot. Nothing awaits between the cache read, this read and the
+    // set below, so the second caller always finds the first one's promise.
+    const pending = inflight.get(key);
+    if (pending) return pending;
+    const work = draft(ctx, llm, key, bundle);
+    inflight.set(key, work);
+    try {
+      return await work;
+    } finally {
+      if (inflight.get(key) === work) inflight.delete(key);
+    }
+  };
+
+  async function draft(ctx: CampaignContext, llm: LlmClient, key: string, bundle: EvidenceFact[]): Promise<EvidenceSection<unknown>> {
+    const { header, businessType } = ctx;
     const decision = await deps.takeUsage(ctx.session ?? "unknown");
     if (!decision.allowed) return withoutData("degraded", CAP_HIT);
 
     let campaign: Campaign;
     try {
-      campaign = await draftCampaign(deps.llm, bundle, { title: header.title, cityName: header.cityName, businessType, releaseDate: header.releaseDate });
+      campaign = await draftCampaign(llm, bundle, { title: header.title, cityName: header.cityName, businessType, releaseDate: header.releaseDate });
     } catch (err) {
       if (!(err instanceof LlmError)) throw err;
       try { deps.onError?.("campaign writer", err); } catch { /* a broken logger must not break the brief */ }
@@ -79,5 +99,5 @@ export function makeDraftCampaign(deps: CampaignSectionDeps): DraftCampaign {
     const section: EvidenceSection<unknown> = { status: "ok", data: campaign, provenance };
     if (isComplete(ctx)) cache.set(key, section);
     return section;
-  };
+  }
 }

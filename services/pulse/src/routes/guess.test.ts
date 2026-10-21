@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Campaign } from "../../../../shared/types/pulse.js";
+import { createTtlCache } from "../campaignCache.js";
 import { createRateLimiter } from "../http/rateLimit.js";
 import { createRouter } from "../http/router.js";
 import { LlmError } from "../llm/client.js";
@@ -89,7 +90,63 @@ describe("GET /guess", () => {
     expect(await res.json()).toEqual({ error: "rate_limited" });
     expect(Number(res.headers.get("retry-after"))).toBeGreaterThanOrEqual(1);
     expect(vi.mocked(deps.isKnown).mock.calls.length).toBe(calls);
-    expect(llm!.calls).toHaveLength(10);
+  });
+
+  describe("cache", () => {
+    const frozen = () => ({ ttlMs: 3_600_000, max: 50, now: () => 0 });
+
+    it("serves a repeat guess from the cache: no usage, no LLM call", async () => {
+      const { get, deps, llm } = await start();
+      const first = await (await get(GOOD)).json();
+      const second = await (await get(GOOD, { "x-pulse-session": "someone-else" })).json();
+      expect(second).toEqual(first);
+      expect(llm!.calls).toHaveLength(1);
+      expect(deps.takeUsage).toHaveBeenCalledTimes(1);
+    });
+
+    it("keys on title, media type, city and business type", async () => {
+      const { get, llm } = await start();
+      for (const qs of [GOOD, "city=mumbai&type=cafe&mediaType=movie&tmdbId=1", "city=delhi&type=d2c_food&mediaType=movie&tmdbId=1", "city=delhi&type=cafe&mediaType=tv&tmdbId=1", "city=delhi&type=cafe&mediaType=movie&tmdbId=2"]) {
+        expect((await get(qs)).status).toBe(200);
+      }
+      expect(llm!.calls).toHaveLength(5);
+      await get(GOOD);
+      expect(llm!.calls).toHaveLength(5);
+    });
+
+    it("stores under guess|tmdbId|mediaType|citySlug|businessType, only after a good draft", async () => {
+      const cache = createTtlCache<Campaign>(frozen());
+      const { get } = await start({ cache });
+      await get(GOOD);
+      expect(cache.get("guess|1|movie|delhi|cafe")).toMatchObject({ groundedBy: "none" });
+    });
+
+    it("does not cache the fallback idea, a cap refusal or a failure", async () => {
+      const cache = createTtlCache<Campaign>(frozen());
+      const garbled = await start({ cache }, fakeLlm(["a", "b", "c", REPLY]));
+      expect(((await (await garbled.get(GOOD)).json()) as Campaign).ideas[0].title).toBe("Campaign draft unavailable");
+      expect(cache.size()).toBe(0);
+      expect(((await (await garbled.get(GOOD)).json()) as Campaign).ideas).toHaveLength(3); // retried, then cached
+      expect(cache.size()).toBe(1);
+      await new Promise<void>((r) => server!.close(() => r()));
+
+      const capped = createTtlCache<Campaign>(frozen());
+      const c = await start({ cache: capped, takeUsage: async () => ({ allowed: false, reason: "session_cap" }) });
+      expect((await c.get(GOOD)).status).toBe(429);
+      expect(capped.size()).toBe(0);
+    });
+
+    it("is consulted after the known-title gate and before the cap, so a hit takes no usage even at the cap", async () => {
+      const cache = createTtlCache<Campaign>(frozen());
+      cache.set("guess|1|movie|delhi|cafe", { ideas: [], groundedBy: "none" });
+      const { get, deps, llm } = await start({ cache, takeUsage: async () => ({ allowed: false, reason: "global_cap" }) });
+      expect((await get(GOOD)).status).toBe(200);
+      expect(llm!.calls).toHaveLength(0);
+      void deps;
+      await new Promise<void>((r) => server!.close(() => r()));
+      const unknown = await start({ cache, isKnown: async () => false });
+      expect((await unknown.get(GOOD)).status).toBe(404);
+    });
   });
 
   it("keys the limiter on the rightmost X-Forwarded-For entry", async () => {

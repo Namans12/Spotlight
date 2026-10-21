@@ -4,7 +4,7 @@ import { streamBrief, type CampaignContext } from "./brief.js";
 import { createTtlCache } from "./campaignCache.js";
 import { makeDraftCampaign, type CampaignSectionDeps } from "./campaignSection.js";
 import { getCity } from "./cities.js";
-import { LlmError } from "./llm/client.js";
+import { LlmError, type LlmClient } from "./llm/client.js";
 import { fixtureDeps } from "./testing/fakes.js";
 import { fakeLlm, type FakeLlm } from "./testing/llm.js";
 
@@ -182,11 +182,96 @@ describe("makeDraftCampaign cache (R28b)", () => {
   });
 });
 
+describe("makeDraftCampaign in-flight de-duplication", () => {
+  const deferred = <T>() => { let resolve!: (v: T) => void; let reject!: (e: unknown) => void; const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; }); return { promise, resolve, reject }; };
+  const flush = () => new Promise<void>((r) => setTimeout(r, 0));
+
+  /** An LLM that answers only when the test releases it. */
+  function gatedLlm() {
+    const gates: ReturnType<typeof deferred<string>>[] = [];
+    const llm: LlmClient = { chat: () => { const g = deferred<string>(); gates.push(g); return g.promise.then((content) => ({ role: "assistant" as const, content })); } };
+    return { llm, gates };
+  }
+
+  it("two overlapping identical briefs share one draft and take one usage slot", async () => {
+    const { llm, gates } = gatedLlm();
+    const takeUsage = vi.fn(async (_s: string) => ({ allowed: true }) as const);
+    const draft = makeDraftCampaign({ llm, model: "m-1", takeUsage });
+    const a = draft(ctxOf({ session: "s-a" }));
+    const b = draft(ctxOf({ session: "s-b" }));
+    await flush();
+    expect(gates).toHaveLength(1);
+    gates[0].resolve(OK_REPLY);
+    const [sa, sb] = await Promise.all([a, b]);
+    expect(sa.status).toBe("ok");
+    expect(sb).toBe(sa);
+    expect(gates).toHaveLength(1);
+    expect(takeUsage).toHaveBeenCalledTimes(1);
+  });
+
+  it("after it finishes, the next identical call is a cache hit (and the entry is gone from the in-flight map)", async () => {
+    const inflight = new Map<string, Promise<EvidenceSection<unknown>>>();
+    const { llm, gates } = gatedLlm();
+    const draft = makeDraftCampaign({ llm, model: "m-1", takeUsage: async () => ({ allowed: true }), inflight });
+    const a = draft(ctxOf());
+    await flush();
+    expect(inflight.size).toBe(1);
+    gates[0].resolve(OK_REPLY);
+    await a;
+    expect(inflight.size).toBe(0);
+    await draft(ctxOf());
+    expect(gates).toHaveLength(1);
+  });
+
+  it("a rejection reaches every waiter and clears the entry, so the next call tries again", async () => {
+    const inflight = new Map<string, Promise<EvidenceSection<unknown>>>();
+    const gate = deferred<{ allowed: true }>();
+    let calls = 0;
+    const takeUsage = vi.fn(async (_s: string) => { calls++; if (calls === 1) return gate.promise; return { allowed: true } as const; });
+    const draft = makeDraftCampaign({ llm: fakeLlm([OK_REPLY]), model: "m-1", takeUsage, inflight });
+    const a = draft(ctxOf());
+    const b = draft(ctxOf());
+    const settled = Promise.allSettled([a, b]);
+    gate.reject(new Error("db down"));
+    const [ra, rb] = await settled;
+    expect(ra.status).toBe("rejected");
+    expect(rb.status).toBe("rejected");
+    expect(takeUsage).toHaveBeenCalledTimes(1);
+    expect(inflight.size).toBe(0);
+    expect((await draft(ctxOf())).status).toBe("ok");
+    expect(takeUsage).toHaveBeenCalledTimes(2);
+  });
+
+  it("different keys do not share a draft", async () => {
+    const { llm, gates } = gatedLlm();
+    const takeUsage = vi.fn(async (_s: string) => ({ allowed: true }) as const);
+    const draft = makeDraftCampaign({ llm, model: "m-1", takeUsage });
+    const a = draft(ctxOf());
+    const b = draft(ctxOf({ businessType: "d2c_food" }));
+    const c = draft(ctxOf({ header: { ...header, city: "mumbai", cityName: "Mumbai" } }));
+    await flush();
+    expect(gates).toHaveLength(3);
+    gates.forEach((g) => g.resolve(OK_REPLY));
+    await Promise.all([a, b, c]);
+    expect(takeUsage).toHaveBeenCalledTimes(3);
+  });
+
+  it("a shared cap refusal is shared too and is not cached", async () => {
+    const { llm, gates } = gatedLlm();
+    const takeUsage = vi.fn(async (_s: string) => ({ allowed: false, reason: "session_cap" }) as const);
+    const draft = makeDraftCampaign({ llm, model: "m-1", takeUsage });
+    const [a, b] = await Promise.all([draft(ctxOf()), draft(ctxOf())]);
+    expect(a.note).toBe(NOTES.cap);
+    expect(b).toBe(a);
+    expect(takeUsage).toHaveBeenCalledTimes(1);
+    expect(gates).toHaveLength(0);
+  });
+});
+
 describe("makeDraftCampaign LlmError mapping", () => {
   const cases: [LlmError["kind"], RegExp][] = [
     ["rate_limited", /busy/i],
     ["unavailable", /unavailable/i],
-    ["bad_response", /unusable/i],
   ];
   it.each(cases)("%s becomes a degraded section with a fixed sentence, never the raw error", async (kind, re) => {
     const { draft } = setup([new LlmError(kind, "RAW-UPSTREAM-DETAIL sk-secret")]);
@@ -195,6 +280,15 @@ describe("makeDraftCampaign LlmError mapping", () => {
     expect(s.note).toMatch(re);
     expect(s.note).toContain("the evidence above is unaffected");
     expect(JSON.stringify(s)).not.toMatch(/RAW-UPSTREAM|sk-secret/);
+  });
+
+  it("bad_response is retried inside the draft, so three of them give the placeholder draft, not an error", async () => {
+    const { draft, llm } = setup([new LlmError("bad_response", "RAW-UPSTREAM-DETAIL")]);
+    const s = await draft(ctxOf());
+    expect(llm.calls).toHaveLength(3);
+    expect(s.status).toBe("degraded");
+    expect((s.data as Campaign).ideas[0].title).toBe("Campaign draft unavailable");
+    expect(JSON.stringify(s)).not.toContain("RAW-UPSTREAM");
   });
 
   it("reports the real cause through onError", async () => {

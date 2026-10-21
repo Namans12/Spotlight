@@ -6,9 +6,13 @@
 // fake server. Specifically unverified: that Groq accepts
 // `response_format: {type:"json_object"}` for the configured model (the 400
 // fallback below exists because some models refuse it), that `max_tokens`
-// leaves room for the model's reasoning as well as its answer (a truncated
-// answer shows up as unparseable JSON and goes through the campaign retry
-// loop), and the status codes Groq uses for its free-tier limits.
+// leaves room for the model's reasoning as well as its answer (it is 4096
+// because reasoning tokens count toward the completion budget on Groq; a
+// truncated answer reports finish_reason "length", which the campaign loop
+// treats as unusable), the `json_validate_failed` / `failed_generation` 400
+// Groq may answer a malformed JSON-mode generation with, and the status codes
+// Groq uses for its free-tier limits. A possible tuning knob once a live key
+// exists is `reasoning_effort`; it is not sent now because it is unverified.
 //
 // Errors are deliberately thin: a kind and a fixed sentence. The key, the
 // request body and the upstream response body never appear in a message, a
@@ -23,6 +27,8 @@ export interface ChatMessage {
   content: string | null;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
+  /** The provider's stop reason on a reply ("stop", "length", ...), when it sent one. */
+  finish_reason?: string;
 }
 export interface LlmClient {
   chat(messages: ChatMessage[], opts?: { tools?: ToolSpec[]; json?: boolean }): Promise<ChatMessage>;
@@ -37,9 +43,10 @@ export class LlmError extends Error {
   }
 }
 
+const FAILED_GENERATION = /json_validate_failed|failed_generation/i;
 const TIMEOUT_MS = 20_000;
 const TEMPERATURE = 0.4;
-const MAX_TOKENS = 1400;
+const MAX_TOKENS = 4096;
 
 type GroqConfig = Pick<PulseConfig, "groqApiKey" | "groqBaseUrl" | "groqModel">;
 
@@ -58,13 +65,15 @@ function contentText(content: unknown): string | null {
  *  reasoning) comes back as an empty string so callers retry rather than fail. */
 function parseMessage(body: unknown): ChatMessage {
   const choices = (body as { choices?: unknown } | null)?.choices;
-  const message = Array.isArray(choices) ? (choices[0] as { message?: unknown } | undefined)?.message : undefined;
+  const choice = Array.isArray(choices) ? (choices[0] as { message?: unknown; finish_reason?: unknown } | undefined) : undefined;
+  const message = choice?.message;
+  const finish = typeof choice?.finish_reason === "string" ? { finish_reason: choice.finish_reason } : {};
   if (!message || typeof message !== "object") throw new LlmError("bad_response", "The model response had no message.");
   const m = message as { content?: unknown; tool_calls?: unknown };
   const toolCalls = Array.isArray(m.tool_calls) && m.tool_calls.length > 0 ? (m.tool_calls as ToolCall[]) : undefined;
   const text = contentText(m.content);
-  if (toolCalls) return { role: "assistant", content: text, tool_calls: toolCalls };
-  return { role: "assistant", content: text ?? "" };
+  if (toolCalls) return { role: "assistant", content: text, tool_calls: toolCalls, ...finish };
+  return { role: "assistant", content: text ?? "", ...finish };
 }
 
 export function createGroqClient(cfg: GroqConfig, fetchImpl: typeof fetch = fetch): LlmClient {
@@ -96,6 +105,9 @@ export function createGroqClient(cfg: GroqConfig, fetchImpl: typeof fetch = fetc
         // Some models refuse response_format. Say-so is in the 400 body; one
         // retry without it, never more.
         const detail = await res.text().catch(() => "");
+        // A malformed JSON-mode generation is a bad answer, not an unsupported
+        // option: it is reported as bad_response for the caller to retry.
+        if (FAILED_GENERATION.test(detail)) throw new LlmError("bad_response", "The model failed to produce valid JSON.");
         if (/response_format/i.test(detail)) res = await post(messages, opts, false);
       }
       if (res.status === 429) throw new LlmError("rate_limited", "The model provider is rate limiting requests.");

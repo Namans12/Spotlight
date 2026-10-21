@@ -179,6 +179,62 @@ describe("draftCampaign", () => {
     expect(c.ideas).toHaveLength(3);
   });
 
+  it("never accepts a truncated answer, even when the partial text parses, and asks for a shorter one", async () => {
+    const cut = { role: "assistant" as const, content: valid, finish_reason: "length" };
+    const llm = fakeLlm([cut, valid]);
+    const c = await draftCampaign(llm, bundle, ctx);
+    expect(llm.calls).toHaveLength(2);
+    const feedback = String(llm.calls[1].at(-1)!.content);
+    expect(llm.calls[1].at(-1)!.role).toBe("user");
+    expect(feedback).toMatch(/cut off/);
+    expect(feedback).toMatch(/shorter/);
+    expect(feedback).toMatch(/exactly 3 ideas, at most 2 clauses each/);
+    expect(c.ideas[0].clauses[0].evidence).toEqual(["venue:a"]); // the second, finished answer won
+  });
+
+  it("three truncated answers end in the fallback idea, never the partial drafts", async () => {
+    const cut = { role: "assistant" as const, content: valid, finish_reason: "length" };
+    const llm = fakeLlm([cut, cut, cut]);
+    const c = await draftCampaign(llm, bundle, ctx);
+    expect(llm.calls).toHaveLength(3);
+    expect(c.ideas).toEqual([FALLBACK_IDEA]);
+  });
+
+  it("an earlier complete answer still beats a later truncated one", async () => {
+    const cut = { role: "assistant" as const, content: valid, finish_reason: "length" };
+    const c = await draftCampaign(fakeLlm([citesUnknown, cut, cut]), bundle, ctx);
+    expect(c.ideas).toHaveLength(3);
+    c.ideas.flatMap((i) => i.clauses).forEach((cl) => expect(cl.evidence).toEqual([]));
+  });
+
+  it("accepts a finished answer whose finish_reason is stop", async () => {
+    const llm = fakeLlm([{ role: "assistant", content: valid, finish_reason: "stop" }]);
+    expect((await draftCampaign(llm, bundle, ctx)).ideas).toHaveLength(3);
+    expect(llm.calls).toHaveLength(1);
+  });
+
+  it("a bad_response from the provider (e.g. json_validate_failed) counts as an unparseable attempt and is retried with feedback", async () => {
+    const llm = fakeLlm([new LlmError("bad_response", "The model failed to produce valid JSON."), valid]);
+    const c = await draftCampaign(llm, bundle, ctx);
+    expect(llm.calls).toHaveLength(2);
+    expect(String(llm.calls[1].at(-1)!.content)).toMatch(/rejected.*invalid JSON/);
+    expect(c.ideas).toHaveLength(3);
+    expect(c.ideas[0].clauses[0].evidence).toEqual(["venue:a"]);
+  });
+
+  it("bad_response on every attempt (3 in total) ends in the fallback idea rather than an error", async () => {
+    const llm = fakeLlm([new LlmError("bad_response", "x")]);
+    const c = await draftCampaign(llm, bundle, ctx);
+    expect(llm.calls).toHaveLength(3);
+    expect(c.ideas).toEqual([FALLBACK_IDEA]);
+  });
+
+  it("bad_response after an earlier parseable answer keeps that answer, downgraded", async () => {
+    const c = await draftCampaign(fakeLlm([citesUnknown, new LlmError("bad_response", "x"), new LlmError("bad_response", "x")]), bundle, ctx);
+    expect(c.ideas).toHaveLength(3);
+    c.ideas.flatMap((i) => i.clauses).forEach((cl) => expect(cl.evidence).toEqual([]));
+  });
+
   it("an LlmError on the first call propagates for the caller to describe", async () => {
     await expect(draftCampaign(fakeLlm([new LlmError("rate_limited", "x")]), bundle, ctx)).rejects.toMatchObject({ kind: "rate_limited" });
   });
@@ -387,6 +443,11 @@ describe("buildBundle", () => {
     expect(f[0].fact).not.toMatch(/[<>]/);
     expect(f[0].fact).not.toMatch(/\s{2,}/);
     expect(f[0].fact).toContain("Evil Name with tabs bbold/b");
+  });
+
+  it("drops zero-width, bidi and BOM characters", () => {
+    const f = buildBundle({ themes: ok<TagAffinity[]>([{ tagId: "t1", name: "Ta\u200bg\u202e X\u2060\ufeff", affinity: 1 }]) }, "Delhi", "Dune");
+    expect(f[0].fact).toBe("Fans of Dune in Delhi over-index on the place theme Tag X");
   });
 
   it("sanitises the title and city that are spliced into every fact", () => {

@@ -31,7 +31,7 @@ describe("createGroqClient request", () => {
     const h = calls[0].init.headers as Record<string, string>;
     expect(h.Authorization).toBe("Bearer sk-test-secret-key");
     expect(h["Content-Type"]).toBe("application/json");
-    expect(body(calls[0])).toEqual({ model: "m-1", messages: MSGS, temperature: 0.4, max_tokens: 1400 });
+    expect(body(calls[0])).toEqual({ model: "m-1", messages: MSGS, temperature: 0.4, max_tokens: 4096 });
     expect(calls[0].init.signal).toBeInstanceOf(AbortSignal);
   });
 
@@ -67,6 +67,14 @@ describe("response_format fallback", () => {
     const b = client([text(400, "response_format nope")]);
     await expect(b.llm.chat(MSGS, { json: true })).rejects.toMatchObject({ kind: "bad_response" });
     expect(b.calls).toHaveLength(2);
+  });
+
+  it("a 400 for a failed JSON generation is bad_response and is not retried without response_format", async () => {
+    for (const detail of ['{"error":{"message":"Failed to generate JSON.","code":"json_validate_failed","failed_generation":"{\\"ideas\\":"}}', "failed_generation response_format"]) {
+      const { llm, calls } = client([text(400, detail)]);
+      await expect(llm.chat(MSGS, { json: true })).rejects.toMatchObject({ kind: "bad_response" });
+      expect(calls).toHaveLength(1);
+    }
   });
 
   it("does not retry a 400 when json was not requested", async () => {
@@ -113,6 +121,18 @@ describe("failures map to typed LlmErrors", () => {
       expect(JSON.stringify([err!.message, err!.stack?.split("\n")[0]])).not.toMatch(/sk-test-secret-key|PROMPT-SECRET-TEXT/);
       expect(err!.cause).toBeUndefined();
     }
+  });
+});
+
+describe("finish_reason", () => {
+  it("is surfaced on the returned message when the provider sends one", async () => {
+    const res = new Response(JSON.stringify({ choices: [{ message: { role: "assistant", content: "{\"ideas\":" }, finish_reason: "length" }] }), { status: 200 });
+    expect(await client([res]).llm.chat(MSGS)).toEqual({ role: "assistant", content: "{\"ideas\":", finish_reason: "length" });
+    const stop = new Response(JSON.stringify({ choices: [{ message: { role: "assistant", content: "x" }, finish_reason: "stop" }] }), { status: 200 });
+    expect((await client([stop]).llm.chat(MSGS)).finish_reason).toBe("stop");
+  });
+  it("is left off when absent", async () => {
+    expect(await client([ok({ role: "assistant", content: "x" })]).llm.chat(MSGS)).not.toHaveProperty("finish_reason");
   });
 });
 

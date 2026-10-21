@@ -1,5 +1,7 @@
 import type { TitleSummary } from "../brief.js";
-import { draftWithoutQloo } from "../campaign.js";
+import type { Campaign } from "../../../../shared/types/pulse.js";
+import { draftWithoutQloo, isFallback } from "../campaign.js";
+import { createTtlCache, type TtlCache } from "../campaignCache.js";
 import { clientAddress, type RateLimiter } from "../http/rateLimit.js";
 import type { Handler } from "../http/router.js";
 import { LlmError, type LlmClient } from "../llm/client.js";
@@ -19,6 +21,8 @@ export interface GuessRouteDeps {
   llm: LlmClient | null;
   /** Takes one slot of the session's and the day's budget. */
   takeUsage: (session: string) => Promise<CapDecision>;
+  /** Successful guesses by title, city and business type; one is made if not given. */
+  cache?: TtlCache<Campaign>;
   now?: () => Date;
 }
 
@@ -28,6 +32,9 @@ export interface GuessRouteDeps {
  *  limit, the known-title gate (so a made-up id costs no model call), whether
  *  a model is configured at all, the daily cap, and only then the draft. */
 export function guessHandler(deps: GuessRouteDeps): Handler {
+  // The same hour and size as the brief's campaign cache: toggling the
+  // "without Qloo" view back and forth should not spend the daily budget.
+  const cache = deps.cache ?? createTtlCache<Campaign>({ ttlMs: 60 * 60 * 1000, max: 50 });
   const fail = (res: Parameters<Handler>[1], what: string, err: unknown) => {
     console.error(`guess ${what} failed:`, err instanceof Error ? err.message : String(err));
     json(res, 503, { error: err instanceof LlmError ? "llm_unavailable" : "unavailable" });
@@ -47,6 +54,11 @@ export function guessHandler(deps: GuessRouteDeps): Handler {
 
     if (!deps.llm) return json(res, 503, { error: "llm_unavailable" });
 
+    // After the known-title gate, before anything is spent.
+    const cacheKey = `guess|${key.tmdbId}|${key.mediaType}|${city.slug}|${businessType}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return json(res, 200, cached);
+
     // Before the cap, so a failed lookup does not spend a slot.
     let summary: TitleSummary | null;
     try { summary = await deps.header(key); } catch (err) { return fail(res, "title lookup", err); }
@@ -56,6 +68,8 @@ export function guessHandler(deps: GuessRouteDeps): Handler {
       const usage = await deps.takeUsage(sessionKey(req, deps.now?.() ?? new Date()));
       if (!usage.allowed) return json(res, 429, { error: "daily_limit" });
       const campaign = await draftWithoutQloo(deps.llm, { title: summary.title, cityName: city.name, businessType, releaseDate: summary.releaseDate });
+      // The placeholder idea is not a result worth keeping for an hour.
+      if (!isFallback(campaign)) cache.set(cacheKey, campaign);
       json(res, 200, campaign);
     } catch (err) {
       fail(res, "draft", err);
