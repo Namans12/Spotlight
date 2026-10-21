@@ -33,6 +33,7 @@ const NO_DRAFT = "The writer didn't return a usable draft this time — try agai
 const ERROR_NOTES: Record<LlmErrorKind, string> = {
   rate_limited: "The AI writer is busy right now — the evidence above is unaffected. Try again in a minute.",
   unavailable: "The AI writer is unavailable right now — the evidence above is unaffected.",
+  // A type-exhaustiveness backstop: an LlmError bad_response is retried inside the draft loop and never reaches here.
   bad_response: "The AI writer returned something unusable — the evidence above is unaffected.",
 };
 const WRITER_LIMITS = "Drafted by an AI model from the evidence listed above; every cited claim links to that evidence, uncited clauses are the model's own suggestions.";
@@ -84,12 +85,15 @@ export function makeDraftCampaign(deps: CampaignSectionDeps): DraftCampaign {
     const decision = await deps.takeUsage(ctx.session ?? "unknown");
     if (!decision.allowed) return withoutData("degraded", CAP_HIT);
 
+    const report = (context: string, err: unknown) => {
+      try { deps.onError?.(context, err); } catch { /* a broken logger must not break the brief */ }
+    };
     let campaign: Campaign;
     try {
-      campaign = await draftCampaign(llm, bundle, { title: header.title, cityName: header.cityName, businessType, releaseDate: header.releaseDate });
+      campaign = await draftCampaign(llm, bundle, { title: header.title, cityName: header.cityName, businessType, releaseDate: header.releaseDate }, report);
     } catch (err) {
       if (!(err instanceof LlmError)) throw err;
-      try { deps.onError?.("campaign writer", err); } catch { /* a broken logger must not break the brief */ }
+      report("campaign writer", err);
       return withoutData("degraded", ERROR_NOTES[err.kind]);
     }
 

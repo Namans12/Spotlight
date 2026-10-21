@@ -101,6 +101,24 @@ describe("POST /chat streaming", () => {
     expect(sent.at(-1)).toEqual({ role: "user", content: "m14" });
   });
 
+  it("runs no agent work for a client that disconnected while the usage slot was being taken", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const llm = fakeLlm([assistant("never sent")]);
+    const takeUsage = vi.fn(async () => { await gate; return { allowed: true } as const; });
+    const { post, deps } = await start({ takeUsage }, llm);
+    const ac = new AbortController();
+    const pending = post(ask(), {}, ac.signal).then((r) => r.text()).catch(() => "aborted");
+    await vi.waitFor(() => expect(takeUsage).toHaveBeenCalled());
+    ac.abort();
+    await pending;
+    await new Promise((r) => setTimeout(r, 50)); // let the server see the socket close
+    release();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(llm!.calls).toHaveLength(0);
+    expect(deps.getTools).not.toHaveBeenCalled();
+  });
+
   it("stops the agent when the client disconnects: the tool is told to abort and no further model call is made", async () => {
     let started!: () => void;
     const running = new Promise<void>((r) => { started = r; });

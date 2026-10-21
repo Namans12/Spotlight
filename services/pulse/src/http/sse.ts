@@ -38,8 +38,20 @@ export interface SseStream {
  *  unref'd so it can never hold the process open. */
 export function startSse(res: ServerResponse, opts: { timers?: Timers } = {}): SseStream {
   const timers = opts.timers ?? realTimers;
-  writeSseHead(res);
   const ac = new AbortController();
+  // A client can disconnect before the stream is opened (while the caller was
+  // awaiting something else), and "close" has then already fired: a listener
+  // registered now would never hear it. So the stream starts already closed.
+  if (res.destroyed || res.writableEnded) {
+    ac.abort();
+    return {
+      signal: ac.signal,
+      closed: true,
+      write: () => false,
+      end() { /* nothing was started, nothing to end */ },
+    };
+  }
+  writeSseHead(res);
   let closed = false;
 
   const ping = timers.setInterval(() => {

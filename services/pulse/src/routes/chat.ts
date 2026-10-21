@@ -109,6 +109,8 @@ export function chatHandler(deps: ChatRouteDeps): Handler {
     }
 
     const stream = startSse(res, { timers: deps.timers });
+    // The client may have gone while the usage slot was being taken; then there is nobody to answer.
+    if (stream.closed) return;
     try {
       let tools: AgentTool[];
       try {

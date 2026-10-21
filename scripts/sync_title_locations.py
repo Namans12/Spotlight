@@ -404,7 +404,17 @@ def load_seed() -> dict[str, list[str]]:
     reach. QIDs only: names and coordinates are still read from Wikidata."""
     if not SEED_PATH.exists():
         return {}
-    seed = json.loads(SEED_PATH.read_text(encoding="utf-8"))
+    name = SEED_PATH.name
+    try:
+        seed = json.loads(SEED_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as err:
+        # SystemExit with a string prints it alone: one line, no traceback.
+        raise SystemExit(f"{name}: not valid JSON ({err})") from None
+    if not isinstance(seed, dict):
+        raise SystemExit(f"{name}: expected an object mapping each city slug to a list of QIDs")
+    for slug, qids in seed.items():
+        if not isinstance(qids, list) or not all(isinstance(q, str) for q in qids):
+            raise SystemExit(f'{name}: "{slug}" must be a list of QID strings')
     return {slug: [q for q in qids if valid_qid(q)] for slug, qids in seed.items()}
 
 

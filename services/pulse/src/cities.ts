@@ -32,6 +32,9 @@ function isStringArray(v: unknown): v is string[] {
 export function parseCities(raw: unknown): City[] {
   if (!Array.isArray(raw)) fail("file", "expected a JSON array of cities");
   const seen = new Set<string>();
+  // A QID names one place, so it can belong to one city once: a repeat would
+  // make the builder count the same titles for two cities.
+  const qidOwner = new Map<string, string>();
   return raw.map((entry, i): City => {
     if (typeof entry !== "object" || entry === null) fail(`entry ${i}`, "expected an object");
     const e = entry as Record<string, unknown>;
@@ -53,6 +56,13 @@ export function parseCities(raw: unknown): City[] {
     if (!COUNTRIES.includes(country)) fail(`"${slug}"`, `country must be one of ${COUNTRIES.join(", ")}`);
     if (typeof e.prewarm !== "boolean") fail(`"${slug}"`, "prewarm must be a boolean");
     if (!isStringArray(e.qids) || e.qids.length === 0) fail(`"${slug}"`, "qids must be a non-empty array of strings");
+    for (const qid of e.qids) {
+      const owner = qidOwner.get(qid);
+      if (owner !== undefined) {
+        fail(`"${slug}"`, owner === slug ? `QID ${qid} is listed twice in "${slug}"` : `QID ${qid} is already used by "${owner}" and cannot also belong to "${slug}"`);
+      }
+      qidOwner.set(qid, slug);
+    }
     const w = e.wikipedia as { filmed?: unknown; set?: unknown } | null | undefined;
     if (!w || !isStringArray(w.filmed) || !isStringArray(w.set)) {
       fail(`"${slug}"`, "wikipedia must have filmed and set arrays of category names");
@@ -69,8 +79,20 @@ export function parseCities(raw: unknown): City[] {
   });
 }
 
+/** parseCities over the file's text, so a JSON syntax error names the file
+ *  instead of surfacing as a bare SyntaxError at module load. */
+export function parseCitiesText(text: string, file = "pulse_cities.json"): City[] {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (err) {
+    throw new Error(`${file}: not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  return parseCities(raw);
+}
+
 const dataPath = fileURLToPath(new URL("../../../data/pulse_cities.json", import.meta.url));
-const cities = parseCities(JSON.parse(readFileSync(dataPath, "utf8")));
+const cities = parseCitiesText(readFileSync(dataPath, "utf8"), "pulse_cities.json");
 const bySlug = new Map(cities.map((c) => [c.slug, c]));
 
 export function getCity(slug: string): City | null {

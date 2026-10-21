@@ -91,6 +91,28 @@ describe("startSse", () => {
     expect(() => sse.end()).not.toThrow();
   });
 
+  it("a response already destroyed before streaming starts is closed at once: no head, no timer, signal aborted", () => {
+    const res = fake();
+    (res as { destroyed: boolean }).destroyed = true;
+    const timers = manualTimers();
+    const sse = startSse(res, { timers });
+    expect(sse.closed).toBe(true);
+    expect(sse.signal.aborted).toBe(true);
+    expect(res.status).toBe(0);
+    expect(timers.pending()).toBe(0);
+    expect(sse.write({ type: "done" })).toBe(false);
+    expect(res.body).toBe("");
+    expect(() => sse.end()).not.toThrow();
+  });
+
+  it("a response that has already ended counts as gone too", () => {
+    const res = fake();
+    res.writableEnded = true;
+    const sse = startSse(res, { timers: manualTimers() });
+    expect(sse.closed).toBe(true);
+    expect(sse.signal.aborted).toBe(true);
+  });
+
   it("does not ping a stream that has already ended", () => {
     const res = fake();
     const timers = manualTimers();

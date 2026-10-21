@@ -33,6 +33,34 @@ describe("loadConfig", () => {
   });
 });
 
+describe("fixtures in production", () => {
+  const base = { DATABASE_URL: "postgres://x", QLOO_FIXTURES: "1" };
+
+  it("refuses to start with QLOO_FIXTURES=1 and NODE_ENV=production unless PULSE_ALLOW_FIXTURES=1 is also set", () => {
+    expect(() => loadConfig({ ...base, NODE_ENV: "production" })).toThrow(
+      "QLOO_FIXTURES=1 serves synthetic data and must not run in production; set PULSE_ALLOW_FIXTURES=1 only for a deliberate demo",
+    );
+    expect(() => loadConfig({ ...base, NODE_ENV: "production", PULSE_ALLOW_FIXTURES: "0" })).toThrow(/PULSE_ALLOW_FIXTURES=1/);
+  });
+
+  it("starts, and flags it for a loud startup line, when production fixtures are deliberately allowed", () => {
+    const c = loadConfig({ ...base, NODE_ENV: "production", PULSE_ALLOW_FIXTURES: "1" });
+    expect(c.qlooFixtures).toBe(true);
+    expect(c.fixturesInProduction).toBe(true);
+  });
+
+  it("is unaffected outside production, and in production without fixtures", () => {
+    for (const env of [{ ...base }, { ...base, NODE_ENV: "development" }, { ...base, NODE_ENV: "test" }]) {
+      const c = loadConfig(env);
+      expect(c.qlooFixtures).toBe(true);
+      expect(c.fixturesInProduction).toBe(false);
+    }
+    const live = loadConfig({ DATABASE_URL: "postgres://x", NODE_ENV: "production" });
+    expect(live.qlooFixtures).toBe(false);
+    expect(live.fixturesInProduction).toBe(false);
+  });
+});
+
 describe("assertTmdbConfigured", () => {
   const live = loadConfig({ DATABASE_URL: "postgres://x" });
   const fixtures = loadConfig({ DATABASE_URL: "postgres://x", QLOO_FIXTURES: "1" });

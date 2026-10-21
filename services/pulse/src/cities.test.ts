@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allCities, getCity, parseCities } from "./cities.js";
+import { allCities, getCity, parseCities, parseCitiesText } from "./cities.js";
 
 const valid = {
   slug: "delhi",
@@ -63,5 +63,37 @@ describe("parseCities", () => {
 
   it("rejects non-array input", () => {
     expect(() => parseCities({})).toThrow(/array/);
+  });
+
+  it("rejects a QID used by two cities, naming the QID and both slugs", () => {
+    expect(() => parseCities([valid, { ...valid, slug: "ncr", name: "NCR" }])).toThrow(/Q1353.*"delhi".*"ncr"|Q1353.*delhi.*ncr/);
+  });
+
+  it("rejects a QID repeated within one city, naming it", () => {
+    expect(() => parseCities([{ ...valid, qids: ["Q1353", "Q9", "Q1353"] }])).toThrow(/Q1353.*twice.*delhi/);
+  });
+
+  it("rejects an empty qids array", () => {
+    expect(() => parseCities([{ ...valid, qids: [] }])).toThrow(/delhi.*qids/);
+  });
+
+  it("rejects wikipedia.filmed that is not an array of names", () => {
+    expect(() => parseCities([{ ...valid, wikipedia: { filmed: "Films_shot_in_Delhi", set: [] } }])).toThrow(/delhi.*wikipedia/);
+    expect(() => parseCities([{ ...valid, wikipedia: { set: [] } }])).toThrow(/delhi.*wikipedia/);
+  });
+
+  it("rejects an entry that is not an object", () => {
+    expect(() => parseCities([null])).toThrow(/entry 0.*object/);
+    expect(() => parseCities([valid, "delhi"])).toThrow(/entry 1.*object/);
+  });
+});
+
+describe("parseCitiesText", () => {
+  it("names the file when the JSON is malformed", () => {
+    expect(() => parseCitiesText('[{"slug": ', "pulse_cities.json")).toThrow(/pulse_cities\.json.*not valid JSON/);
+  });
+
+  it("parses valid text", () => {
+    expect(parseCitiesText(JSON.stringify([valid])).map((c) => c.slug)).toEqual(["delhi"]);
   });
 });

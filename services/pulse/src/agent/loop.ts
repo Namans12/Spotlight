@@ -145,8 +145,9 @@ export async function* runAgent(llm: LlmClient, tools: AgentTool[], history: Cha
   let harnessCalls = 0;
   let totalCalls = 0;
   const usedSummary = () => {
+    if (used.length === 0) return "I didn't get to run any lookups";
     const steps = used.length === 1 ? "1 lookup" : `${used.length} lookups`;
-    return `I ran ${steps} (${[...new Set(used)].join(", ") || "none"}) but did not get to a final answer`;
+    return `I ran ${steps} (${[...new Set(used)].join(", ")}) but did not get to a final answer`;
   };
   try {
     for (let round = 0; round < maxRounds; round++) {

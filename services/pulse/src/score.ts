@@ -69,6 +69,10 @@ function localStrength(heat: number[] | null): number | null {
   return usable.length === 0 ? null : usable.reduce((a, b) => a + b, 0) / usable.length;
 }
 
+/** A score as the wire shows it: 3 decimals. The ranking compares scores
+ *  through this too, so what a client sees is what ordered the cards. */
+export const roundScore = (x: number): number => Math.round(x * 1000) / 1000;
+
 /** Scores and ranks (best first). Local affinity is min-max normalised among
  *  the candidates that have cells; one with none is 0 and does not enter the
  *  range, so a city with no heatmap data at all ranks everything on the other
@@ -94,9 +98,8 @@ export function scoreCandidates(cands: Candidate[], type: BusinessType): Scored[
 
   // Scores are compared as the wire shows them (3 decimals), so float noise
   // far below that cannot outrank popularity.
-  const wire = (x: number) => Math.round(x * 1000) / 1000;
   return scored.sort((a, b) =>
-    wire(b.score) - wire(a.score)
+    roundScore(b.score) - roundScore(a.score)
     || b.candidate.popularity - a.candidate.popularity
     || a.candidate.card.releaseDate.localeCompare(b.candidate.card.releaseDate)
     || a.candidate.card.tmdbId - b.candidate.card.tmdbId);

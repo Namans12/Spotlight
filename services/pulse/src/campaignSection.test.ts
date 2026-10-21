@@ -291,6 +291,20 @@ describe("makeDraftCampaign LlmError mapping", () => {
     expect(JSON.stringify(s)).not.toContain("RAW-UPSTREAM");
   });
 
+  it("reports a persistent bad_response through onError once (a misconfigured model must not be silent), keeping the placeholder note", async () => {
+    const onError = vi.fn();
+    const { draft } = setup([new LlmError("bad_response", "The model provider answered HTTP 404.")], { onError });
+    const s = await draft(ctxOf());
+    expect(s.status).toBe("degraded");
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith("campaign writer", expect.objectContaining({ kind: "bad_response", message: "The model provider answered HTTP 404." }));
+  });
+
+  it("a throwing onError does not break the brief on the bad_response path", async () => {
+    const { draft } = setup([new LlmError("bad_response", "x")], { onError: () => { throw new Error("logger down"); } });
+    expect((await draft(ctxOf())).status).toBe("degraded");
+  });
+
   it("reports the real cause through onError", async () => {
     const onError = vi.fn();
     const { draft } = setup([new LlmError("rate_limited", "Groq HTTP 429")], { onError });

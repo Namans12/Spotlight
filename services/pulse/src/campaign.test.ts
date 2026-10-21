@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { BriefSectionKey, Campaign, DemographicsData, EvidenceSection, HeatCell, LocalHook, NamedEntity, TagAffinity, Venue } from "../../../shared/types/pulse.js";
 import {
   buildBundle, downgradeUncited, draftCampaign, draftWithoutQloo, FALLBACK_IDEA, validateCampaign, type EvidenceFact,
 } from "./campaign.js";
-import { LlmError } from "./llm/client.js";
+import { createGroqClient, LlmError } from "./llm/client.js";
 import { fakeLlm } from "./testing/llm.js";
 
 const ok = <T>(data: T): EvidenceSection<unknown> => ({ status: "ok", data, provenance: [] });
@@ -227,6 +227,37 @@ describe("draftCampaign", () => {
     const c = await draftCampaign(llm, bundle, ctx);
     expect(llm.calls).toHaveLength(3);
     expect(c.ideas).toEqual([FALLBACK_IDEA]);
+  });
+
+  it("reports a persistent provider bad_response to onError once, after the last attempt, and still returns the fallback", async () => {
+    const onError = vi.fn();
+    const llm = fakeLlm([new LlmError("bad_response", "The model provider answered HTTP 404.")]);
+    const c = await draftCampaign(llm, bundle, ctx, onError);
+    expect(llm.calls).toHaveLength(3);
+    expect(c.ideas).toEqual([FALLBACK_IDEA]);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith("campaign writer", expect.objectContaining({ kind: "bad_response", message: "The model provider answered HTTP 404." }));
+    const g = vi.fn();
+    await draftWithoutQloo(fakeLlm([new LlmError("bad_response", "x")]), ctx, g);
+    expect(g).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not report when a retry recovered, or when the model's own output was merely invalid", async () => {
+    const onError = vi.fn();
+    await draftCampaign(fakeLlm([new LlmError("bad_response", "x"), valid]), bundle, ctx, onError);
+    await draftCampaign(fakeLlm([badJson]), bundle, ctx, onError);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("never puts the key, request body or prompt in what it reports (through the real client)", async () => {
+    const reported: unknown[] = [];
+    const fetchImpl = (async () => new Response(JSON.stringify({ error: { message: "The model `m` does not exist", code: "model_not_found", echo: "sk-LEAK prompt-text" } }), { status: 404 })) as unknown as typeof fetch;
+    const llm = createGroqClient({ groqApiKey: "gsk_SECRETKEY", groqBaseUrl: "http://x.invalid", groqModel: "m" }, fetchImpl);
+    await draftCampaign(llm, bundle, ctx, (_c, err) => reported.push(err));
+    expect(reported).toHaveLength(1);
+    const text = String((reported[0] as Error).message) + " " + String(reported[0]) + " " + ((reported[0] as Error).stack ?? "");
+    expect(text).toContain("404");
+    expect(text).not.toMatch(/gsk_SECRETKEY|sk-LEAK|prompt-text|Dune|venue:a/);
   });
 
   it("bad_response after an earlier parseable answer keeps that answer, downgraded", async () => {

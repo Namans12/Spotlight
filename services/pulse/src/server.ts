@@ -4,7 +4,7 @@ import { assertTmdbConfigured, loadConfig } from "./config.js";
 import { corsHeaders } from "./http/cors.js";
 import { createRouter, type Handler } from "./http/router.js";
 import { createToolProvider } from "./agent/tools.js";
-import { createGroqClient } from "./llm/client.js";
+import { createGroqClient, LlmError } from "./llm/client.js";
 import { createQlooClient } from "./qloo/client.js";
 import { getPool } from "./db/pool.js";
 import { isKnownTitle } from "./db/titles.js";
@@ -24,6 +24,9 @@ import { takeUsage } from "./usage.js";
 
 const config = loadConfig(process.env);
 assertTmdbConfigured(config, process.env);
+if (config.fixturesInProduction) {
+  console.warn("WARNING: QLOO_FIXTURES=1 in NODE_ENV=production (PULSE_ALLOW_FIXTURES=1): serving SYNTHETIC Qloo data, not real results. Deliberate demos only.");
+}
 
 const sql = getPool(config);
 const qloo = createQlooClient(config);
@@ -33,7 +36,9 @@ const qloo = createQlooClient(config);
 const llm = config.groqApiKey ? createGroqClient(config) : null;
 const campaignCaps = { session: config.sessionDailyCampaign, global: config.globalDailyLlm };
 const takeCampaignUsage = (session: string) => takeUsage(sql, session, "campaign", campaignCaps);
-const logError = (context: string, err: unknown) => console.error(`${context} failed:`, err instanceof Error ? err.message : String(err));
+// An LlmError's kind says what to fix (a wrong GROQ_MODEL is a bad_response with HTTP 404); its message is already free of the key and prompt.
+const logError = (context: string, err: unknown) =>
+  console.error(`${context} failed:`, err instanceof LlmError ? `${err.kind}: ${err.message}` : err instanceof Error ? err.message : String(err));
 const titleHeader = createTitleLookup(sql, (mediaType, id) => tmdbDetail(mediaType, id));
 
 const briefRoute = briefHandler({
@@ -60,6 +65,7 @@ const guessRoute = guessHandler({
   header: titleHeader,
   llm,
   takeUsage: takeCampaignUsage,
+  onError: logError,
 });
 
 // The chat agent. Its tools read the same tables and call the same Qloo client

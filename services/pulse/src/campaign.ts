@@ -263,15 +263,29 @@ const shortId = (id: string) => cleanText(id, 60);
 const CUT_OFF = `Your last answer was cut off before it finished. Reply again with a shorter answer: exactly 3 ideas, at most 2 clauses each, short titles. JSON only, matching ${SCHEMA}.`;
 const REJECTED = `The provider rejected your last answer as invalid JSON. Reply again with JSON only, matching ${SCHEMA}.`;
 
-async function run(llm: LlmClient, messages: ChatMessage[], bundleIds: Set<string>): Promise<Campaign> {
+/** Told about a provider failure the draft loop absorbed: the LlmError itself,
+ *  whose message is a fixed sentence (kind and HTTP status) and never holds the
+ *  key, the request body or the prompt. */
+export type DraftOnError = (context: string, err: unknown) => void;
+
+async function run(llm: LlmClient, messages: ChatMessage[], bundleIds: Set<string>, onError?: DraftOnError): Promise<Campaign> {
   const convo = [...messages];
   let lastParseable: Campaign | null = null;
+  // The provider's last failure, cleared by any attempt that got an answer, so
+  // a persistent one (a wrong model name answers HTTP 404 every time) is
+  // reported once instead of vanishing into the placeholder draft.
+  let providerFailure: LlmError | null = null;
+  const report = () => {
+    if (!providerFailure || !onError) return;
+    try { onError("campaign writer", providerFailure); } catch { /* a broken logger must not break the draft */ }
+  };
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     let reply: ChatMessage;
     try {
       reply = await llm.chat(convo, { json: true });
     } catch (err) {
       if (err instanceof LlmError && err.kind === "bad_response") {
+        providerFailure = err;
         // The provider could not produce usable output (for example Groq's
         // json_validate_failed): that is an unparseable attempt, retried.
         convo.push({ role: "user", content: REJECTED });
@@ -279,9 +293,10 @@ async function run(llm: LlmClient, messages: ChatMessage[], bundleIds: Set<strin
       }
       // A rate limit or outage on a retry should not throw away an answer we
       // already have; with nothing usable yet the caller has to hear about it.
-      if (err instanceof LlmError && lastParseable) break;
+      if (err instanceof LlmError && lastParseable) { providerFailure = err; break; }
       throw err;
     }
+    providerFailure = null;
     const content = reply.content ?? "";
     if (reply.finish_reason === "length") {
       // Cut off mid-answer: even if the partial text happens to parse, it is
@@ -308,6 +323,7 @@ async function run(llm: LlmClient, messages: ChatMessage[], bundleIds: Set<strin
     }
     convo.push({ role: "assistant", content }, { role: "user", content: feedback });
   }
+  report();
   return lastParseable ? downgradeUncited(lastParseable, bundleIds) : { ideas: [structuredClone(FALLBACK_IDEA)], groundedBy: "qloo" };
 }
 
@@ -317,17 +333,17 @@ async function run(llm: LlmClient, messages: ChatMessage[], bundleIds: Set<strin
  *  the single fallback idea. A provider failure (LlmError) propagates unless an
  *  earlier answer can be used instead. With an empty bundle there is nothing to
  *  ground in, so it is an ungrounded draft. */
-export async function draftCampaign(llm: LlmClient, bundle: EvidenceFact[], ctx: DraftContext): Promise<Campaign> {
-  if (bundle.length === 0) return draftWithoutQloo(llm, ctx);
+export async function draftCampaign(llm: LlmClient, bundle: EvidenceFact[], ctx: DraftContext, onError?: DraftOnError): Promise<Campaign> {
+  if (bundle.length === 0) return draftWithoutQloo(llm, ctx, onError);
   const ids = new Set(bundle.map((f) => f.id));
-  const c = await run(llm, [{ role: "system", content: systemPrompt(true) }, { role: "user", content: userPrompt(ctx, bundle) }], ids);
+  const c = await run(llm, [{ role: "system", content: systemPrompt(true) }, { role: "user", content: userPrompt(ctx, bundle) }], ids, onError);
   return { ...c, groundedBy: "qloo" };
 }
 
 /** The same task with no evidence at all, for the "What an LLM guesses with no
  *  taste data" view. Every clause ends up with evidence []. */
-export async function draftWithoutQloo(llm: LlmClient, ctx: DraftContext): Promise<Campaign> {
-  const c = await run(llm, [{ role: "system", content: systemPrompt(false) }, { role: "user", content: userPrompt(ctx, null) }], new Set());
+export async function draftWithoutQloo(llm: LlmClient, ctx: DraftContext, onError?: DraftOnError): Promise<Campaign> {
+  const c = await run(llm, [{ role: "system", content: systemPrompt(false) }, { role: "user", content: userPrompt(ctx, null) }], new Set(), onError);
   return { ...c, groundedBy: "none" };
 }
 

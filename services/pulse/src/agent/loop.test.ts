@@ -93,6 +93,18 @@ describe("runAgent", () => {
     expect(ev.at(-1)).toEqual({ type: "done" });
   });
 
+  it("the step-limit message reads naturally with zero lookups, and with some", async () => {
+    const none = await collect(runAgent(fakeLlm([text("never")]), [], [user("hi")], 0));
+    const noneText = (none.at(-2) as { text: string }).text;
+    expect(noneText).toContain("step limit");
+    expect(noneText).toContain("I didn't get to run any lookups");
+    expect(noneText).not.toMatch(/I ran 0 lookups|\(none\)/);
+    const some = await collect(runAgent(fakeLlm([toolCallMsg(call("pulse_board", {}))]), [fakeTool("pulse_board", {})], [user("loop")], 2));
+    const someText = (some.at(-2) as { text: string }).text;
+    expect(someText).toContain("step limit");
+    expect(someText).toContain("I ran 2 lookups (pulse_board) but did not get to a final answer");
+  });
+
   it("honours a different round limit", async () => {
     const llm = fakeLlm([toolCallMsg(call("pulse_board", {}))]);
     const ev = await collect(runAgent(llm, [fakeTool("pulse_board", {})], [user("loop")], 2));
@@ -358,6 +370,23 @@ describe("runAgent", () => {
       expect(ev.map((e) => e.type)).toEqual(["message", "done"]);
       expect((ev[0] as { text: string }).text).toContain("ran out of time");
       expect(seen?.aborted).toBe(true);
+    });
+
+    it("the out-of-time message says plainly when no lookup had run, and names them when some had", async () => {
+      const timers = manualTimers();
+      let seen: AbortSignal | undefined;
+      const llm = { chat: (_m: ChatMessage[], o?: { signal?: AbortSignal }) => { seen = o?.signal; return new Promise<ChatMessage>(() => {}); } };
+      const events = collect(runAgent(llm, [], [user("hi")], 6, { timers }));
+      await vi.waitFor(() => expect(seen).toBeDefined());
+      timers.fire(90_000);
+      const text0 = ((await events)[0] as { text: string }).text;
+      expect(text0).toContain("ran out of time");
+      expect(text0).toContain("I didn't get to run any lookups");
+      expect(text0).not.toMatch(/I ran 0 lookups|\(none\)/);
+      const timers2 = manualTimers();
+      const tool = fakeTool("t", () => { timers2.fire(90_000); return { ok: true }; });
+      const ev = await collect(runAgent(fakeLlm([toolCallMsg(call("t"))]), [tool], [user("hi")], 6, { timers: timers2 }));
+      expect((ev.at(-2) as { text: string }).text).toContain("I ran 1 lookup (t) but did not get to a final answer");
     });
 
     it("does not start another round once it has fired", async () => {

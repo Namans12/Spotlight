@@ -139,13 +139,79 @@ describe("GET /guess", () => {
     it("is consulted after the known-title gate and before the cap, so a hit takes no usage even at the cap", async () => {
       const cache = createTtlCache<Campaign>(frozen());
       cache.set("guess|1|movie|delhi|cafe", { ideas: [], groundedBy: "none" });
-      const { get, deps, llm } = await start({ cache, takeUsage: async () => ({ allowed: false, reason: "global_cap" }) });
+      const { get, llm } = await start({ cache, takeUsage: async () => ({ allowed: false, reason: "global_cap" }) });
       expect((await get(GOOD)).status).toBe(200);
       expect(llm!.calls).toHaveLength(0);
-      void deps;
       await new Promise<void>((r) => server!.close(() => r()));
       const unknown = await start({ cache, isKnown: async () => false });
       expect((await unknown.get(GOOD)).status).toBe(404);
+    });
+  });
+
+  describe("in-flight de-duplication", () => {
+    const deferred = <T>() => { let resolve!: (v: T) => void; let reject!: (e: unknown) => void; const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; }); return { promise, resolve, reject }; };
+    const flush = () => new Promise<void>((r) => setTimeout(r, 25));
+    function gatedLlm() {
+      const gates: ReturnType<typeof deferred<string>>[] = [];
+      const llm = { chat: () => { const g = deferred<string>(); gates.push(g); return g.promise.then((content) => ({ role: "assistant" as const, content })); } };
+      return { llm: llm as unknown as FakeLlm, gates };
+    }
+
+    it("two simultaneous identical guesses share one draft and take one usage slot", async () => {
+      const { llm, gates } = gatedLlm();
+      const { get, deps } = await start({}, llm);
+      const a = get(GOOD, { "x-pulse-session": "a" });
+      const b = get(GOOD, { "x-pulse-session": "b" });
+      await flush();
+      expect(gates).toHaveLength(1);
+      gates[0].resolve(REPLY);
+      const [ra, rb] = await Promise.all([a, b]);
+      expect(ra.status).toBe(200);
+      expect(rb.status).toBe(200);
+      expect(await rb.json()).toEqual(await ra.json());
+      expect(gates).toHaveLength(1);
+      expect(deps.takeUsage).toHaveBeenCalledTimes(1);
+    });
+
+    it("different keys do not share a draft", async () => {
+      const { llm, gates } = gatedLlm();
+      const { get, deps } = await start({}, llm);
+      const a = get(GOOD);
+      const b = get("city=mumbai&type=cafe&mediaType=movie&tmdbId=1");
+      await flush();
+      expect(gates).toHaveLength(2);
+      gates.forEach((g) => g.resolve(REPLY));
+      await Promise.all([a, b]);
+      expect(deps.takeUsage).toHaveBeenCalledTimes(2);
+    });
+
+    it("a failure reaches every waiter, clears the entry, and the next guess tries again", async () => {
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      const { llm, gates } = gatedLlm();
+      const { get, deps } = await start({}, llm);
+      const a = get(GOOD);
+      const b = get(GOOD);
+      await flush();
+      expect(gates).toHaveLength(1);
+      gates[0].reject(new LlmError("unavailable", "x"));
+      const [ra, rb] = await Promise.all([a, b]);
+      expect([ra.status, rb.status]).toEqual([503, 503]);
+      expect(deps.takeUsage).toHaveBeenCalledTimes(1);
+      const c = get(GOOD);
+      await flush();
+      expect(gates).toHaveLength(2);
+      gates[1].resolve(REPLY);
+      expect((await c).status).toBe(200);
+      expect(deps.takeUsage).toHaveBeenCalledTimes(2);
+      log.mockRestore();
+    });
+
+    it("a shared cap refusal is shared and answers 429 to both", async () => {
+      const { get, deps, llm } = await start({ takeUsage: vi.fn(async () => { await new Promise((r) => setTimeout(r, 20)); return { allowed: false, reason: "session_cap" } as const; }) });
+      const [ra, rb] = await Promise.all([get(GOOD), get(GOOD)]);
+      expect([ra.status, rb.status]).toEqual([429, 429]);
+      expect(deps.takeUsage).toHaveBeenCalledTimes(1);
+      expect(llm!.calls).toHaveLength(0);
     });
   });
 
@@ -189,6 +255,16 @@ describe("GET /guess", () => {
       expect(await res.json()).toEqual({ error: "daily_limit" });
       expect(llm!.calls).toHaveLength(0);
     }
+  });
+
+  it("reports a persistent provider bad_response to onError (a misconfigured model is not silent) and still answers with the placeholder", async () => {
+    const onError = vi.fn();
+    const { get } = await start({ onError }, fakeLlm([new LlmError("bad_response", "The model provider answered HTTP 404.")]));
+    const res = await get(GOOD);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as Campaign).ideas[0].title).toBe("Campaign draft unavailable");
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith("campaign writer", expect.objectContaining({ kind: "bad_response" }));
   });
 
   it("503 llm_unavailable when the model fails, without leaking the cause", async () => {

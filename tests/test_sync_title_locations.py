@@ -12,6 +12,7 @@ against fakes; there is no network and no database.
 from __future__ import annotations
 
 import sys
+import zlib
 from pathlib import Path
 
 import pytest
@@ -211,7 +212,7 @@ MUMBAI = {"slug": "mumbai", "name": "Mumbai", "lat": 19.076, "lon": 72.8777}
 
 def _nb(label, qid=None, sl=5, coord="Point(72.85 19.05)"):
     b = {
-        "item": {"value": f"http://www.wikidata.org/entity/{qid or 'Q' + str(abs(hash(label)) % 10**7)}"},
+        "item": {"value": f"http://www.wikidata.org/entity/{qid or 'Q' + str(zlib.crc32(label.encode()) % 10**7)}"},
         "label": {"value": label},
         "sl": {"value": str(sl)},
     }
@@ -318,6 +319,18 @@ def test_seed_qids_are_validated_on_load(tmp_path, monkeypatch):
     seed.write_text('{"goa": ["Q4841379", "Q1 } SELECT", "nonsense"]}')
     monkeypatch.setattr(slt, "SEED_PATH", seed)
     assert slt.load_seed() == {"goa": ["Q4841379"]}
+
+
+def test_a_malformed_seed_stops_with_a_one_line_message_not_a_traceback(tmp_path, monkeypatch):
+    seed = tmp_path / "seed.json"
+    monkeypatch.setattr(slt, "SEED_PATH", seed)
+    for text in ['{"goa": [', "[]", '"goa"', '{"goa": "Q1"}', '{"goa": ["Q1", 7]}', '{"goa": {"Q1": 1}}']:
+        seed.write_text(text)
+        with pytest.raises(SystemExit) as exc:
+            slt.load_seed()
+        message = str(exc.value)
+        assert "seed.json" in message
+        assert "\n" not in message.strip()
 
 
 def test_a_missing_seed_file_means_no_seed(tmp_path, monkeypatch):

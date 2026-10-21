@@ -3,6 +3,8 @@ export interface PulseConfig {
   allowedOrigins: string[];
   databaseUrl: string;
   qlooFixtures: boolean;
+  /** Synthetic Qloo data is being served in production, by an explicit PULSE_ALLOW_FIXTURES=1. */
+  fixturesInProduction: boolean;
   groqApiKey: string | null;
   groqBaseUrl: string;
   groqModel: string;
@@ -44,6 +46,13 @@ export function loadConfig(env: NodeJS.ProcessEnv): PulseConfig {
   const databaseUrl = optional(env.DATABASE_URL);
   if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
+  const qlooFixtures = env.QLOO_FIXTURES === "1";
+  const production = env.NODE_ENV === "production";
+  // A forgotten QLOO_FIXTURES=1 would serve invented data as if it were Qloo's.
+  if (qlooFixtures && production && env.PULSE_ALLOW_FIXTURES !== "1") {
+    throw new Error("QLOO_FIXTURES=1 serves synthetic data and must not run in production; set PULSE_ALLOW_FIXTURES=1 only for a deliberate demo");
+  }
+
   return {
     port: intOr(env.PORT, DEFAULT_PORT),
     allowedOrigins: (env.PULSE_ALLOWED_ORIGINS ?? "")
@@ -51,7 +60,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): PulseConfig {
       .map((o) => o.trim())
       .filter(Boolean),
     databaseUrl,
-    qlooFixtures: env.QLOO_FIXTURES === "1",
+    qlooFixtures,
+    fixturesInProduction: qlooFixtures && production,
     groqApiKey: optional(env.GROQ_API_KEY),
     groqBaseUrl: optional(env.GROQ_BASE_URL) ?? DEFAULT_GROQ_BASE_URL,
     groqModel: optional(env.GROQ_MODEL) ?? DEFAULT_GROQ_MODEL,

@@ -14,7 +14,7 @@ import { getPopularity } from "./db/titles.js";
 import { peekEvidence } from "./evidence.js";
 import { labelCell } from "./geo.js";
 import { notFoundIsStale, type TitleKey } from "./resolve.js";
-import { scoreCandidates, whyLine, type Candidate } from "./score.js";
+import { roundScore, scoreCandidates, whyLine, type Candidate } from "./score.js";
 
 /** One statement type serves every read the board makes. */
 export type BoardSql = EvidenceSql;
@@ -170,7 +170,7 @@ export async function buildBoard(deps: BoardDeps, city: City, type: BusinessType
     const topHood = strongest ? labelCell(strongest, hoods) : null;
     return {
       ...s.candidate.card,
-      score: Math.round(s.score * 1000) / 1000,
+      score: roundScore(s.score),
       why: whyLine(s, i + 1, all.length, city.name, topHood),
     };
   });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LocalHook } from "../../../shared/types/pulse.js";
-import { businessFit, freshness, scoreCandidates, whyLine, type Candidate } from "./score.js";
+import { businessFit, freshness, roundScore, scoreCandidates, whyLine, type Candidate } from "./score.js";
 
 let seq = 0;
 /** A candidate with nothing going for it unless a test says otherwise: no
@@ -21,6 +21,14 @@ function cand(over: Partial<Candidate> = {}): Candidate {
 }
 const filmed = (landmark: string | null = null): LocalHook => ({ kind: "filmed", placeName: "Delhi", landmark, source: "both" });
 const setIn: LocalHook = { kind: "set", placeName: "Delhi", landmark: null, source: "wikipedia" };
+
+describe("roundScore", () => {
+  it("rounds to the 3 decimals the wire shows", () => {
+    expect(roundScore(0.12344)).toBe(0.123);
+    expect(roundScore(0.1235)).toBe(0.124);
+    expect(roundScore(1)).toBe(1);
+  });
+});
 
 describe("freshness", () => {
   it.each([
