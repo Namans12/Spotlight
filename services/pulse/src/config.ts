@@ -8,6 +8,9 @@ export interface PulseConfig {
   groqModel: string;
   warmSecret: string | null;
   sessionDailyChat: number;
+  /** Campaign drafts (a brief's campaign, a /guess) per session per UTC day. Separate from chat. */
+  sessionDailyCampaign: number;
+  /** Chat plus campaign drafts across every session per UTC day. */
   globalDailyLlm: number;
 }
 
@@ -15,6 +18,7 @@ const DEFAULT_PORT = 8787;
 const DEFAULT_GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions";
 const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
 const DEFAULT_SESSION_DAILY_CHAT = 30;
+const DEFAULT_SESSION_DAILY_CAMPAIGN = 40;
 const DEFAULT_GLOBAL_DAILY_LLM = 800;
 
 /** Only plain digit strings parse; anything else falls back to the default.
@@ -53,6 +57,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): PulseConfig {
     groqModel: optional(env.GROQ_MODEL) ?? DEFAULT_GROQ_MODEL,
     warmSecret: optional(env.PULSE_WARM_SECRET),
     sessionDailyChat: intOr(env.PULSE_SESSION_DAILY_CHAT, DEFAULT_SESSION_DAILY_CHAT),
+    sessionDailyCampaign: intOr(env.PULSE_SESSION_DAILY_CAMPAIGN, DEFAULT_SESSION_DAILY_CAMPAIGN),
     globalDailyLlm: intOr(env.PULSE_GLOBAL_DAILY_LLM, DEFAULT_GLOBAL_DAILY_LLM),
   };
 }

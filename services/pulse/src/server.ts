@@ -3,22 +3,34 @@ import { tmdbDetail } from "../../../lib/tmdbProxy.js";
 import { assertTmdbConfigured, loadConfig } from "./config.js";
 import { corsHeaders } from "./http/cors.js";
 import { createRouter, type Handler } from "./http/router.js";
+import { createGroqClient } from "./llm/client.js";
 import { createQlooClient } from "./qloo/client.js";
 import { getPool } from "./db/pool.js";
 import { isKnownTitle } from "./db/titles.js";
 import { createRateLimiter } from "./http/rateLimit.js";
+import { makeDraftCampaign } from "./campaignSection.js";
 import { resolveTitle } from "./resolve.js";
 import { boardHandler } from "./routes/board.js";
 import { briefHandler } from "./routes/brief.js";
+import { guessHandler } from "./routes/guess.js";
 import { warmHandler } from "./routes/warm.js";
 import { createBackgroundWarmer, createWarmQueue, warmCities, type WarmDeps } from "./warm.js";
 import { createTitleLookup } from "./titleHeader.js";
+import { takeUsage } from "./usage.js";
 
 const config = loadConfig(process.env);
 assertTmdbConfigured(config, process.env);
 
 const sql = getPool(config);
 const qloo = createQlooClient(config);
+
+// Null without GROQ_API_KEY: the brief then says the writer is not configured
+// and /guess answers 503, rather than the service refusing to start.
+const llm = config.groqApiKey ? createGroqClient(config) : null;
+const campaignCaps = { session: config.sessionDailyCampaign, global: config.globalDailyLlm };
+const takeCampaignUsage = (session: string) => takeUsage(sql, session, "campaign", campaignCaps);
+const logError = (context: string, err: unknown) => console.error(`${context} failed:`, err instanceof Error ? err.message : String(err));
+const titleHeader = createTitleLookup(sql, (mediaType, id) => tmdbDetail(mediaType, id));
 
 const briefRoute = briefHandler({
   sql,
@@ -27,18 +39,23 @@ const briefRoute = briefHandler({
   isKnown: (key) => isKnownTitle(sql, key),
   // 30 briefs a minute per client: each one can cost Qloo calls on a public endpoint.
   rateLimiter: createRateLimiter({ max: 30, windowMs: 60_000 }),
-  header: createTitleLookup(sql, (mediaType, id) => tmdbDetail(mediaType, id)),
-  // Replaced by the real drafter in a later task; until then the brief says so
-  // rather than showing an empty box with no explanation.
-  draftCampaign: async () => ({ status: "empty", data: null, provenance: [], note: "Campaign drafting is added in a later task." }),
+  header: titleHeader,
+  draftCampaign: makeDraftCampaign({ llm, model: config.groqModel, takeUsage: takeCampaignUsage, onError: logError }),
   onError: (context, err) => console.error(`brief: ${context} failed:`, err instanceof Error ? err.message : String(err)),
 });
-
-const logError = (context: string, err: unknown) => console.error(`${context} failed:`, err instanceof Error ? err.message : String(err));
 
 // Everything warming needs, shared by the board's background queue and POST /warm.
 const warmDeps: WarmDeps = { sql, qloo, resolve: (key) => resolveTitle(sql, qloo, key), onError: logError };
 const warmQueue = createWarmQueue({ onError: (key, err) => logError(`warm ${key}`, err) });
+
+const guessRoute = guessHandler({
+  // Its own, stricter limiter than the brief's: every guess is a model call.
+  rateLimiter: createRateLimiter({ max: 10, windowMs: 60_000 }),
+  isKnown: (key) => isKnownTitle(sql, key),
+  header: titleHeader,
+  llm,
+  takeUsage: takeCampaignUsage,
+});
 
 const boardRoute = boardHandler({
   sql,
@@ -62,6 +79,7 @@ const healthz: Handler = async (_req, res) => {
 const route = createRouter({
   "GET /healthz": healthz,
   "GET /brief": briefRoute,
+  "GET /guess": guessRoute,
   "GET /board": boardRoute,
   "POST /warm": warmRoute,
 });

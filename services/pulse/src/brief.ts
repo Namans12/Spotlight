@@ -20,6 +20,8 @@ export interface CampaignContext {
   sections: Partial<Record<BriefSectionKey, EvidenceSection<unknown>>>;
   header: BriefHeader;
   businessType: BusinessType;
+  /** The caller's hashed session (see usage.ts sessionKey), for the usage cap. */
+  session?: string;
 }
 export type DraftCampaign = (ctx: CampaignContext) => Promise<EvidenceSection<unknown>>;
 
@@ -40,6 +42,8 @@ export interface BriefRequest {
   city: City;
   businessType: BusinessType;
   key: TitleKey;
+  /** Hashed session of the caller, passed through to the campaign drafter. */
+  session?: string;
   /** Aborted when the client has gone; remaining work is skipped. */
   signal?: AbortSignal;
 }
@@ -123,7 +127,7 @@ function sourceEntries(rows: { kind: string; source: string }[], citySlug: strin
  *  as each completes, then the campaign (which is drafted from the others),
  *  then `done`. Nothing in here throws: a failure becomes an error section. */
 export async function* streamBrief(deps: BriefDeps, req: BriefRequest): AsyncGenerator<BriefEvent> {
-  const { city, businessType, key, signal } = req;
+  const { city, businessType, key, signal, session } = req;
   const { sql, qloo } = deps;
   const now = () => (deps.now ? deps.now() : new Date());
   const report = (context: string, err: unknown) => {
@@ -249,7 +253,7 @@ export async function* streamBrief(deps: BriefDeps, req: BriefRequest): AsyncGen
       // Through a promise chain, so a drafter that throws before returning a
       // promise is caught the same way as one that rejects.
       const campaign = await Promise.resolve()
-        .then(() => deps.draftCampaign({ sections: { ...collected }, header, businessType }))
+        .then(() => deps.draftCampaign({ sections: { ...collected }, header, businessType, session }))
         .then((s) => sanitiseError(s, "section campaign", report), (err) => { report("section campaign", err); return errorSection(noteFor(err)); });
       yield { type: "section", key: "campaign", section: campaign };
     }

@@ -47,3 +47,17 @@ describe("assertTmdbConfigured", () => {
     expect(() => assertTmdbConfigured(fixtures, {})).not.toThrow();
   });
 });
+
+describe("sessionDailyCampaign (R27)", () => {
+  it("defaults to 40, separate from the chat quota", () => {
+    const c = loadConfig({ DATABASE_URL: "postgres://x" });
+    expect(c.sessionDailyCampaign).toBe(40);
+    expect(c.sessionDailyChat).toBe(30);
+  });
+  it("honours PULSE_SESSION_DAILY_CAMPAIGN, parsed as strictly as the other quotas", () => {
+    expect(loadConfig({ DATABASE_URL: "postgres://x", PULSE_SESSION_DAILY_CAMPAIGN: "2" }).sessionDailyCampaign).toBe(2);
+    expect(loadConfig({ DATABASE_URL: "postgres://x", PULSE_SESSION_DAILY_CAMPAIGN: "0" }).sessionDailyCampaign).toBe(0);
+    expect(loadConfig({ DATABASE_URL: "postgres://x", PULSE_SESSION_DAILY_CAMPAIGN: "4x" }).sessionDailyCampaign).toBe(40);
+    expect(loadConfig({ DATABASE_URL: "postgres://x", PULSE_SESSION_DAILY_CAMPAIGN: "" }).sessionDailyCampaign).toBe(40);
+  });
+});

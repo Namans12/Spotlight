@@ -1,8 +1,9 @@
+import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { BriefEvent } from "../../../../shared/types/pulse.js";
+import type { BriefEvent, EvidenceSection } from "../../../../shared/types/pulse.js";
 import { createRateLimiter } from "../http/rateLimit.js";
 import { createRouter } from "../http/router.js";
 import { fixtureDeps, type FixtureOverrides } from "../testing/fakes.js";
@@ -117,6 +118,26 @@ describe("GET /brief known-title gate (R22a)", () => {
     const { get } = await start({ isKnown });
     await get("city=atlantis&type=cafe&mediaType=movie&tmdbId=1");
     expect(isKnown).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /brief session identity (R27)", () => {
+  const NOW = new Date("2026-10-21T10:00:00Z");
+  const sha = (v: string) => createHash("sha256").update(v).digest("hex");
+  const draft = () => vi.fn(async (_ctx: unknown) => ({ status: "empty", data: null, provenance: [] }) as EvidenceSection<unknown>);
+
+  it("hands the campaign drafter the hashed X-Pulse-Session, never the raw header", async () => {
+    const draftCampaign = draft();
+    const { get } = await start({ draftCampaign, now: () => NOW });
+    await (await get(GOOD, { "x-pulse-session": "raw-id-1" })).text();
+    expect((draftCampaign.mock.calls[0][0] as { session: string }).session).toBe(sha("raw-id-1:2026-10-21"));
+  });
+
+  it("falls back to the client address when the header is absent", async () => {
+    const draftCampaign = draft();
+    const { get } = await start({ draftCampaign, now: () => NOW });
+    await (await get(GOOD, { "x-forwarded-for": "6.6.6.6, 203.0.113.9" })).text();
+    expect((draftCampaign.mock.calls[0][0] as { session: string }).session).toBe(sha("203.0.113.9:2026-10-21"));
   });
 });
 
