@@ -34,6 +34,11 @@ export interface QlooClient {
   close?(): Promise<void>;
 }
 
+export const DEMOGRAPHICS_EMPTY_NOTE =
+  "Qloo doesn't have an audience profile for this title yet \u2014 common for releases that haven't been out long.";
+export const THIN_SIGNAL_NOTE = "Qloo doesn't have enough taste data on this title yet to suggest this.";
+export const NO_FOOD_THEMES_NOTE = "No food or drink themes stood out for this audience in this city.";
+
 const STATUSES: readonly EvidenceStatus[] = ["ok", "empty", "needs_input", "partial", "degraded", "error"];
 
 function provenance(call: string, params: Record<string, string>): Provenance[] {
@@ -94,6 +99,13 @@ function throwIfRateLimited(raw: unknown): void {
   }
 }
 
+/** The harness's HTTP 400 for an entity Qloo has too little signal on
+ *  (QLOO_CONTRACT, not retryable). Returns the code, or null for any other reply. */
+function contractRejection(raw: unknown): string | null {
+  const env = raw as { status?: unknown; error?: { code?: unknown; retryable?: unknown } } | null;
+  return env?.status === "error" && env.error?.code === "QLOO_CONTRACT" && env.error.retryable !== true ? "QLOO_CONTRACT" : null;
+}
+
 export interface HarnessClientOptions {
   /** Injectable so tests do not wait out the real backoffs. */
   sleep?: (ms: number) => Promise<void>;
@@ -118,9 +130,19 @@ export function createHarnessQlooClient(transport: HarnessTransport, opts: Harne
       return raw;
     }, { signal: callOpts.signal });
 
-  async function section<T>(r: recipes.ToolRecipe<T>): Promise<EvidenceSection<T>> {
+  /** `thinSignal` is for the recommend calls keyed on one title: a contract
+   *  rejection there means "too little taste data on this title", which is an
+   *  answer (empty, so it caches for 3 days) rather than a failure to retry on
+   *  every request. It is still logged, with no params or keys, so a genuine
+   *  recipe bug stays visible in the server log instead of hiding as "empty". */
+  async function section<T>(r: recipes.ToolRecipe<T>, opts: { thinSignal?: boolean } = {}): Promise<EvidenceSection<T>> {
     try {
       const raw = await callTool(r.tool, r.args);
+      const rejected = opts.thinSignal ? contractRejection(raw) : null;
+      if (rejected) {
+        console.warn(`qloo contract rejection (${r.call}): ${rejected}`);
+        return { status: "empty", data: null, provenance: provenance(r.call, r.params), note: THIN_SIGNAL_NOTE };
+      }
       return mapHarnessResult(r.envelope ? r.envelope(raw) : raw, r.call, r.params, r.pick);
     } catch (err) {
       return failed(r.call, r.params, `Qloo call failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -149,19 +171,32 @@ export function createHarnessQlooClient(transport: HarnessTransport, opts: Harne
       const body = await limited(() => transport.getJson(req.path, req.params));
       return remember(recipes.parseEntityRefs(body));
     },
-    demographics: (entityId) => section(recipes.demographics(entityId)),
+    async demographics(entityId) {
+      const s = await section(recipes.demographics(entityId));
+      // Live, brand-new releases come back ok with no rows. Say why, rather
+      // than pass on whatever generic summary the harness wrote.
+      return s.status === "empty" ? { ...s, note: DEMOGRAPHICS_EMPTY_NOTE } : s;
+    },
     heatmap: (entityId, city) => section(recipes.heatmap(entityId, city)),
-    places: (entityId, city, includeTagIds) => section(recipes.places(entityId, city, includeTagIds)),
+    places: (entityId, city, includeTagIds) => section(recipes.places(entityId, city, includeTagIds), { thinSignal: true }),
     async placeTags(entityId, city) {
-      const venues = await section(recipes.venuesToTag(entityId, city));
+      const venues = await section(recipes.venuesToTag(entityId, city), { thinSignal: true });
       if (!venues.data || venues.data.length === 0) {
         return { status: venues.status, data: null, provenance: venues.provenance, ...(venues.note ? { note: venues.note } : {}) };
       }
       const tags = await section(recipes.tagsOfVenues(venues.data));
-      return { ...tags, provenance: [...venues.provenance, ...tags.provenance] };
+      const provenanceOf = [...venues.provenance, ...tags.provenance];
+      if (!tags.data) return { ...tags, provenance: provenanceOf };
+      // Filtered here, at the mapping step, so what the evidence cache stores
+      // is the food themes the page shows, not Qloo's raw tag dump (which is
+      // mostly hobbies, keywords and other non-food families). Changing the
+      // filter therefore takes effect as cached rows expire (3 days).
+      const themes = recipes.foodThemes(tags.data);
+      if (themes.length === 0) return { status: "empty", data: null, provenance: provenanceOf, note: NO_FOOD_THEMES_NOTE };
+      return { ...tags, data: themes, provenance: provenanceOf };
     },
-    artists: (entityId) => section(recipes.artists(entityId)),
-    brands: (entityId) => section(recipes.brands(entityId)),
+    artists: (entityId) => section(recipes.artists(entityId), { thinSignal: true }),
+    brands: (entityId) => section(recipes.brands(entityId), { thinSignal: true }),
     async trends(entityId) {
       const type = await titleType(entityId);
       if (!type) return failed("trends", { entity_id: entityId }, "Could not work out whether this title is a movie or a show, which Qloo's trends need.");

@@ -4,8 +4,8 @@
 // not an error), so a typo in a recipe looks exactly like "no data". Keeping
 // them in one file means a live check against Qloo has one place to fix.
 //
-// What the recipes were built from (no Qloo key was available, and none of
-// this has touched live Qloo):
+// What the recipes were built from (the first version had no Qloo key; the
+// live spike of 2026-10-21 then checked them against the hackathon host):
 //   - tool names and argument schemas: `tools/list` of `qloo mcp` from
 //     @qloo/qloo-harness 0.1.26, which runs without a key;
 //   - reply envelope and per-tool result fields: that package's
@@ -13,25 +13,34 @@
 //     entity_tags, audience_demographics and trends handlers);
 //   - raw Qloo response fields the harness passes through untouched
 //     (heatmap location/query, demographics query, trending points) and the
-//     two REST lookups: Qloo's documentation, as remembered, not the package.
+//     two REST lookups.
 //
-// UNVERIFIED against live data (the Task 1 spike must check each):
-//   - heatmap:   point shape {location:{geohash,latitude,longitude},
-//                query:{affinity,popularity}}.
-//   - demographics: result shape {query:{age:{<AgeBucket>:n},gender:{male,female}}}.
-//   - places:    the harness drops entity `location` and `tags`, so lat/lon
-//                come only from properties.geocode if present and tags are
-//                always empty; the include_tags URNs from findTags must be
-//                accepted by recommend for target_type place.
-//   - placeTags: a two-step derivation (recommend venues, then entity_tags of
-//                those venues); there is no single place-tags-for-a-city tool.
-//   - trends:    point shape; the date and percentile field names are guesses
-//                (see trendPoint). The window (90 days) is our choice.
-//   - findTags:  the harness tool has no parent-type argument, so place/brand
-//                scoping is a local filter on the returned tag id/type.
-//   - entityByImdb / searchTitles: the REST paths, params and entity shape.
-//   - the hackathon base URL (see harness.ts), and that its key works with
-//     the harness at all.
+// VERIFIED LIVE (2026-10-21):
+//   - where_popular heatmap: cells carry lat, lon and geohash plus
+//     query.affinity and query.popularity, as `heatmap` reads them.
+//   - recommend for places and artists, including the include_tags filters.
+//   - recommend for brands filtered to include_tags
+//     ["urn:tag:genre:brand:food_and_beverage"] returns food and drink brands;
+//     unfiltered it returns luxury cars and tech for a food business.
+//   - entity_tags of venues (`tagsOfVenues`): the tags come in families, and
+//     only some describe food (see FOOD_TAG_PREFIXES); the rest is noise.
+//   - find_tags (`findTags`), and the IMDb id to entity lookup via /entities.
+//   - audience_demographics for established titles.
+//
+// UNVERIFIED, or verified to come back empty:
+//   - trends: empty for every title tried. The point shape and the date and
+//     percentile field names remain guesses (see trendPoint); the window (90
+//     days) is our choice. The SPA hides a trend section that is not ok.
+//   - demographics: ok-with-no-rows (so `empty`) for brand-new releases.
+//   - venue lat/lon and tags: the harness's place rows carry an address but
+//     no coordinates and no tags, so Venue.lat/lon are null and Venue.tags is [].
+//   - findTags: the harness tool has no parent-type argument, so place/brand
+//     scoping is a local filter on the returned tag id/type.
+//   - searchTitles: the /search REST path, params and entity shape.
+//   - artists and brands can be rejected with an HTTP 400 QLOO_CONTRACT for a
+//     thin-signal title (brand-new, little taste data); the client maps that to
+//     `empty` rather than an error (see client.ts).
+//   - the hackathon base URL (see harness.ts) works with the harness.
 
 import type {
   AgeBucket, DemographicsData, HeatCell, NamedEntity, TagAffinity, Venue,
@@ -49,7 +58,7 @@ const LIMITS: Record<string, string> = {
   recommend_places: "Venues are what fans of this title in this city over-index on, not endorsements or a count of visitors.",
   entity_tags: "Tags describe the venues recommended for this title in this city; affinity is relative within this query, not a share of venues.",
   recommend_artists: "Artists are what fans of this title over-index on, not listening counts or an endorsement.",
-  recommend_brands: "Brands are what fans of this title over-index on, not sales, sponsorship or an endorsement.",
+  recommend_brands: "Food & beverage brands that fans of this title over-index on, not endorsements or sales figures.",
   trends: "A recent popularity percentile as Qloo reports it; not viewership, sales or a forecast.",
 };
 const DEFAULT_LIMITS = "Qloo affinity is relative to this query only; it is not a count or a percentage of people.";
@@ -157,6 +166,31 @@ function venue(item: unknown): Venue | null {
 
 const venues = (results: unknown[]): Venue[] => results.flatMap((r) => { const v = venue(r); return v ? [v] : []; });
 
+const venueKey = (v: Venue): string | null => {
+  const name = v.name.trim().toLowerCase();
+  const address = v.address?.trim().toLowerCase();
+  // Without an address two same-named venues cannot be told apart from two
+  // branches of one chain, so they are left alone.
+  return name && address ? `${name}\u0000${address}` : null;
+};
+
+/** Qloo can return one venue as two entities. Venues with the same name and
+ *  the same address (case and padding aside) collapse to the one with the
+ *  higher affinity (a missing affinity is the lowest), in the position of the
+ *  first copy. Runs before any cap, so a duplicate does not cost a slot. */
+export function dedupeVenues(list: Venue[]): Venue[] {
+  const best = new Map<string, Venue>();
+  const out: (Venue | string)[] = [];
+  for (const v of list) {
+    const k = venueKey(v);
+    if (k === null) { out.push(v); continue; }
+    const held = best.get(k);
+    if (!held) { best.set(k, v); out.push(k); continue; }
+    if ((v.affinity ?? -Infinity) > (held.affinity ?? -Infinity)) best.set(k, v);
+  }
+  return out.map((x) => (typeof x === "string" ? best.get(x)! : x));
+}
+
 // qloo_recommend accepts 1-10 include_tags; more is rejected outright, which
 // would turn the whole section into an error. Empty means "no filter".
 const MAX_INCLUDE_TAGS = 10;
@@ -179,7 +213,7 @@ export function places(entityId: string, city: City, tagIds: string[]): ToolReci
       filter_location: city.qlooLocationQuery,
       ...(includeTagIds.length > 0 ? { include_tags: includeTagIds.join(",") } : {}),
     },
-    pick: venues,
+    pick: (results) => dedupeVenues(venues(results)),
   };
 }
 
@@ -211,6 +245,34 @@ export function tagsOfVenues(venueIds: string[]): ToolRecipe<TagAffinity[]> {
   };
 }
 
+/** The tag families that describe what a place serves. Real venue entity-tags
+ *  also carry a lot of noise (keyword, hobby, category, archetype, decor,
+ *  amenity, hotel_rating, credit_card, genre:brand/music/media, ...) that says
+ *  nothing about food and drink. Matched as an id PREFIX, never a substring. */
+export const FOOD_TAG_PREFIXES = [
+  "urn:tag:specialty_dish:place:",
+  "urn:tag:genre:place:",
+  "urn:tag:cuisine:qloo:",
+  "urn:tag:dining_option:qloo:",
+  "urn:tag:popular_food_item:qloo:",
+] as const;
+export const MAX_THEMES = 12;
+
+/** Food-family tags only, one per lowercased name (the highest affinity wins),
+ *  strongest first (a missing affinity last), at most MAX_THEMES. */
+export function foodThemes(tags: TagAffinity[]): TagAffinity[] {
+  const score = (t: TagAffinity) => t.affinity ?? -Infinity;
+  const byName = new Map<string, TagAffinity>();
+  for (const t of tags) {
+    if (!FOOD_TAG_PREFIXES.some((p) => t.tagId.startsWith(p))) continue;
+    const k = t.name.trim().toLowerCase();
+    const held = byName.get(k);
+    if (!held || score(t) > score(held)) byName.set(k, t);
+  }
+  // Array.sort is stable, so equal affinities keep Qloo's order.
+  return [...byName.values()].sort((a, b) => score(b) - score(a)).slice(0, MAX_THEMES);
+}
+
 function namedEntities(results: unknown[]): NamedEntity[] {
   return results.flatMap((r) => {
     const e = rec(r);
@@ -220,17 +282,28 @@ function namedEntities(results: unknown[]): NamedEntity[] {
   });
 }
 
-function recommendFor(kind: "artist" | "brand", entityId: string): ToolRecipe<NamedEntity[]> {
+/** Verified live 2026-10-21: with this include_tags, qloo_recommend for
+ *  target_type "brand" returns food & drink brands; without it a food
+ *  business is shown luxury cars and tech. */
+export const BRAND_FOOD_TAG = "urn:tag:genre:brand:food_and_beverage";
+
+function recommendFor(kind: "artist" | "brand", entityId: string, includeTags: string[] = []): ToolRecipe<NamedEntity[]> {
   return {
     call: `recommend_${kind}s`,
     tool: "qloo_recommend",
-    args: { target_type: kind, signals: [entityId], limit: 10, explain: false },
-    params: { entity_id: entityId, target_type: kind },
+    args: {
+      target_type: kind,
+      signals: [entityId],
+      ...(includeTags.length > 0 ? { include_tags: includeTags } : {}),
+      limit: 10,
+      explain: false,
+    },
+    params: { entity_id: entityId, target_type: kind, ...(includeTags.length > 0 ? { include_tags: includeTags.join(",") } : {}) },
     pick: namedEntities,
   };
 }
 export const artists = (entityId: string) => recommendFor("artist", entityId);
-export const brands = (entityId: string) => recommendFor("brand", entityId);
+export const brands = (entityId: string) => recommendFor("brand", entityId, [BRAND_FOOD_TAG]);
 
 /** The title's own type, which qloo_trends requires and the client's
  *  interface does not carry. */

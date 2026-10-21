@@ -207,13 +207,13 @@ describe("the harness-backed client", () => {
   it("derives place tags from the venues recommended for the city, and cites both calls", async () => {
     const { t, calls } = fakeTransport({
       qloo_recommend: [{ status: "ok", result_count: 2, results: [{ entity_id: "v-1", name: "A" }, { entity_id: "v-2", name: "B" }] }],
-      qloo_entity_tags: [{ status: "ok", result_count: 1, results: [{ id: "urn:tag:x", name: "Fixture Tag", affinity: 0.4 }] }],
+      qloo_entity_tags: [{ status: "ok", result_count: 1, results: [{ id: "urn:tag:genre:place:fx-1", name: "Fixture Tag", affinity: 0.4 }] }],
     });
     const q = createHarnessQlooClient(t, { sleep: noSleep });
     const s = await q.placeTags("ent-1", delhi);
     expect(calls.map(c => c.name)).toEqual(["qloo_recommend", "qloo_entity_tags"]);
     expect(calls[1]?.args).toMatchObject({ entities: ["v-1", "v-2"], entity_type: "place" });
-    expect(s.data).toEqual([{ tagId: "urn:tag:x", name: "Fixture Tag", affinity: 0.4 }]);
+    expect(s.data).toEqual([{ tagId: "urn:tag:genre:place:fx-1", name: "Fixture Tag", affinity: 0.4 }]);
     expect(s.provenance).toHaveLength(2);
   });
 
@@ -374,5 +374,254 @@ describe("the harness-backed client", () => {
     expect(await q.callTool("qloo_describe", { entity: "x" })).toEqual({ status: "ok", results: [{ x: 1 }] });
     expect(calls).toEqual([{ name: "qloo_describe", args: { entity: "x" } }]);
     expect((await q.listTools())[0]?.name).toBe("qloo_recommend");
+  });
+});
+
+
+// ---- live spike lock-in (2026-10-21) -------------------------------------
+
+const BRAND_FOOD_TAG = "urn:tag:genre:brand:food_and_beverage";
+
+describe("demographics on a title Qloo has no audience profile for (L2)", () => {
+  it("explains an empty result honestly, and says nothing odd for an ok one", async () => {
+    const { t } = fakeTransport({ qloo_audience_demographics: [{ status: "ok", result_count: 0, results: [] }] });
+    const q = createHarnessQlooClient(t, { sleep: noSleep });
+    const s = await q.demographics("ent-new");
+    expect(s.status).toBe("empty");
+    expect(s.data).toBeNull();
+    expect(s.note).toBe("Qloo doesn't have an audience profile for this title yet \u2014 common for releases that haven't been out long.");
+    expect(s.provenance[0]?.call).toBe("audience_demographics");
+
+    const e = fakeTransport({ qloo_audience_demographics: [{ status: "empty", summary: "Nothing found.", results: [] }] });
+    const s2 = await createHarnessQlooClient(e.t, { sleep: noSleep }).demographics("ent-new");
+    expect(s2.note).toBe(s.note);
+  });
+});
+
+describe("a thin-signal title Qloo rejects with a contract error (L3)", () => {
+  const contract = { status: "error", results: [], summary: "Qloo rejected the request.", error: { code: "QLOO_CONTRACT", layer: "qloo", retryable: false, recovery: "Check the arguments." } };
+  const THIN_NOTE = "Qloo doesn't have enough taste data on this title yet to suggest this.";
+  const venuesOk = { status: "ok", result_count: 1, results: [{ entity_id: "v-1", name: "Fixture Cafe 1" }] };
+
+  const calls: [string, (q: ReturnType<typeof createHarnessQlooClient>) => Promise<{ status: string; data: unknown; note?: string }>, string][] = [
+    ["artists", (q) => q.artists("ent-1"), "recommend_artists"],
+    ["brands", (q) => q.brands("ent-1"), "recommend_brands"],
+    ["places", (q) => q.places("ent-1", delhi, ["urn:tag:genre:place:fx-1"]), "recommend_places"],
+    ["placeTags (venue step)", (q) => q.placeTags("ent-1", delhi), "recommend_places"],
+  ];
+
+  it.each(calls)("%s maps it to empty with the thin-signal note, and warns once with no params", async (_n, run, callName) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { t, calls: sent } = fakeTransport({ qloo_recommend: [contract] });
+      const s = await run(createHarnessQlooClient(t, { sleep: noSleep }));
+      expect(sent).toHaveLength(1); // not retried
+      expect(s.status).toBe("empty");
+      expect(s.data).toBeNull();
+      expect(s.note).toBe(THIN_NOTE);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(`qloo contract rejection (${callName}): QLOO_CONTRACT`);
+    } finally { warn.mockRestore(); }
+  });
+
+  it("placeTags stops at the rejected venue step: no entity_tags call", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { t, calls: sent } = fakeTransport({ qloo_recommend: [contract], qloo_entity_tags: [{ status: "ok", results: [{ id: "urn:tag:genre:place:x", name: "X", affinity: 1 }] }] });
+      await createHarnessQlooClient(t, { sleep: noSleep }).placeTags("ent-1", delhi);
+      expect(sent.map((c) => c.name)).toEqual(["qloo_recommend"]);
+    } finally { warn.mockRestore(); }
+  });
+
+  it.each(calls)("%s still reports QLOO_AUTH as an error, with no contract warning", async (_n, run) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const auth = { status: "error", results: [], error: { code: "QLOO_AUTH", layer: "qloo", retryable: false, recovery: "Set QLOO_API_KEY." } };
+      const { t } = fakeTransport({ qloo_recommend: [auth] });
+      const s = await run(createHarnessQlooClient(t, { sleep: noSleep }));
+      expect(s.status).toBe("error");
+      expect(s.note).toContain("Set QLOO_API_KEY.");
+      expect(warn).not.toHaveBeenCalled();
+    } finally { warn.mockRestore(); }
+  });
+
+  it.each(calls)("%s still backs off on a rate limit and then fails as an error section", async (_n, run) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const rateLimited = { status: "error", results: [], error: { code: "QLOO_RATE_LIMIT", layer: "qloo", retryable: true, recovery: "wait" } };
+      const { t, calls: sent } = fakeTransport({ qloo_recommend: [rateLimited] });
+      const s = await run(createHarnessQlooClient(t, { sleep: noSleep }));
+      expect(sent).toHaveLength(3);
+      expect(s.status).toBe("error");
+      expect(warn).not.toHaveBeenCalled();
+    } finally { warn.mockRestore(); }
+  });
+
+  it("agent tool calls keep the raw envelope: only the recipe-backed sections are remapped", async () => {
+    const { t } = fakeTransport({ qloo_recommend: [contract] });
+    const q = createHarnessQlooClient(t, { sleep: noSleep });
+    expect(await q.callTool("qloo_recommend", {})).toEqual(contract);
+  });
+
+  it("does not touch a venue step that succeeded", async () => {
+    const { t } = fakeTransport({ qloo_recommend: [venuesOk], qloo_entity_tags: [{ status: "ok", results: [{ id: "urn:tag:genre:place:chinese", name: "Chinese", affinity: 0.5 }] }] });
+    const s = await createHarnessQlooClient(t, { sleep: noSleep }).placeTags("ent-1", delhi);
+    expect(s.status).toBe("ok");
+  });
+});
+
+describe("place themes keep only food and drink tag families (L4)", () => {
+  const tagReply = (rows: { id: string; name: string; affinity?: number }[]) => ({
+    qloo_recommend: [{ status: "ok", result_count: 1, results: [{ entity_id: "v-1", name: "Fixture Cafe 1" }] }],
+    qloo_entity_tags: [{ status: "ok", result_count: rows.length, results: rows }],
+  });
+  const themes = async (rows: { id: string; name: string; affinity?: number }[]) =>
+    createHarnessQlooClient(fakeTransport(tagReply(rows)).t, { sleep: noSleep }).placeTags("ent-1", delhi);
+
+  it("drops hobby, keyword, archetype, brand, music and other noise families", async () => {
+    const s = await themes([
+      { id: "urn:tag:specialty_dish:place:fx_a", name: "Dish A", affinity: 0.9 },
+      { id: "urn:tag:keyword:qloo:fx", name: "Keyword", affinity: 0.99 },
+      { id: "urn:tag:hobby:qloo:fx", name: "Hobby", affinity: 0.98 },
+      { id: "urn:tag:category:qloo:fx", name: "Category", affinity: 0.97 },
+      { id: "urn:tag:archetype:qloo:fx", name: "Archetype", affinity: 0.96 },
+      { id: "urn:tag:genre:brand:fx", name: "Brand genre", affinity: 0.95 },
+      { id: "urn:tag:genre:music:fx", name: "Music genre", affinity: 0.94 },
+      { id: "urn:tag:genre:media:fx", name: "Media genre", affinity: 0.93 },
+      { id: "urn:tag:decor:qloo:fx", name: "Decor", affinity: 0.92 },
+      { id: "urn:tag:hotel_rating:place:fx", name: "Stars", affinity: 0.91 },
+      { id: "urn:tag:credit_card:place:fx", name: "Cards", affinity: 0.9 },
+      { id: "urn:tag:cuisine:qloo:fx_b", name: "Cuisine B", affinity: 0.5 },
+    ]);
+    expect(s.status).toBe("ok");
+    expect(s.data?.map((t) => t.name)).toEqual(["Dish A", "Cuisine B"]);
+  });
+
+  it("keeps each of the five food families", async () => {
+    const ids = [
+      "urn:tag:specialty_dish:place:a", "urn:tag:genre:place:b", "urn:tag:cuisine:qloo:c",
+      "urn:tag:dining_option:qloo:d", "urn:tag:popular_food_item:qloo:e",
+    ];
+    const s = await themes(ids.map((id, i) => ({ id, name: `Name ${i}`, affinity: 0.9 - i / 10 })));
+    expect(s.data?.map((t) => t.tagId)).toEqual(ids);
+  });
+
+  it("does not match a family by loose substring (genre:place must be the id's prefix)", async () => {
+    const s = await themes([
+      { id: "urn:tag:genre:place:ok", name: "Ok", affinity: 0.1 },
+      { id: "urn:tag:genre:media:urn:tag:genre:place:", name: "Sneaky", affinity: 0.9 },
+      { id: "x-urn:tag:cuisine:qloo:y", name: "Sneakier", affinity: 0.8 },
+    ]);
+    expect(s.data?.map((t) => t.name)).toEqual(["Ok"]);
+  });
+
+  it("dedupes by lowercased name keeping the highest affinity, sorts by affinity, caps at 12", async () => {
+    const rows = [
+      { id: "urn:tag:genre:place:dessert", name: "Dessert shop", affinity: 0.4 },
+      { id: "urn:tag:specialty_dish:place:dessert", name: "dessert SHOP", affinity: 0.8 },
+      ...Array.from({ length: 14 }, (_, i) => ({ id: `urn:tag:specialty_dish:place:f${i}`, name: `Dish ${i}`, affinity: 0.7 - i * 0.01 })),
+    ];
+    const s = await themes(rows);
+    const data = s.data!;
+    expect(data).toHaveLength(12);
+    expect(data[0]).toEqual({ tagId: "urn:tag:specialty_dish:place:dessert", name: "dessert SHOP", affinity: 0.8 });
+    expect(data.filter((t) => t.name.toLowerCase() === "dessert shop")).toHaveLength(1);
+    const aff = data.map((t) => t.affinity as number);
+    expect(aff).toEqual([...aff].sort((a, b) => b - a));
+    expect(data.map((t) => t.name)).toEqual(["dessert SHOP", ...Array.from({ length: 11 }, (_, i) => `Dish ${i}`)]);
+  });
+
+  it("puts a tag with no affinity after those that have one", async () => {
+    const s = await themes([
+      { id: "urn:tag:genre:place:a", name: "No affinity" },
+      { id: "urn:tag:genre:place:b", name: "Has affinity", affinity: 0.1 },
+    ]);
+    expect(s.data?.map((t) => t.name)).toEqual(["Has affinity", "No affinity"]);
+  });
+
+  it("answers empty with an honest note when nothing food-related is left, keeping provenance", async () => {
+    const s = await themes([
+      { id: "urn:tag:keyword:qloo:fx", name: "Keyword", affinity: 0.9 },
+      { id: "urn:tag:lifestyle:qloo:fx", name: "Lifestyle", affinity: 0.8 },
+    ]);
+    expect(s.status).toBe("empty");
+    expect(s.data).toBeNull();
+    expect(s.note).toBe("No food or drink themes stood out for this audience in this city.");
+    expect(s.provenance.map((p) => p.call)).toEqual(["recommend_places", "entity_tags"]);
+  });
+
+  it("keeps the provenance of both calls when there are themes", async () => {
+    const s = await themes([{ id: "urn:tag:genre:place:a", name: "A", affinity: 0.5 }]);
+    expect(s.provenance.map((p) => p.call)).toEqual(["recommend_places", "entity_tags"]);
+  });
+});
+
+describe("what a business owner's tag names look like to businessFit (L4)", () => {
+  it("still matches realistic food-family names against a business type's query words", async () => {
+    const { businessFit } = await import("../score.js");
+    const names = ["Dessert shop", "Coffee", "Bakery", "Arab restaurant", "Burrito"];
+    expect(businessFit(names, "cafe")).toBeCloseTo(3 / 5); // dessert, coffee, bakery
+    expect(businessFit(["Dessert shop", "Snacks", "Burrito", "Cold beverage"], "d2c_food")).toBeCloseTo(3 / 4);
+    expect(businessFit(["Caf\u00e9"], "cafe")).toBe(1);
+  });
+});
+
+describe("food and beverage brands (L5)", () => {
+  it("asks qloo_recommend for brands tagged food & beverage, and cites the tag", async () => {
+    const { t, calls } = fakeTransport({
+      qloo_recommend: [{ status: "ok", result_count: 1, results: [{ entity_id: "b-1", name: "Fixture Brand 1", affinity: 0.4 }] }],
+    });
+    const s = await createHarnessQlooClient(t, { sleep: noSleep }).brands("ent-1");
+    expect(calls).toEqual([{
+      name: "qloo_recommend",
+      args: { target_type: "brand", signals: ["ent-1"], include_tags: [BRAND_FOOD_TAG], limit: 10, explain: false },
+    }]);
+    expect(s.data).toEqual([{ entityId: "b-1", name: "Fixture Brand 1", affinity: 0.4 }]);
+    expect(s.provenance[0]?.params).toEqual({ entity_id: "ent-1", target_type: "brand", include_tags: BRAND_FOOD_TAG });
+    expect(s.provenance[0]?.limits).toBe("Food & beverage brands that fans of this title over-index on, not endorsements or sales figures.");
+  });
+
+  it("leaves artist recommendations untagged", async () => {
+    const { t, calls } = fakeTransport({ qloo_recommend: [{ status: "ok", results: [{ entity_id: "a-1", name: "Fixture Artist 1" }] }] });
+    const s = await createHarnessQlooClient(t, { sleep: noSleep }).artists("ent-1");
+    expect(calls[0]?.args).toEqual({ target_type: "artist", signals: ["ent-1"], limit: 10, explain: false });
+    expect(s.provenance[0]?.params).toEqual({ entity_id: "ent-1", target_type: "artist" });
+  });
+});
+
+describe("duplicate venues (L6)", () => {
+  const v = (id: string, name: string, address: string | null, affinity: number | null) =>
+    ({ entity_id: id, name, affinity, properties: address === null ? {} : { address } });
+  const placesFor = async (results: unknown[]) =>
+    createHarnessQlooClient(fakeTransport({ qloo_recommend: [{ status: "ok", result_count: results.length, results }] }).t, { sleep: noSleep })
+      .places("ent-1", delhi, []);
+
+  it("keeps the highest-affinity copy of a venue with the same name and address, ignoring case and padding", async () => {
+    const s = await placesFor([
+      v("a", "Fixture Cafe 1", "1 Test Road", 0.5),
+      v("b", "Other Place", "2 Test Road", 0.4),
+      v("c", "  fixture cafe 1 ", " 1 TEST road", 0.9),
+    ]);
+    expect(s.data?.map((x) => x.entityId)).toEqual(["c", "b"]);
+  });
+
+  it("keeps same-named venues at different addresses, and ones with no address to compare", async () => {
+    const s = await placesFor([
+      v("a", "Fixture Cafe 1", "1 Test Road", 0.5),
+      v("b", "Fixture Cafe 1", "9 Other Road", 0.4),
+      v("c", "Fixture Cafe 2", null, 0.3),
+      v("d", "Fixture Cafe 2", null, 0.2),
+    ]);
+    expect(s.data?.map((x) => x.entityId)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("treats a missing affinity as lower than any number", async () => {
+    const s = await placesFor([v("a", "Fixture Cafe 1", "1 Road", null), v("b", "Fixture Cafe 1", "1 Road", 0.1)]);
+    expect(s.data?.map((x) => x.entityId)).toEqual(["b"]);
+  });
+
+  it("dedupes before any cap: 20 rows with a duplicate yield 19", async () => {
+    const rows = Array.from({ length: 20 }, (_, i) => v(`id${i}`, i === 19 ? "Fixture Cafe 0" : `Fixture Cafe ${i}`, i === 19 ? "0 Road" : `${i} Road`, 0.9 - i * 0.01));
+    expect((await placesFor(rows)).data).toHaveLength(19);
   });
 });

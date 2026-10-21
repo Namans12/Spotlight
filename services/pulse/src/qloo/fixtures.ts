@@ -97,7 +97,7 @@ export function createFixtureClient(): QlooClient {
       return fixtureSection("recommend_places", { entity_id: entityId, filter_location: city.qlooLocationQuery }, venues);
     },
     async placeTags(entityId, city) {
-      const tags: TagAffinity[] = range(4).map((i) => ({ tagId: `fx-tag-${i + 1}`, name: `Fixture Tag ${i + 1}`, affinity: Number((0.8 - 0.15 * i).toFixed(2)) }));
+      const tags: TagAffinity[] = range(4).map((i) => ({ tagId: `urn:tag:genre:place:fx-tag-${i + 1}`, name: `Fixture Tag ${i + 1}`, affinity: Number((0.8 - 0.15 * i).toFixed(2)) }));
       return fixtureSection("entity_tags", { entity_id: entityId, within: city.qlooLocationQuery }, tags);
     },
     async artists(entityId) {
