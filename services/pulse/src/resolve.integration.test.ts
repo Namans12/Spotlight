@@ -3,7 +3,7 @@ import postgres from "postgres";
 import type { QlooClient } from "./qloo/client.js";
 import { resolveTitle } from "./resolve.js";
 
-vi.mock("../../../lib/omdb.js", () => ({ resolveOmdbLookup: vi.fn(async () => null) }));
+vi.mock("./tmdbLookup.js", async (orig) => ({ ...(await orig<typeof import("./tmdbLookup.js")>()), lookupTmdbTitle: vi.fn(async () => null) }));
 
 // Runs only against a real, migrated database:
 //   PULSE_TEST_DATABASE_URL=postgres://postgres@127.0.0.1:54329/spotlight_test npm --prefix services/pulse test

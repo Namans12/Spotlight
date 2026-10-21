@@ -73,13 +73,13 @@ export function loadConfig(env: NodeJS.ProcessEnv): PulseConfig {
 }
 
 /** Resolution needs a TMDB key to find IMDb ids for titles Spotlight has not
- *  rated yet, and resolveOmdbLookup reports a missing key as "no result", which
- *  resolveTitle would then cache as "Qloo has no such title" for three days.
- *  So outside fixtures mode a missing key must stop the service at startup,
- *  where it is obvious, instead of silently poisoning the cache. */
+ *  rated yet. lookupTmdbTitle throws on a missing key (and on a TMDB outage), so
+ *  nothing would be cached as a miss, but every uncached title would then fail
+ *  to resolve. Outside fixtures mode a missing key must therefore stop the
+ *  service at startup, where it is obvious, instead of failing request by request. */
 export function assertTmdbConfigured(cfg: Pick<PulseConfig, "qlooFixtures">, env: NodeJS.ProcessEnv): void {
   if (cfg.qlooFixtures) return;
   if (!optional(env.TMDB_API_KEY)) {
-    throw new Error("TMDB_API_KEY is required unless QLOO_FIXTURES=1: without it every title lookup would be cached as a miss");
+    throw new Error("TMDB_API_KEY is required unless QLOO_FIXTURES=1: without it no title that Spotlight has not rated can be resolved");
   }
 }

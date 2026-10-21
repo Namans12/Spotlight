@@ -2,9 +2,9 @@
 // ids, so every Pulse request starts here; the answer is cached in
 // qloo_entities because the lookup costs a Qloo call and Qloo is rate limited.
 
-import { resolveOmdbLookup } from "../../../lib/omdb.js";
 import { getCachedEntity, getImdbId, upsertEntity, type EntitySql } from "./db/entities.js";
 import type { QlooClient, QlooEntityRef } from "./qloo/client.js";
+import { lookupTmdbTitle, type TmdbTitle } from "./tmdbLookup.js";
 
 export interface TitleKey { tmdbId: number; mediaType: "movie" | "tv"; }
 
@@ -58,11 +58,13 @@ const inFlight = new Map<string, Promise<Resolution>>();
  *
  * Errors contract (do not weaken): only a definite "Qloo has no such title" is
  * cached as a miss (not_found = true, retried after 3 days). An error THROWN by
- * the Qloo client (outage, timeout, exhausted 429 retries) or by the database
- * propagates to the caller and caches nothing, because an outage must never
- * read as "no such title" for the next three days. Callers (briefs, the board)
- * catch and degrade. The one thing this cannot tell apart is a TMDB outage:
- * resolveOmdbLookup reports unreachable and unconfigured as null.
+ * the Qloo client (outage, timeout, exhausted 429 retries), by the database, or
+ * by the TMDB lookup (TmdbUnavailableError once its retries are spent, or a
+ * missing TMDB key) propagates to the caller and caches nothing, because an
+ * outage must never read as "no such title" for the next three days. Callers
+ * (briefs, the board) catch and degrade. Only a TMDB 404 (lookupTmdbTitle
+ * returns null) counts as a definite answer, and with no title to search by it
+ * is cached as a miss.
  *
  * Concurrent calls for the same title share one resolution, so a burst of
  * requests for one title costs Qloo one call, not one each.
@@ -91,8 +93,10 @@ async function resolve(sql: EntitySql, qloo: QlooClient, key: TitleKey, now: Dat
     return { entityId: null, reason };
   };
 
-  let lookup: Awaited<ReturnType<typeof resolveOmdbLookup>> | undefined;
-  const tmdbLookup = async () => (lookup ??= await resolveOmdbLookup(key.mediaType, key.tmdbId));
+  // Memoised for this resolution, a 404 (null) included: `lookup ??=` would
+  // re-ask TMDB on the miss path because null is nullish.
+  let lookup: { value: TmdbTitle | null } | undefined;
+  const tmdbLookup = async () => (lookup ??= { value: await lookupTmdbTitle(key.mediaType, key.tmdbId) }).value;
 
   let imdbId = await getImdbId(sql, key);
   if (!imdbId) imdbId = (await tmdbLookup())?.imdbId ?? null;

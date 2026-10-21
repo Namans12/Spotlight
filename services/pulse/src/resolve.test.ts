@@ -3,9 +3,11 @@ import type { QlooClient, QlooEntityRef } from "./qloo/client.js";
 import { notFoundIsStale, pickSearchMatch, resolveTitle } from "./resolve.js";
 import type { EntitySql } from "./db/entities.js";
 
-vi.mock("../../../lib/omdb.js", () => ({ resolveOmdbLookup: vi.fn() }));
-import { resolveOmdbLookup } from "../../../lib/omdb.js";
-const omdb = vi.mocked(resolveOmdbLookup);
+// resolve.ts reads TMDB through ./tmdbLookup.js: null is a definite 404, a
+// throw is an outage (see that module). The default answer here is the 404.
+vi.mock("./tmdbLookup.js", async (orig) => ({ ...(await orig<typeof import("./tmdbLookup.js")>()), lookupTmdbTitle: vi.fn() }));
+import { lookupTmdbTitle, TmdbUnavailableError } from "./tmdbLookup.js";
+const tmdb = vi.mocked(lookupTmdbTitle);
 
 type Row = Record<string, unknown>;
 interface Call { text: string; values: unknown[] }
@@ -55,8 +57,8 @@ const ref = (entityId: string, type: "movie" | "tv_show", year: number | null, n
   ({ entityId, name, type, year });
 
 beforeEach(() => {
-  omdb.mockReset();
-  omdb.mockResolvedValue(null);
+  tmdb.mockReset();
+  tmdb.mockResolvedValue(null);
 });
 
 describe("pickSearchMatch", () => {
@@ -113,7 +115,7 @@ describe("resolveTitle", () => {
     expect(await resolveTitle(sql, qloo, key, NOW)).toEqual({ entityId: "q1", method: "search" });
     expect(entityByImdb).not.toHaveBeenCalled();
     expect(searchTitles).not.toHaveBeenCalled();
-    expect(omdb).not.toHaveBeenCalled();
+    expect(tmdb).not.toHaveBeenCalled();
     expect(calls).toHaveLength(1);
     expect(calls[0].text).toContain("FROM qloo_entities");
     expect(calls[0].values).toEqual([9, "movie"]);
@@ -143,25 +145,25 @@ describe("resolveTitle", () => {
     const { sql, calls } = fakeSql({ title_ratings: [{ imdb_id: "tt1" }] });
     const { qloo } = fakeQloo({ entityByImdb: async () => ref("q1", "movie", 2024) });
     await resolveTitle(sql, qloo, key, NOW);
-    expect(omdb).not.toHaveBeenCalled();
+    expect(tmdb).not.toHaveBeenCalled();
     const ratings = calls.find((c) => c.text.includes("FROM title_ratings"))!;
     expect(ratings.values).toEqual([9, "movie"]);
   });
 
   it("falls back to the TMDB lookup when title_ratings has no IMDb id", async () => {
-    omdb.mockResolvedValue({ imdbId: "tt2", title: "Dune", year: "2021" });
+    tmdb.mockResolvedValue({ imdbId: "tt2", title: "Dune", year: "2021" });
     for (const title_ratings of [[], [{ imdb_id: null }]]) {
       const { sql, upserts } = fakeSql({ title_ratings });
       const { qloo, entityByImdb } = fakeQloo({ entityByImdb: async () => ref("q2", "movie", 2021) });
       expect(await resolveTitle(sql, qloo, key, NOW)).toEqual({ entityId: "q2", method: "imdb" });
-      expect(omdb).toHaveBeenLastCalledWith("movie", 9);
+      expect(tmdb).toHaveBeenLastCalledWith("movie", 9);
       expect(entityByImdb).toHaveBeenCalledWith("tt2");
       expect(upserts[0]).toMatchObject({ imdb_id: "tt2", qloo_entity_id: "q2", method: "imdb", not_found: false });
     }
   });
 
   it("searches by title and year when the IMDb id misses, mapping tv to tv_show", async () => {
-    omdb.mockResolvedValue({ imdbId: "tt3", title: "Severance", year: "2022" });
+    tmdb.mockResolvedValue({ imdbId: "tt3", title: "Severance", year: "2022" });
     const { sql, upserts } = fakeSql();
     const { qloo, searchTitles } = fakeQloo({
       searchTitles: async () => [ref("wrong", "movie", 2022), ref("q3", "tv_show", 2022)],
@@ -173,17 +175,17 @@ describe("resolveTitle", () => {
   });
 
   it("fetches the title lazily, once, when the IMDb id came from title_ratings and missed", async () => {
-    omdb.mockResolvedValue({ imdbId: "tt1", title: "Heat", year: "1995" });
+    tmdb.mockResolvedValue({ imdbId: "tt1", title: "Heat", year: "1995" });
     const { sql, upserts } = fakeSql({ title_ratings: [{ imdb_id: "tt1" }] });
     const { qloo, searchTitles } = fakeQloo({ searchTitles: async () => [ref("q9", "movie", 1995)] });
     expect(await resolveTitle(sql, qloo, key, NOW)).toEqual({ entityId: "q9", method: "search" });
-    expect(omdb).toHaveBeenCalledTimes(1);
+    expect(tmdb).toHaveBeenCalledTimes(1);
     expect(searchTitles).toHaveBeenCalledWith("Heat", "movie");
     expect(upserts[0]).toMatchObject({ imdb_id: "tt1", method: "search" });
   });
 
   it("does not search without a year; the miss is cached", async () => {
-    omdb.mockResolvedValue({ imdbId: null, title: "Heat", year: null });
+    tmdb.mockResolvedValue({ imdbId: null, title: "Heat", year: null });
     const { sql, upserts } = fakeSql();
     const { qloo } = fakeQloo({ searchTitles: async () => [ref("q9", "movie", 1995)] });
     expect(await resolveTitle(sql, qloo, key, NOW)).toEqual({ entityId: null, reason: "no_imdb_and_no_match" });
@@ -209,7 +211,7 @@ describe("resolveTitle", () => {
 
   it("records a miss as not_found instead of throwing (Review Focus 1)", async () => {
     const qloo = { entityByImdb: vi.fn().mockResolvedValue(null), searchTitles: vi.fn().mockResolvedValue([]) } as unknown as QlooClient;
-    omdb.mockResolvedValue({ imdbId: null, title: "Nope", year: "2024" });
+    tmdb.mockResolvedValue({ imdbId: null, title: "Nope", year: "2024" });
     const { sql, upserts } = fakeSql({ title_ratings: [{ imdb_id: "tt1" }] });
     const r = await resolveTitle(sql, qloo, { tmdbId: 9, mediaType: "movie" });
     expect(r).toEqual({ entityId: null, reason: "not_in_qloo" });
@@ -218,6 +220,38 @@ describe("resolveTitle", () => {
   });
 
   describe("outages are not misses (R17)", () => {
+    it("lets a TMDB outage propagate and caches nothing, not even in qloo_entities", async () => {
+      tmdb.mockRejectedValue(new TmdbUnavailableError("TMDB lookup failed after 3 attempts (HTTP 503) for movie 9", 3));
+      const { sql, upserts, calls } = fakeSql();
+      const { qloo, entityByImdb, searchTitles } = fakeQloo();
+      await expect(resolveTitle(sql, qloo, key, NOW)).rejects.toBeInstanceOf(TmdbUnavailableError);
+      expect(entityByImdb).not.toHaveBeenCalled();
+      expect(searchTitles).not.toHaveBeenCalled();
+      expect(upserts).toHaveLength(0);
+      expect(calls.some((c) => c.text.startsWith("INSERT"))).toBe(false);
+    });
+
+    it("lets a TMDB outage on the late title lookup propagate too, after Qloo's IMDb match missed", async () => {
+      tmdb.mockRejectedValue(new TmdbUnavailableError("TMDB lookup failed after 3 attempts (timed out) for movie 9", 3));
+      const { sql, upserts } = fakeSql({ title_ratings: [{ imdb_id: "tt1" }] });
+      const { qloo, entityByImdb, searchTitles } = fakeQloo();
+      await expect(resolveTitle(sql, qloo, key, NOW)).rejects.toBeInstanceOf(TmdbUnavailableError);
+      expect(entityByImdb).toHaveBeenCalledWith("tt1");
+      expect(searchTitles).not.toHaveBeenCalled();
+      expect(upserts).toHaveLength(0);
+    });
+
+    it("a TMDB 404 is a definite miss: cached once, from a single TMDB call", async () => {
+      tmdb.mockResolvedValue(null);
+      const { sql, upserts } = fakeSql();
+      const { qloo, entityByImdb, searchTitles } = fakeQloo();
+      expect(await resolveTitle(sql, qloo, key, NOW)).toEqual({ entityId: null, reason: "no_imdb_and_no_match" });
+      expect(tmdb).toHaveBeenCalledTimes(1);
+      expect(entityByImdb).not.toHaveBeenCalled();
+      expect(searchTitles).not.toHaveBeenCalled();
+      expect(upserts).toEqual([{ tmdb_id: 9, media_type: "movie", imdb_id: null, qloo_entity_id: null, method: null, not_found: true, resolved_at: NOW }]);
+    });
+
     it("lets an entityByImdb failure propagate and caches nothing", async () => {
       const { sql, upserts } = fakeSql({ title_ratings: [{ imdb_id: "tt1" }] });
       const { qloo, searchTitles } = fakeQloo({ entityByImdb: async () => { throw new Error("Qloo timeout"); } });
@@ -227,7 +261,7 @@ describe("resolveTitle", () => {
     });
 
     it("lets a searchTitles failure propagate and caches nothing", async () => {
-      omdb.mockResolvedValue({ imdbId: "tt1", title: "Heat", year: "1995" });
+      tmdb.mockResolvedValue({ imdbId: "tt1", title: "Heat", year: "1995" });
       const { sql, upserts } = fakeSql();
       const { qloo } = fakeQloo({ searchTitles: async () => { throw new Error("429 exhausted"); } });
       await expect(resolveTitle(sql, qloo, key, NOW)).rejects.toThrow("429 exhausted");
