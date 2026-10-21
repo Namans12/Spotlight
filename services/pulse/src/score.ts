@@ -31,6 +31,11 @@ export interface Scored {
 const WEIGHTS: Parts = { local_affinity: 0.55, business_fit: 0.25, local_hook: 0.1, freshness: 0.1 };
 /** Declaration order; it is also the tie-break order when two parts weigh the same. */
 const PART_ORDER = ["local_affinity", "business_fit", "local_hook", "freshness"] as const;
+/** Builder's calls: a part is only claimed in the why-line when it is at least
+ *  this strong, so a line never asserts something the numbers barely support.
+ *  Business fit is a raw share of tags; local affinity is the normalised value. */
+const CLAIM_FLOOR_BUSINESS_FIT = 0.2;
+const CLAIM_FLOOR_LOCAL_AFFINITY = 0.2;
 const TOP_CELLS = 5;
 const TOP_TAGS = 10;
 
@@ -87,8 +92,11 @@ export function scoreCandidates(cands: Candidate[], type: BusinessType): Scored[
     return { candidate, score, parts, businessType: type };
   });
 
+  // Scores are compared as the wire shows them (3 decimals), so float noise
+  // far below that cannot outrank popularity.
+  const wire = (x: number) => Math.round(x * 1000) / 1000;
   return scored.sort((a, b) =>
-    b.score - a.score
+    wire(b.score) - wire(a.score)
     || b.candidate.popularity - a.candidate.popularity
     || a.candidate.card.releaseDate.localeCompare(b.candidate.card.releaseDate)
     || a.candidate.card.tmdbId - b.candidate.card.tmdbId);
@@ -101,11 +109,15 @@ const FIT_WORDS: Record<BusinessType, string> = {
 
 /** "#<rank> of <total> for <City> audiences", then the two parts that added
  *  the most to the score, largest first, equal parts in declaration order.
- *  A part that added nothing is left out rather than claimed, except local
- *  affinity, whose absence is itself worth saying. */
+ *  A part that added nothing, or sits below its claim floor, is left out
+ *  rather than claimed. The exception is a candidate with no heatmap cells at
+ *  all: that absence is worth saying ("no local signal yet"). It is decided
+ *  from the cells, not from the normalised value, because normalisation gives
+ *  the weakest candidate WITH cells a 0 too. */
 export function whyLine(s: Scored, rank: number, total: number, cityName: string, topHood: string | null): string {
+  const hasCells = localStrength(s.candidate.heat) !== null;
   const words: Record<(typeof PART_ORDER)[number], string> = {
-    local_affinity: s.parts.local_affinity === 0
+    local_affinity: !hasCells
       ? "no local signal yet"
       : topHood ? `strongest around ${topHood}` : "strong local affinity",
     business_fit: FIT_WORDS[s.businessType],
@@ -116,7 +128,11 @@ export function whyLine(s: Scored, rank: number, total: number, cityName: string
   };
   const chosen = PART_ORDER
     .map((k, order) => ({ k, order, weighted: WEIGHTS[k] * s.parts[k] }))
-    .filter((p) => p.weighted > 0 || p.k === "local_affinity")
+    .filter((p) => {
+      if (p.k === "local_affinity") return !hasCells || s.parts.local_affinity >= CLAIM_FLOOR_LOCAL_AFFINITY;
+      if (p.k === "business_fit") return s.parts.business_fit >= CLAIM_FLOOR_BUSINESS_FIT;
+      return p.weighted > 0;
+    })
     .sort((a, b) => b.weighted - a.weighted || a.order - b.order)
     .slice(0, 2)
     .map((p) => words[p.k]);

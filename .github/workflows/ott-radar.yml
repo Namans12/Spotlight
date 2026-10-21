@@ -70,4 +70,4 @@ jobs:
             echo "Pulse warm skipped (not configured)"
             exit 0
           fi
-          curl -fsS --max-time 30 -X POST -H "Authorization: Bearer $PULSE_WARM_SECRET" "$PULSE_URL/warm"
+          curl -fsS --max-time 30 -X POST -H "Authorization: Bearer $PULSE_WARM_SECRET" "${PULSE_URL%/}/warm"

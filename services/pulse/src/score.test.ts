@@ -149,10 +149,11 @@ describe("whyLine", () => {
   });
 
   it("orders the two parts by weighted size, not by declaration", () => {
-    const s = scoreCandidates([cand({ heat: [0.1], placeTagNames: ["Cafe"] }), cand({ heat: [0.9], placeTagNames: [] })], "cafe");
-    const low = s.find((x) => x.parts.local_affinity === 0)!;
-    // local 0, business_fit 0.25 -> only business_fit is positive; local is the second eligible part.
-    expect(whyLine(low, 2, 2, "Delhi", "Hauz Khas")).toBe("#2 of 2 for Delhi audiences · fans over-index on café-style spots · no local signal yet");
+    const s = scoreCandidates([cand({ heat: [0.9], hook: setIn, placeTagNames: ["Cafe"], daysAhead: 20 })], "cafe")[0];
+    // local_affinity (0.55) and business_fit (0.25) outweigh the 0.10 hook.
+    expect(whyLine(s, 1, 1, "Delhi", "Hauz Khas")).toBe("#1 of 1 for Delhi audiences · strongest around Hauz Khas · fans over-index on café-style spots");
+    const noLocal = scoreCandidates([cand({ heat: [], hook: setIn, placeTagNames: ["Cafe"], daysAhead: 20 })], "cafe")[0];
+    expect(whyLine(noLocal, 1, 1, "Delhi", null)).toBe("#1 of 1 for Delhi audiences · fans over-index on café-style spots · set in Delhi");
   });
 
   it("says no local signal yet when local affinity is 0 and it is among the top two", () => {
@@ -161,6 +162,30 @@ describe("whyLine", () => {
     // With freshness worth something it leads, because it weighs more.
     const fresh = scoreCandidates([cand({ heat: [], daysAhead: 3 })], "cafe")[0];
     expect(whyLine(fresh, 1, 1, "Goa", null)).toBe("#1 of 1 for Goa audiences · out this week · no local signal yet");
+  });
+
+  it("does not say 'no local signal yet' for the weakest candidate that HAS cells", () => {
+    const s = scoreCandidates([cand({ heat: [0.9] }), cand({ heat: [0.1] }), cand({ heat: [0.5], daysAhead: 3 })], "cafe");
+    const weakest = s.find((x) => x.candidate.heat?.[0] === 0.1)!;
+    expect(weakest.parts.local_affinity).toBe(0);
+    expect(whyLine(weakest, 3, 3, "Delhi", "Hauz Khas")).toBe("#3 of 3 for Delhi audiences");
+    const withFresh = scoreCandidates([cand({ heat: [0.9] }), cand({ heat: [0.1], daysAhead: 3 })], "cafe").find((x) => x.candidate.heat?.[0] === 0.1)!;
+    expect(whyLine(withFresh, 2, 2, "Delhi", "Hauz Khas")).toBe("#2 of 2 for Delhi audiences · out this week");
+    expect(whyLine(withFresh, 2, 2, "Delhi", "Hauz Khas")).not.toContain("no local signal yet");
+  });
+
+  it("says it for a candidate with no cells on a mixed board, and not for the others", () => {
+    const s = scoreCandidates([cand({ heat: [0.9] }), cand({ heat: [0.4] }), cand({ heat: null }), cand({ heat: [] }), cand({ heat: [Number.NaN] })], "cafe");
+    for (const x of s) {
+      const line = whyLine(x, 1, s.length, "Delhi", "Hauz Khas");
+      const empty = !x.candidate.heat || x.candidate.heat.filter(Number.isFinite).length === 0;
+      expect(line.includes("no local signal yet")).toBe(empty);
+    }
+  });
+
+  it("an all-empty city still says it for every card", () => {
+    const s = scoreCandidates([cand({ heat: [] }), cand({ heat: null }), cand({ heat: [], daysAhead: 3 })], "cafe");
+    s.forEach((x) => expect(whyLine(x, 1, 3, "Goa", null)).toContain("no local signal yet"));
   });
 
   it("never claims a part that contributed nothing", () => {
@@ -191,5 +216,52 @@ describe("whyLine", () => {
   it("falls back to a neighbourhood-free phrase when the strongest cell has no label", () => {
     const s = scoreCandidates([cand({ heat: [0.5] })], "cafe")[0];
     expect(whyLine(s, 1, 1, "Delhi", null)).toBe("#1 of 1 for Delhi audiences · strong local affinity");
+  });
+});
+
+describe("claim floors", () => {
+  it("claims business fit at a share of 0.2 but not below it", () => {
+    const at = scoreCandidates([cand({ heat: [0.9], placeTagNames: ["Cafe", "a", "b", "c", "d"] })], "cafe")[0]; // 1/5 = 0.2
+    expect(at.parts.business_fit).toBe(0.2);
+    expect(whyLine(at, 1, 1, "Delhi", "Hauz Khas")).toContain("fans over-index on café-style spots");
+    const below = scoreCandidates([cand({ heat: [0.9], placeTagNames: ["Cafe", "a", "b", "c", "d", "e"] })], "cafe")[0]; // 1/6
+    expect(below.parts.business_fit).toBeLessThan(0.2);
+    expect(whyLine(below, 1, 1, "Delhi", "Hauz Khas")).toBe("#1 of 1 for Delhi audiences · strongest around Hauz Khas");
+  });
+
+  it("applies the same floor to the d2c_food wording", () => {
+    const ok = scoreCandidates([cand({ heat: [0.9], placeTagNames: ["Snacks"] })], "d2c_food")[0];
+    expect(whyLine(ok, 1, 1, "Delhi", "Hauz Khas")).toContain("snack & dessert brands");
+    const low = scoreCandidates([cand({ heat: [0.9], placeTagNames: ["Snacks", ...Array(9).fill("x")] })], "d2c_food")[0]; // 0.1
+    expect(whyLine(low, 1, 1, "Delhi", "Hauz Khas")).not.toContain("snack & dessert brands");
+  });
+
+  // The others' range is 0..1, so a candidate's heat is its normalised value.
+  const withLocal = (v: number, hood: string | null) => {
+    const s = scoreCandidates([cand({ heat: [0] }), cand({ heat: [1] }), cand({ heat: [v] })], "cafe");
+    return whyLine(s.find((x) => x.candidate.heat?.[0] === v && x.candidate.heat.length === 1 && v !== 0 && v !== 1)!, 2, 3, "Delhi", hood);
+  };
+
+  it("claims local affinity at a normalised 0.2 but not below it", () => {
+    expect(withLocal(0.2, "Hauz Khas")).toBe("#2 of 3 for Delhi audiences · strongest around Hauz Khas");
+    expect(withLocal(0.2, null)).toBe("#2 of 3 for Delhi audiences · strong local affinity");
+    expect(withLocal(0.19, "Hauz Khas")).toBe("#2 of 3 for Delhi audiences");
+    expect(withLocal(0.19, null)).toBe("#2 of 3 for Delhi audiences");
+  });
+});
+
+describe("tie-break on the wire score", () => {
+  it("orders scores that differ only beyond the 3rd decimal by popularity, then date, then id", () => {
+    const lo = cand({ heat: [0], popularity: 0 });
+    const hi = cand({ heat: [1], popularity: 0 });
+    const popular = cand({ heat: [0.5], popularity: 9 });
+    const slightlyHigher = cand({ heat: [0.5000001], popularity: 1 }); // ~5e-8 more raw score, same 3-decimal score
+    const out = scoreCandidates([slightlyHigher, popular, lo, hi], "cafe").map((x) => x.candidate);
+    expect(slightlyHigher.heat![0]).toBeGreaterThan(popular.heat![0]);
+    expect(out.indexOf(popular)).toBeLessThan(out.indexOf(slightlyHigher));
+    // A difference that does show in the 3rd decimal still wins over popularity.
+    const clearlyHigher = cand({ heat: [0.52], popularity: 1 });
+    const out2 = scoreCandidates([popular, clearlyHigher, lo, hi], "cafe").map((x) => x.candidate);
+    expect(out2.indexOf(clearlyHigher)).toBeLessThan(out2.indexOf(popular));
   });
 });
