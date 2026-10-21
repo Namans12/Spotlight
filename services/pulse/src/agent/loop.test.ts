@@ -191,6 +191,12 @@ describe("runAgent", () => {
   });
 
   describe("provider failures end the stream with a fixed sentence, never the provider's text", () => {
+    it("a daily-limit rate limit (a wait of minutes) does not say 'try again in a minute'", async () => {
+      const llm = fakeLlm([new LlmError("rate_limited", "x", { limitReached: true })]);
+      const ev = await collect(runAgent(llm, [], [user("hi")]));
+      expect((ev[0] as { text: string }).text).toBe("The AI service has reached its limit for now. Please try again later.");
+    });
+
     it.each([
       ["rate_limited", /busy/i],
       ["unavailable", /unavailable/i],
@@ -454,7 +460,7 @@ describe("runAgent: what is re-sent to the model on each round (free-tier token 
     // characters (about 3,700 once serialised, because the cut preview is itself JSON and
     // its quotes are escaped on the wire) and is re-sent once per later request. Measured
     // with the two small fake tools below: 2,271 / 6,148 / 10,027 characters per request,
-    // 18,446 cumulative (~5,000 tokens). The bounds leave ~10% headroom; a regression that
+    // 18,446 cumulative (live, the same turn measured 7,286 prompt tokens over three rounds). The bounds leave ~10% headroom; a regression that
     // duplicated a result in the history, or sent it un-truncated, would blow through them.
     const bigResult = { rows: Array.from({ length: 3000 }, (_, i) => `row ${i}`) };
     const tools = [fakeTool("pulse_board", bigResult, spec), fakeTool("release_brief", bigResult, spec)];

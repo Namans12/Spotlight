@@ -6,8 +6,12 @@
 export type LlmErrorKind = "rate_limited" | "unavailable" | "bad_response";
 
 export class LlmError extends Error {
-  constructor(readonly kind: LlmErrorKind, message: string) {
+  /** True for a `rate_limited` whose provider wait was too long to sit out (the
+   *  daily limit, minutes away): callers then say "try again later", not "in a minute". */
+  readonly limitReached: boolean;
+  constructor(readonly kind: LlmErrorKind, message: string, opts: { limitReached?: boolean } = {}) {
     super(message);
     this.name = "LlmError";
+    this.limitReached = opts.limitReached === true;
   }
 }

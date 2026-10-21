@@ -25,8 +25,11 @@ export const JITTER_MS = 250;
 export const MAX_WAITING = 12;
 /** Retries after a 429 (so a request is sent at most 1 + this many times). */
 export const MAX_429_RETRIES = 2;
-/** Prompt characters per token, for the estimate (a deliberately cautious ratio). */
-export const CHARS_PER_TOKEN = 3.6;
+/** Prompt characters per token, for the estimate. Plain prose runs near 4, but
+ *  this payload is mostly JSON (tool specs, tool results), which tokenises at
+ *  about 3 or fewer: 3.6 under-estimated it live (a turn the estimate put at
+ *  about 5,000 tokens measured 7,286), so the ratio is 3.0. */
+export const CHARS_PER_TOKEN = 3.0;
 /** The completion allowance in the estimate, capped by the request's max_tokens. */
 export const COMPLETION_ALLOWANCE = 600;
 
@@ -82,6 +85,8 @@ export interface Pacer {
   schedule<T>(signal: AbortSignal | undefined, task: () => Promise<T>): Promise<T>;
   /** Remembers the token headroom a response reported. */
   record(headers: Headers): void;
+  /** Drops the remembered headroom (it is stale after a wait that was not for it). */
+  forget(): void;
   /** Before sending: when the last reported headroom is below `estimate`, waits
    *  for the token window to reset if that is at most MAX_WAIT_MS away, else for
    *  just the shortfall to refill (when the limit is known) if that is. */
@@ -165,10 +170,14 @@ export function createPacer(deps: PacerDeps = {}): Pacer {
         wait = Math.ceil((estimate - have) / perMs) + JITTER_MS;
         if (wait > MAX_WAIT_MS) return;
       }
-      seen = null; // one wait per report: the refill is assumed done afterwards
       await sleep(wait, signal);
+      // One wait per report: the refill is assumed done afterwards. Cleared only
+      // after the sleep completes, so an aborted wait leaves the report in place
+      // and the next request still paces.
+      seen = null;
     },
 
+    forget() { seen = null; },
     sleep,
     waiting: () => queue.length,
   };

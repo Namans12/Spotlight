@@ -1,6 +1,6 @@
 import type { TitleSummary } from "../brief.js";
 import type { BusinessType, Campaign } from "../../../../shared/types/pulse.js";
-import { draftWithoutQloo, isFallback } from "../campaign.js";
+import { DRAFT_DEADLINE_MS, draftWithoutQloo, isFallback } from "../campaign.js";
 import { createTtlCache, type TtlCache } from "../campaignCache.js";
 import { clientAddress, type RateLimiter } from "../http/rateLimit.js";
 import type { Handler } from "../http/router.js";
@@ -10,7 +10,7 @@ import { sessionKey, type CapDecision } from "../usage.js";
 import { json, parseTitleParams } from "./params.js";
 
 /** What one shared draft came to: a campaign, or a refusal by the usage cap. */
-type Drafted = { campaign: Campaign } | { capped: true };
+type Drafted = { campaign: Campaign } | { capped: true } | { busy: true };
 
 export interface GuessRouteDeps {
   /** Its own, stricter instance: a guess is an LLM call, so it must not share
@@ -30,6 +30,8 @@ export interface GuessRouteDeps {
   inflight?: Map<string, Promise<Drafted>>;
   /** Told why a draft was unusable (a provider failure); never the key or the prompt. */
   onError?: (context: string, err: unknown) => void;
+  /** One draft's whole budget, queue wait included; DRAFT_DEADLINE_MS unless a test says otherwise. */
+  draftDeadlineMs?: number;
   now?: () => Date;
 }
 
@@ -95,6 +97,7 @@ export function guessHandler(deps: GuessRouteDeps): Handler {
       }
       const result = await work;
       if ("capped" in result) return json(res, 429, { error: "daily_limit" });
+      if ("busy" in result) return json(res, 429, { error: "rate_limited" }, { "Retry-After": "10" });
       json(res, 200, result.campaign);
     } catch (err) {
       fail(res, "draft", err);
@@ -104,7 +107,17 @@ export function guessHandler(deps: GuessRouteDeps): Handler {
   async function draft(req: Parameters<Handler>[0], summary: TitleSummary, cityName: string, businessType: BusinessType, cacheKey: string): Promise<Drafted> {
     const usage = await deps.takeUsage(sessionKey(req, deps.now?.() ?? new Date()));
     if (!usage.allowed) return { capped: true };
-    const campaign = await draftWithoutQloo(deps.llm!, { title: summary.title, cityName, businessType, releaseDate: summary.releaseDate }, report);
+    // Its own deadline (the draft may be queued behind other model calls), not
+    // tied to this connection: overlapping identical guesses share the draft.
+    // A cut draft is not cached and the usage slot taken above stays taken.
+    const deadline = AbortSignal.timeout(deps.draftDeadlineMs ?? DRAFT_DEADLINE_MS);
+    let campaign: Campaign;
+    try {
+      campaign = await draftWithoutQloo(deps.llm!, { title: summary.title, cityName, businessType, releaseDate: summary.releaseDate }, report, deadline);
+    } catch (err) {
+      if (err instanceof LlmError && deadline.aborted) { report("campaign writer", err); return { busy: true }; }
+      throw err;
+    }
     // The placeholder idea is not a result worth keeping for an hour.
     if (!isFallback(campaign)) cache.set(cacheKey, campaign);
     return { campaign };

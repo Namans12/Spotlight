@@ -276,6 +276,53 @@ describe("GET /guess", () => {
     log.mockRestore();
   });
 
+  describe("deadline", () => {
+    const flush = () => new Promise<void>((r) => setTimeout(r, 0));
+    function blockedLlm() {
+      let blocked = true;
+      const signals: (AbortSignal | undefined)[] = [];
+      const llm = {
+        calls: [] as unknown[],
+        opts: [] as unknown[],
+        chat: (_m: unknown, o?: { signal?: AbortSignal }) => {
+          signals.push(o?.signal);
+          if (!blocked) return Promise.resolve({ role: "assistant" as const, content: REPLY });
+          return new Promise<never>((_res, rej) => o?.signal?.addEventListener("abort", () => rej(new LlmError("unavailable", "The model request was cancelled.")), { once: true }));
+        },
+      };
+      return { llm: llm as unknown as FakeLlm, signals, unblock: () => { blocked = false; } };
+    }
+
+    it("a draft stuck in the queue is cut at the deadline: 429 rate_limited with Retry-After 10, nothing cached, nothing in flight", async () => {
+      const { llm, signals } = blockedLlm();
+      const cache = createTtlCache<Campaign>({ ttlMs: 60_000, max: 10 });
+      const inflight = new Map<string, Promise<unknown>>();
+      const { get, deps } = await start({ cache, inflight: inflight as never, draftDeadlineMs: 25 }, llm);
+      const res = await get(GOOD);
+      expect(res.status).toBe(429);
+      expect(res.headers.get("retry-after")).toBe("10");
+      expect(await res.json()).toEqual({ error: "rate_limited" });
+      expect(signals[0]!.aborted).toBe(true);
+      await flush();
+      expect(cache.size()).toBe(0);
+      expect(inflight.size).toBe(0);
+      expect(deps.takeUsage).toHaveBeenCalledTimes(1); // the slot taken for the cut draft is kept
+    });
+
+    it("overlapping identical guesses share the cut, and the next one starts a fresh draft", async () => {
+      const { llm, signals, unblock } = blockedLlm();
+      const { get, deps } = await start({ draftDeadlineMs: 25 }, llm);
+      const [a, b] = await Promise.all([get(GOOD), get(GOOD)]);
+      expect([a.status, b.status]).toEqual([429, 429]);
+      expect(signals).toHaveLength(1);
+      unblock();
+      const c = await get(GOOD);
+      expect(c.status).toBe(200);
+      expect(signals).toHaveLength(2);
+      expect(deps.takeUsage).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it("looks the title up with the validated key and drafts nothing for a title with no header", async () => {
     const header = vi.fn(async () => null);
     const { get, llm } = await start({ header });

@@ -59,6 +59,8 @@ export const CHAT_MAX_TOKENS = 1200;
 const MAX_NAME = 64;
 const MAX_SHOWN_ARGS = 300;
 
+/** A rate limit whose reset is minutes away (the daily limit): "in a minute" would be a lie. */
+const LIMIT_REACHED = "The AI service has reached its limit for now. Please try again later.";
 const LLM_SENTENCES: Record<LlmErrorKind, string> = {
   rate_limited: "The AI service is busy right now. Please try again in a minute.",
   unavailable: "The AI service is unavailable right now. Please try again shortly.",
@@ -164,7 +166,7 @@ export async function* runAgent(llm: LlmClient, tools: AgentTool[], history: Cha
       } catch (err) {
         if (ac.signal.aborted) { yield* stopped(); return; } // the client left, or time ran out
         report("model call", err);
-        yield { type: "error", text: err instanceof LlmError ? LLM_SENTENCES[err.kind] : GENERIC_FAILURE };
+        yield { type: "error", text: err instanceof LlmError ? (err.kind === "rate_limited" && err.limitReached ? LIMIT_REACHED : LLM_SENTENCES[err.kind]) : GENERIC_FAILURE };
         yield { type: "done" };
         return;
       }

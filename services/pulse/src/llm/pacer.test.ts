@@ -43,9 +43,9 @@ describe("rateLimitWaitMs (what a 429 asks for)", () => {
 });
 
 describe("estimateTokens", () => {
-  it("is chars / 3.6 plus a completion allowance capped by max_tokens", () => {
-    expect(estimateTokens(3600, 4096)).toBe(1000 + COMPLETION_ALLOWANCE);
-    expect(estimateTokens(3600, 200)).toBe(1000 + 200);
+  it("is chars / 3 (JSON-heavy prompts run near 3 characters a token) plus a completion allowance capped by max_tokens", () => {
+    expect(estimateTokens(3000, 4096)).toBe(1000 + COMPLETION_ALLOWANCE);
+    expect(estimateTokens(3000, 200)).toBe(1000 + 200);
     expect(estimateTokens(0, 1200)).toBe(COMPLETION_ALLOWANCE);
   });
 });
@@ -189,6 +189,35 @@ describe("proactive pacing", () => {
     advance(5000); // the reset has passed
     await pacer.beforeSend(1500);
     expect(sleeps).toEqual([2000]);
+  });
+  it("keeps the report when a proactive wait is aborted, so the next request still paces", async () => {
+    let t = 5_000;
+    const sleeps: number[] = [];
+    const ac = new AbortController();
+    const pacer = createPacer({
+      now: () => t,
+      sleep: (ms, signal) => new Promise<void>((resolve, reject) => {
+        sleeps.push(ms);
+        if (signal?.aborted) return reject(new Error("cancelled"));
+        signal?.addEventListener("abort", () => reject(new Error("cancelled")), { once: true });
+        if (!signal) { t += ms; resolve(); }
+      }),
+    });
+    pacer.record(rec(100, "3s"));
+    const waiting = pacer.beforeSend(1500, ac.signal);
+    ac.abort();
+    await expect(waiting).rejects.toThrow("cancelled");
+    await pacer.beforeSend(1500); // no signal: this one sleeps (and completes)
+    expect(sleeps).toEqual([3000, 3000]);
+    await pacer.beforeSend(1500); // a completed wait clears the report
+    expect(sleeps).toEqual([3000, 3000]);
+  });
+  it("forget() drops the report", async () => {
+    const { pacer, sleeps } = clocked();
+    pacer.record(rec(100, "3s"));
+    pacer.forget();
+    await pacer.beforeSend(1500);
+    expect(sleeps).toEqual([]);
   });
   it("ignores headers it cannot read", async () => {
     const { pacer, sleeps } = clocked();

@@ -480,6 +480,7 @@ describe("search_releases", () => {
     expect((spy.calls[0].values[0] as string).length).toBe(80 + 2);
     expect(out.query.length).toBe(80);
     expect(out.results).toHaveLength(6);
+    expect(spy.calls[0].text).toMatch(/LIMIT 10/); // the SQL still reads 10 (the brief's title match uses them); the tool shows 6
   });
 
   it("maps rows to tmdbId/mediaType/title/date/platform", async () => {

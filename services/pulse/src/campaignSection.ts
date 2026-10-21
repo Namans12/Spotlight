@@ -4,7 +4,7 @@
 
 import type { Campaign, EvidenceSection } from "../../../shared/types/pulse.js";
 import type { CampaignContext, DraftCampaign } from "./brief.js";
-import { buildBundle, draftCampaign, isFallback, type EvidenceFact } from "./campaign.js";
+import { buildBundle, DRAFT_DEADLINE_MS, draftCampaign, isFallback, type EvidenceFact } from "./campaign.js";
 import { createTtlCache, type TtlCache } from "./campaignCache.js";
 import { LlmError, type LlmClient, type LlmErrorKind } from "./llm/client.js";
 import type { CapDecision } from "./usage.js";
@@ -19,6 +19,8 @@ export interface CampaignSectionDeps {
   cache?: TtlCache<EvidenceSection<unknown>>;
   /** Drafts in progress by the cache key; one is made if not given. */
   inflight?: Map<string, Promise<EvidenceSection<unknown>>>;
+  /** One draft's whole budget, queue wait included; DRAFT_DEADLINE_MS unless a test says otherwise. */
+  draftDeadlineMs?: number;
   now?: () => number;
   onError?: (context: string, err: unknown) => void;
 }
@@ -36,6 +38,7 @@ const ERROR_NOTES: Record<LlmErrorKind, string> = {
   // A type-exhaustiveness backstop: an LlmError bad_response is retried inside the draft loop and never reaches here.
   bad_response: "The AI writer returned something unusable — the evidence above is unaffected.",
 };
+const LIMIT_REACHED_NOTE = "The AI writer has reached its limit for now — the evidence above is unaffected. Try again later.";
 const WRITER_LIMITS = "Drafted by an AI model from the evidence listed above; every cited claim links to that evidence, uncited clauses are the model's own suggestions.";
 
 const withoutData = (status: "empty" | "degraded", note: string): EvidenceSection<unknown> => ({ status, data: null, provenance: [], note });
@@ -88,13 +91,22 @@ export function makeDraftCampaign(deps: CampaignSectionDeps): DraftCampaign {
     const report = (context: string, err: unknown) => {
       try { deps.onError?.(context, err); } catch { /* a broken logger must not break the brief */ }
     };
+    // The draft has its own deadline: it may be queued behind other model calls, and
+    // nothing else would cut it. It is deliberately NOT tied to this request's
+    // connection: overlapping views of one brief share this draft (see `inflight`),
+    // so one reader leaving must not cancel it for the others. A cut draft is not
+    // cached and leaves no in-flight entry (the caller's finally clears it); the usage
+    // slot taken above stays taken.
+    const deadline = AbortSignal.timeout(deps.draftDeadlineMs ?? DRAFT_DEADLINE_MS);
     let campaign: Campaign;
     try {
-      campaign = await draftCampaign(llm, bundle, { title: header.title, cityName: header.cityName, businessType, releaseDate: header.releaseDate }, report);
+      campaign = await draftCampaign(llm, bundle, { title: header.title, cityName: header.cityName, businessType, releaseDate: header.releaseDate }, report, deadline);
     } catch (err) {
       if (!(err instanceof LlmError)) throw err;
       report("campaign writer", err);
-      return withoutData("degraded", ERROR_NOTES[err.kind]);
+      // A cut-off queue wait is "busy", whatever the cancelled call called itself.
+      if (deadline.aborted) return withoutData("degraded", ERROR_NOTES.rate_limited);
+      return withoutData("degraded", err.kind === "rate_limited" && err.limitReached ? LIMIT_REACHED_NOTE : ERROR_NOTES[err.kind]);
     }
 
     const provenance = [{ source: "spotlight" as const, call: "campaign_writer", params: { model: deps.model, evidenceFacts: String(bundle.length) }, limits: WRITER_LIMITS }];

@@ -266,6 +266,23 @@ describe("rate limits", () => {
     expect(edge.clock.sleeps).toEqual([20_250]);
   });
 
+  it("after sleeping out a 429 it does not sleep a second time for the same shortfall", async () => {
+    // The 429's own headers report few tokens left and a reset further off than retry-after; the retry must just go.
+    const { llm, calls, clock } = client([limited({ "retry-after": "1", "x-ratelimit-remaining-tokens": "100", "x-ratelimit-reset-tokens": "5s", "x-ratelimit-limit-tokens": "8000" }), okBody()]);
+    expect((await llm.chat(MSGS)).content).toBe("done");
+    expect(calls).toHaveLength(2);
+    expect(clock.sleeps).toEqual([1250]);
+  });
+
+  it("a wait over 20 s marks the error limitReached (the daily limit); a short-wait exhaustion does not", async () => {
+    const daily = await client([limited({ "retry-after": "259" })]).llm.chat(MSGS).then(() => null, (e: unknown) => e as LlmError);
+    expect(daily).toMatchObject({ kind: "rate_limited", limitReached: true });
+    const exhausted = await client([limited({ "retry-after": "1" })]).llm.chat(MSGS).then(() => null, (e: unknown) => e as LlmError);
+    expect(exhausted).toMatchObject({ kind: "rate_limited", limitReached: false });
+    const silent = await client([limited({})]).llm.chat(MSGS).then(() => null, (e: unknown) => e as LlmError);
+    expect(silent).toMatchObject({ kind: "rate_limited", limitReached: false });
+  });
+
   it("a 429 that says nothing about when to retry is rate_limited at once", async () => {
     const { llm, calls, clock } = client([limited({})]);
     await expect(llm.chat(MSGS)).rejects.toMatchObject({ kind: "rate_limited" });
@@ -295,7 +312,7 @@ describe("proactive pacing in the client", () => {
     status: 200,
     headers: { "x-ratelimit-remaining-tokens": String(remaining), "x-ratelimit-reset-tokens": reset },
   });
-  const BIG = [{ role: "user" as const, content: "w".repeat(7200) }]; // ~2,000 tokens + the completion allowance
+  const BIG = [{ role: "user" as const, content: "w".repeat(7200) }]; // ~2,400 tokens (3 characters a token) + the completion allowance
 
   it("waits for the reset before sending when the last remaining count was below the estimate", async () => {
     const { llm, calls, clock } = client([withRoom(300, "4s"), withRoom(7000, "1s")]);

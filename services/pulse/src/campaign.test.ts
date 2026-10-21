@@ -491,3 +491,45 @@ describe("buildBundle", () => {
     expect(f[0].id).toBe("artist:abc");
   });
 });
+
+describe("the draft loop and its AbortSignal", () => {
+  it("passes the same signal to every attempt, retries included", async () => {
+    const ac = new AbortController();
+    const llm = fakeLlm([badJson, citesUnknown, valid]);
+    await draftCampaign(llm, bundle, ctx, undefined, ac.signal);
+    expect(llm.calls).toHaveLength(3);
+    expect(llm.opts.map((o) => o?.signal)).toEqual([ac.signal, ac.signal, ac.signal]);
+    const none = fakeLlm([badJson, json(ideas([]))]);
+    await draftWithoutQloo(none, ctx, undefined, ac.signal);
+    expect(none.opts.map((o) => o?.signal)).toEqual([ac.signal, ac.signal]);
+  });
+
+  it("stops retrying once aborted and, with nothing usable yet, throws an LlmError instead of the placeholder", async () => {
+    const ac = new AbortController();
+    const llm = fakeLlm([() => { ac.abort(); return badJson; }, valid]);
+    await expect(draftCampaign(llm, bundle, ctx, undefined, ac.signal)).rejects.toBeInstanceOf(LlmError);
+    expect(llm.calls).toHaveLength(1);
+  });
+
+  it("an abort during a call (the provider call rejects) is not retried as a bad answer", async () => {
+    const ac = new AbortController();
+    const llm = fakeLlm([new LlmError("bad_response", "x"), valid]);
+    ac.abort();
+    await expect(draftWithoutQloo(llm, ctx, undefined, ac.signal)).rejects.toBeInstanceOf(LlmError);
+    expect(llm.calls.length).toBeLessThanOrEqual(1);
+  });
+
+  it("an answer already in hand is kept when the abort comes during a retry", async () => {
+    const ac = new AbortController();
+    const llm = fakeLlm([() => { ac.abort(); return citesUnknown; }, valid]);
+    const c = await draftCampaign(llm, bundle, ctx, undefined, ac.signal);
+    expect(llm.calls).toHaveLength(1);
+    expect(c.ideas).toHaveLength(3); // the parseable draft, downgraded, not thrown away
+  });
+
+  it("without a signal nothing changes", async () => {
+    const llm = fakeLlm([valid]);
+    await draftCampaign(llm, bundle, ctx);
+    expect(llm.opts[0]).toEqual({ json: true, signal: undefined });
+  });
+});

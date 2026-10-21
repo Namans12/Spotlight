@@ -121,10 +121,17 @@ export function createGroqClient(cfg: GroqConfig, fetchImpl: typeof fetch = fetc
       if (res.status !== 429) return res;
       void res.body?.cancel().catch(() => {}); // free the connection; the body is not read
       const wait = rateLimitWaitMs(res.headers);
-      if (wait === null || wait > MAX_WAIT_MS || attempt >= MAX_429_RETRIES) {
+      if (wait !== null && wait > MAX_WAIT_MS) {
+        // Too long to sit out (the daily limit): say so, so the caller does not promise "in a minute".
+        throw new LlmError("rate_limited", "The model provider is rate limiting requests.", { limitReached: true });
+      }
+      if (wait === null || attempt >= MAX_429_RETRIES) {
         throw new LlmError("rate_limited", "The model provider is rate limiting requests.");
       }
       await pacer.sleep(wait + JITTER_MS, opts?.signal);
+      // The 429's own headers (few tokens left, a reset further off than the wait)
+      // describe the moment before this sleep; the retry must not sleep again for them.
+      pacer.forget();
     }
   }
 
@@ -147,7 +154,6 @@ export function createGroqClient(cfg: GroqConfig, fetchImpl: typeof fetch = fetc
       if (dropEffort) effort = false;
       res = await post(messages, opts, json, effort);
     }
-    if (res.status === 429) throw new LlmError("rate_limited", "The model provider is rate limiting requests.");
     if (res.status === 408 || res.status === 401 || res.status === 403 || res.status >= 500) {
       throw new LlmError("unavailable", `The model provider answered HTTP ${res.status}.`);
     }

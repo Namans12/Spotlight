@@ -313,6 +313,72 @@ describe("makeDraftCampaign LlmError mapping", () => {
   });
 });
 
+describe("makeDraftCampaign deadline (a draft is never uncancellable)", () => {
+  const flush = () => new Promise<void>((r) => setTimeout(r, 0));
+  /** A model call that is stuck behind a full queue: it ends only when its signal aborts, as the pacer does. */
+  function blockedLlm(replyAfterwards: string) {
+    const signals: (AbortSignal | undefined)[] = [];
+    let blocked = true;
+    const llm: LlmClient = {
+      chat: (_m, o) => {
+        signals.push(o?.signal);
+        if (!blocked) return Promise.resolve({ role: "assistant" as const, content: replyAfterwards });
+        return new Promise((_res, rej) => o?.signal?.addEventListener("abort", () => rej(new LlmError("unavailable", "The model request was cancelled.")), { once: true }));
+      },
+    };
+    return { llm, signals, unblock: () => { blocked = false; } };
+  }
+
+  it("cuts a draft stuck in the queue at the deadline: degraded with the busy sentence, nothing cached, nothing left in flight", async () => {
+    const { llm, signals } = blockedLlm(OK_REPLY);
+    const cache = createTtlCache<EvidenceSection<unknown>>({ ttlMs: 60_000, max: 10 });
+    const inflight = new Map<string, Promise<EvidenceSection<unknown>>>();
+    const takeUsage = vi.fn(async (_s: string) => ({ allowed: true }) as const);
+    const onError = vi.fn();
+    const draft = makeDraftCampaign({ llm, model: "m-1", takeUsage, cache, inflight, draftDeadlineMs: 25, onError });
+    const started = Date.now();
+    const s = await draft(ctxOf());
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(s).toMatchObject({ status: "degraded", data: null, provenance: [] });
+    expect(s.note).toBe("The AI writer is busy right now — the evidence above is unaffected. Try again in a minute.");
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+    expect(signals[0]!.aborted).toBe(true);
+    expect(cache.size()).toBe(0);
+    expect(inflight.size).toBe(0);
+    expect(takeUsage).toHaveBeenCalledTimes(1); // the slot taken for the cut draft is kept (the work was started)
+    expect(onError).toHaveBeenCalledWith("campaign writer", expect.objectContaining({ name: "LlmError" }));
+  });
+
+  it("a second identical request afterwards starts a fresh draft (and takes its own usage slot)", async () => {
+    const { llm, signals, unblock } = blockedLlm(OK_REPLY);
+    const cache = createTtlCache<EvidenceSection<unknown>>({ ttlMs: 60_000, max: 10 });
+    const takeUsage = vi.fn(async (_s: string) => ({ allowed: true }) as const);
+    const draft = makeDraftCampaign({ llm, model: "m-1", takeUsage, cache, draftDeadlineMs: 20 });
+    expect((await draft(ctxOf())).status).toBe("degraded");
+    unblock();
+    const again = await draft(ctxOf());
+    expect(again.status).toBe("ok");
+    expect(signals).toHaveLength(2);
+    expect(signals[1]).not.toBe(signals[0]); // a fresh deadline per draft
+    expect(takeUsage).toHaveBeenCalledTimes(2);
+    expect(cache.size()).toBe(1);
+  });
+
+  it("a provider rate limit with a long wait (the daily limit) says so, not 'try again in a minute'", async () => {
+    const { draft } = setup([new LlmError("rate_limited", "x", { limitReached: true })]);
+    const s = await draft(ctxOf());
+    expect(s.note).toBe("The AI writer has reached its limit for now — the evidence above is unaffected. Try again later.");
+    expect(s.note).not.toMatch(/in a minute/);
+  });
+
+  it("a draft that finishes before the deadline is unaffected, and its timer does not hold the process", async () => {
+    const { draft, llm } = setup([OK_REPLY], { draftDeadlineMs: 60_000 });
+    expect((await draft(ctxOf())).status).toBe("ok");
+    expect(llm.opts[0]?.signal).toBeInstanceOf(AbortSignal);
+    await flush();
+  });
+});
+
 describe("brief integration", () => {
   const delhi = getCity("delhi")!;
   const collect = async (gen: AsyncGenerator<BriefEvent>) => { const out: BriefEvent[] = []; for await (const e of gen) out.push(e); return out; };
