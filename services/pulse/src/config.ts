@@ -8,6 +8,8 @@ export interface PulseConfig {
   groqApiKey: string | null;
   groqBaseUrl: string;
   groqModel: string;
+  /** Sent as `reasoning_effort`; null means it is not sent. Default "low" for openai/gpt-oss models. */
+  groqReasoningEffort: string | null;
   warmSecret: string | null;
   sessionDailyChat: number;
   /** Campaign drafts (a brief's campaign, a /guess) per session per UTC day. Separate from chat. */
@@ -19,9 +21,14 @@ export interface PulseConfig {
 const DEFAULT_PORT = 8787;
 const DEFAULT_GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions";
 const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
-const DEFAULT_SESSION_DAILY_CHAT = 30;
-const DEFAULT_SESSION_DAILY_CAMPAIGN = 40;
-const DEFAULT_GLOBAL_DAILY_LLM = 800;
+// Sized for Groq's free tier: 1,000 provider requests a day and 8,000 tokens a
+// minute. The units here are drafts and chat turns, and one chat turn can make
+// several provider requests, so the global cap is well under 1,000. Raising
+// these needs a paid Groq tier, or another OpenAI-compatible provider via
+// GROQ_BASE_URL and GROQ_MODEL.
+const DEFAULT_SESSION_DAILY_CHAT = 12;
+const DEFAULT_SESSION_DAILY_CAMPAIGN = 20;
+const DEFAULT_GLOBAL_DAILY_LLM = 300;
 
 /** Only plain digit strings parse; anything else falls back to the default.
  *  parseInt would accept "8787abc" as 8787 and a typo in a quota variable would
@@ -40,6 +47,15 @@ function optional(raw: string | undefined): string | null {
   return v ? v : null;
 }
 
+/** GROQ_REASONING_EFFORT: unset means "low" for openai/gpt-oss models (verified
+ *  live on 2026-10-21) and not sent for any other model; "off" or an empty
+ *  string turns it off for every model. */
+function reasoningEffort(raw: string | undefined, model: string): string | null {
+  if (raw === undefined) return model.startsWith("openai/gpt-oss") ? "low" : null;
+  const v = raw.trim();
+  return v === "" || v.toLowerCase() === "off" ? null : v;
+}
+
 /** Reads the service's settings from the environment, failing at startup
  *  rather than on the first request when the one required value is absent. */
 export function loadConfig(env: NodeJS.ProcessEnv): PulseConfig {
@@ -53,6 +69,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): PulseConfig {
     throw new Error("QLOO_FIXTURES=1 serves synthetic data and must not run in production; set PULSE_ALLOW_FIXTURES=1 only for a deliberate demo");
   }
 
+  const groqModel = optional(env.GROQ_MODEL) ?? DEFAULT_GROQ_MODEL;
   return {
     port: intOr(env.PORT, DEFAULT_PORT),
     allowedOrigins: (env.PULSE_ALLOWED_ORIGINS ?? "")
@@ -64,7 +81,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): PulseConfig {
     fixturesInProduction: qlooFixtures && production,
     groqApiKey: optional(env.GROQ_API_KEY),
     groqBaseUrl: optional(env.GROQ_BASE_URL) ?? DEFAULT_GROQ_BASE_URL,
-    groqModel: optional(env.GROQ_MODEL) ?? DEFAULT_GROQ_MODEL,
+    groqModel,
+    groqReasoningEffort: reasoningEffort(env.GROQ_REASONING_EFFORT, groqModel),
     warmSecret: optional(env.PULSE_WARM_SECRET),
     sessionDailyChat: intOr(env.PULSE_SESSION_DAILY_CHAT, DEFAULT_SESSION_DAILY_CHAT),
     sessionDailyCampaign: intOr(env.PULSE_SESSION_DAILY_CAMPAIGN, DEFAULT_SESSION_DAILY_CAMPAIGN),

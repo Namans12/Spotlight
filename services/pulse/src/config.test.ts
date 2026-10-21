@@ -16,8 +16,10 @@ describe("loadConfig", () => {
   it("defaults the port and the daily quotas", () => {
     const c = loadConfig({ DATABASE_URL: "postgres://x" });
     expect(c.port).toBe(8787);
-    expect(c.sessionDailyChat).toBe(30);
-    expect(c.globalDailyLlm).toBe(800);
+    // Sized for Groq's free tier (1,000 provider requests a day; a chat turn can use several).
+    expect(c.sessionDailyChat).toBe(12);
+    expect(c.sessionDailyCampaign).toBe(20);
+    expect(c.globalDailyLlm).toBe(300);
   });
 
   it("honours valid numeric overrides", () => {
@@ -29,7 +31,29 @@ describe("loadConfig", () => {
 
   it("falls back to the default for values that are not plain integers", () => {
     expect(loadConfig({ DATABASE_URL: "postgres://x", PORT: "8787abc" }).port).toBe(8787);
-    expect(loadConfig({ DATABASE_URL: "postgres://x", PULSE_GLOBAL_DAILY_LLM: "1e3" }).globalDailyLlm).toBe(800);
+    expect(loadConfig({ DATABASE_URL: "postgres://x", PULSE_GLOBAL_DAILY_LLM: "1e3" }).globalDailyLlm).toBe(300);
+  });
+});
+
+describe("groqReasoningEffort", () => {
+  const base = { DATABASE_URL: "postgres://x" };
+  it("defaults to low for the default model and any openai/gpt-oss model", () => {
+    expect(loadConfig(base).groqReasoningEffort).toBe("low");
+    expect(loadConfig({ ...base, GROQ_MODEL: "openai/gpt-oss-20b" }).groqReasoningEffort).toBe("low");
+  });
+  it("is unset for any other model", () => {
+    expect(loadConfig({ ...base, GROQ_MODEL: "llama-3.3-70b-versatile" }).groqReasoningEffort).toBeNull();
+    expect(loadConfig({ ...base, GROQ_MODEL: "qwen/qwen3-32b" }).groqReasoningEffort).toBeNull();
+  });
+  it("GROQ_REASONING_EFFORT overrides the default, for any model", () => {
+    expect(loadConfig({ ...base, GROQ_REASONING_EFFORT: "high" }).groqReasoningEffort).toBe("high");
+    expect(loadConfig({ ...base, GROQ_MODEL: "qwen/qwen3-32b", GROQ_REASONING_EFFORT: "medium" }).groqReasoningEffort).toBe("medium");
+  });
+  it('"off" or an empty string disables it', () => {
+    expect(loadConfig({ ...base, GROQ_REASONING_EFFORT: "off" }).groqReasoningEffort).toBeNull();
+    expect(loadConfig({ ...base, GROQ_REASONING_EFFORT: "OFF" }).groqReasoningEffort).toBeNull();
+    expect(loadConfig({ ...base, GROQ_REASONING_EFFORT: "" }).groqReasoningEffort).toBeNull();
+    expect(loadConfig({ ...base, GROQ_REASONING_EFFORT: "  " }).groqReasoningEffort).toBeNull();
   });
 });
 
@@ -77,15 +101,15 @@ describe("assertTmdbConfigured", () => {
 });
 
 describe("sessionDailyCampaign (R27)", () => {
-  it("defaults to 40, separate from the chat quota", () => {
+  it("defaults to 20, separate from the chat quota", () => {
     const c = loadConfig({ DATABASE_URL: "postgres://x" });
-    expect(c.sessionDailyCampaign).toBe(40);
-    expect(c.sessionDailyChat).toBe(30);
+    expect(c.sessionDailyCampaign).toBe(20);
+    expect(c.sessionDailyChat).toBe(12);
   });
   it("honours PULSE_SESSION_DAILY_CAMPAIGN, parsed as strictly as the other quotas", () => {
     expect(loadConfig({ DATABASE_URL: "postgres://x", PULSE_SESSION_DAILY_CAMPAIGN: "2" }).sessionDailyCampaign).toBe(2);
     expect(loadConfig({ DATABASE_URL: "postgres://x", PULSE_SESSION_DAILY_CAMPAIGN: "0" }).sessionDailyCampaign).toBe(0);
-    expect(loadConfig({ DATABASE_URL: "postgres://x", PULSE_SESSION_DAILY_CAMPAIGN: "4x" }).sessionDailyCampaign).toBe(40);
-    expect(loadConfig({ DATABASE_URL: "postgres://x", PULSE_SESSION_DAILY_CAMPAIGN: "" }).sessionDailyCampaign).toBe(40);
+    expect(loadConfig({ DATABASE_URL: "postgres://x", PULSE_SESSION_DAILY_CAMPAIGN: "4x" }).sessionDailyCampaign).toBe(20);
+    expect(loadConfig({ DATABASE_URL: "postgres://x", PULSE_SESSION_DAILY_CAMPAIGN: "" }).sessionDailyCampaign).toBe(20);
   });
 });
