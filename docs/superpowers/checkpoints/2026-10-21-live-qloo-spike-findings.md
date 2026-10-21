@@ -79,6 +79,59 @@ steps of place themes, artists, brands, places): `empty`, cached for 3 days, one
 line. The board ranks such a title with no local signal. A live check of the heatmap for
 five obscure titles in Delhi: all five now come back `empty` with the thin-signal note.
 
+## Groq free-tier limits (live, 2026-10-21)
+
+**Limits.** The key on Groq's free tier allows **8,000 tokens per minute** (a rolling refill
+of about 133 tokens a second) and **1,000 requests per day**, on every chat model it
+exposes (gpt-oss-120b, gpt-oss-20b, qwen, allam). Responses carry
+`x-ratelimit-remaining-tokens` and `-reset-tokens` ("1.38s", the time for the whole window to
+refill, not for the next request) and `-reset-requests` ("4m19.2s"); a 429 carries
+`retry-after` in seconds. `reasoning_effort: "low"` is accepted by openai/gpt-oss-120b with
+`response_format: json_object`; chat tool calling works; the campaign writer (one call,
+2-3k tokens) takes about 8 s.
+
+**What it cost.** Before this change one chat round carried about 3,700 tokens of fixed
+prompt (system prompt about 790, eleven tool specs about 2,880) before any history or
+tool results, so two rounds plus results (9-12k tokens) overran the minute and a normal
+chat failed with "busy right now" on its second model call.
+
+**What changed (Release Pulse service).**
+- The chat offers 7 tools instead of 11 (the four Pulse tools plus `qloo_recommend`,
+  `qloo_where_popular`, `qloo_audience_demographics`); the other four are kept in
+  `QLOO_EXTRA_TOOLS`, unused, to save about 900 tokens a round.
+- The system prompt is under 1,700 characters (was about 2,850).
+- Tool results seen by the model are cut to 2,800 characters (was 6,000): `pulse_board`
+  top 5, `release_brief` at most 1,800 characters, `search_releases` 6, `titles_shot_in` 10.
+- Chat rounds ask for at most 1,200 completion tokens (the campaign writer keeps 4,096);
+  `reasoning_effort` defaults to "low" for openai/gpt-oss models (`GROQ_REASONING_EFFORT`,
+  "off" disables it), with a one-shot fallback if a model rejects it.
+- The Groq client is rate-limit aware: one process-wide queue (concurrency 1, 12 waiting
+  at most), proactive waits from the remaining-token header (a few seconds, never over 20 s),
+  and on a 429 a wait of `retry-after` plus 250 ms, up to two retries, abortable and inside
+  the chat's 90 s deadline. A wait over 20 s (the daily limit) fails at once as
+  `rate_limited`.
+- Quotas are sized for 1,000 requests a day: global 300 drafts or chat turns a day
+  (a chat turn can use several provider requests), 12 chat turns and 20 campaign drafts per
+  session a day.
+
+**Measured after the change** (one real chat turn, "Which release should my Delhi cafe theme
+this weekend around, and why?", the real tools against a local database, no live Qloo calls):
+3 model rounds, tools `pulse_board` then `release_brief`, prompt tokens per round about
+1,990 / 2,450 / 2,840 (was about 3,700 before any history), a 125-145 word answer, 2.5-4 s
+when the minute had room. Two turns back to back: the first finished in about 4 s and the
+second **waited** (5 s and 18 s, taken from the remaining-token header) and finished in
+about 26 s with no rate-limit error. A first version that only waited for a full window
+reset (which Groq reports as 45-50 s) let every round hit a 429 and recover on `retry-after`
+(46-49 s per turn, still no error); the pacer now waits only for the shortfall to refill
+(limit / 60 tokens a second), which removed the 429s.
+
+**What a paid tier changes.** The 8,000 tokens a minute and 1,000 requests a day go away, so
+the queue and waits rarely trigger; the quota defaults can be raised (the env variables are
+in `.env.example`), `QLOO_EXTRA_TOOLS` can be moved back into `CHAT_QLOO_TOOLS`, and
+`MAX_RESULT_CHARS` and the brief bound relaxed. Another OpenAI-compatible provider works via
+`GROQ_BASE_URL` and `GROQ_MODEL` (the pacer reads the same `x-ratelimit-*` header names
+only if the provider sends them; without them it simply never waits proactively).
+
 ## Still unverified / known gaps
 
 - **Trends are empty for every title tried.** The recipe's point shape and field names are
@@ -95,5 +148,7 @@ five obscure titles in Delhi: all five now come back `empty` with the thin-signa
   tagged as a place genre; the lodging blocklist does not cover it.
 - **The contract-rejection mapping hides a genuine recipe bug as `empty`** in the UI; the
   only signal is the server-log warning, so watch the logs after any recipe change.
-- **Groq (the campaign writer and chat) has not been run live.**
+- **Groq has been run live only in small checks** (see the free-tier section above): chat tool
+  calling and the campaign writer work; a full chat with real Qloo calls and a long history
+  has not been tried.
 - Nothing is deployed, and the hackathon base URL is only exercised from a laptop.

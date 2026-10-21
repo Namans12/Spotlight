@@ -82,8 +82,9 @@ export interface Pacer {
   schedule<T>(signal: AbortSignal | undefined, task: () => Promise<T>): Promise<T>;
   /** Remembers the token headroom a response reported. */
   record(headers: Headers): void;
-  /** Before sending: waits for the token window to refill when the last
-   *  reported headroom is below `estimate` and its reset is at most MAX_WAIT_MS away. */
+  /** Before sending: when the last reported headroom is below `estimate`, waits
+   *  for the token window to reset if that is at most MAX_WAIT_MS away, else for
+   *  just the shortfall to refill (when the limit is known) if that is. */
   beforeSend(estimate: number, signal?: AbortSignal): Promise<void>;
   /** An abortable sleep (the clock the pacer was built with). */
   sleep(ms: number, signal?: AbortSignal): Promise<void>;
@@ -108,7 +109,7 @@ export function createPacer(deps: PacerDeps = {}): Pacer {
   const maxWaiting = deps.maxWaiting ?? MAX_WAITING;
   let running = false;
   const queue: { start: () => void; cancel: () => void }[] = [];
-  let seen: { remaining: number; resetAt: number } | null = null;
+  let seen: { remaining: number; resetAt: number; at: number; limit: number | null } | null = null;
 
   function release(): void {
     const next = queue.shift();
@@ -142,13 +143,28 @@ export function createPacer(deps: PacerDeps = {}): Pacer {
       const reset = parseDuration(headers.get("x-ratelimit-reset-tokens"));
       const remaining = remainingRaw !== null && /^\d+(\.\d+)?$/.test(remainingRaw.trim()) ? Number(remainingRaw) : null;
       if (remaining === null || reset === null) return;
-      seen = { remaining, resetAt: now() + reset };
+      const limitRaw = headers.get("x-ratelimit-limit-tokens");
+      const limit = limitRaw !== null && /^\d+$/.test(limitRaw.trim()) && Number(limitRaw) > 0 ? Number(limitRaw) : null;
+      seen = { remaining, resetAt: now() + reset, at: now(), limit };
     },
 
     async beforeSend(estimate, signal) {
       if (!seen || seen.remaining >= estimate) return;
-      const wait = seen.resetAt - now();
-      if (wait <= 0 || wait > MAX_WAIT_MS) return;
+      const t = now();
+      let wait = seen.resetAt - t;
+      if (wait <= 0) return; // the window has already reset
+      if (wait > MAX_WAIT_MS) {
+        // `reset-tokens` is the time for the WHOLE window to refill, which is far
+        // longer than a request needs when only part of it is spent (live: 50 s
+        // reported while 10 s of refill would have covered the next request). The
+        // window refills at limit/60 tokens a second, so wait only for the shortfall.
+        if (seen.limit === null) return;
+        const perMs = seen.limit / 60_000;
+        const have = seen.remaining + (t - seen.at) * perMs;
+        if (have >= estimate) return;
+        wait = Math.ceil((estimate - have) / perMs) + JITTER_MS;
+        if (wait > MAX_WAIT_MS) return;
+      }
       seen = null; // one wait per report: the refill is assumed done afterwards
       await sleep(wait, signal);
     },

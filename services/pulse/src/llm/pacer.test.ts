@@ -151,6 +151,31 @@ describe("proactive pacing", () => {
     await pacer.beforeSend(1500);
     expect(sleeps).toEqual([]);
   });
+  const recL = (remaining: number, reset: string, limit = 8000) => h({ "x-ratelimit-remaining-tokens": String(remaining), "x-ratelimit-reset-tokens": reset, "x-ratelimit-limit-tokens": String(limit) });
+  it("when the whole window is far from reset, waits only for the shortfall to refill (limit/60 tokens a second)", async () => {
+    // Live shape: 1,282 left, 50 s to a full reset, an 8,000-token minute. A 2,600-token request needs 1,318 more tokens: 9.885 s.
+    const { pacer, sleeps } = clocked();
+    pacer.record(recL(1282, "50s"));
+    await pacer.beforeSend(2600);
+    expect(sleeps).toEqual([9885 + 250]);
+  });
+  it("credits the refill that has happened since the report", async () => {
+    const { pacer, sleeps, advance } = clocked();
+    pacer.record(recL(1282, "50s"));
+    advance(4000); // +533 tokens
+    await pacer.beforeSend(2600);
+    expect(sleeps).toEqual([Math.ceil((2600 - 1282 - 4000 * (8000 / 60_000)) / (8000 / 60_000)) + 250]);
+  });
+  it("does not wait for a shortfall that needs more than 20 s, or when the limit is unknown", async () => {
+    const a = clocked();
+    a.pacer.record(recL(100, "58s"));
+    await a.pacer.beforeSend(6000); // 5,900 tokens = 44 s
+    expect(a.sleeps).toEqual([]);
+    const b = clocked();
+    b.pacer.record(rec(1282, "50s")); // no limit header
+    await b.pacer.beforeSend(2600);
+    expect(b.sleeps).toEqual([]);
+  });
   it("counts time already passed, waits only once per report, and ignores a missing report", async () => {
     const { pacer, sleeps, advance } = clocked();
     await pacer.beforeSend(1500);
