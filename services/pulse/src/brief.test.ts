@@ -86,6 +86,25 @@ describe("streamBrief", () => {
     expect(sectionOf(events, "who").status).toBe("ok");
   });
 
+  it("replaces the note of an error section returned by the Qloo client, and reports the original", async () => {
+    const leaky = (note: string): EvidenceSection<any> => ({ status: "error", data: null, provenance: [{ source: "qloo", call: "artists", params: { entity_id: "e" }, limits: "l" }], note });
+    const deps = fixtureDeps({ artists: async () => leaky("Qloo call failed: secret-ish upstream text"), brands: async () => leaky("x"), heatmap: async () => leaky("Qloo call failed: Rate limit exceeded (429)") });
+    const events = await collect(streamBrief(deps, { city: delhi, businessType: "cafe", key: key(1) }));
+    const a = sectionOf(events, "artists");
+    expect(a.status).toBe("error");
+    expect(a.note).not.toContain("secret-ish");
+    expect(a.provenance).toHaveLength(1);
+    expect(sectionOf(events, "where").note).toMatch(/rate|busy/i);
+    expect(JSON.stringify(events)).not.toContain("secret-ish");
+    expect(deps.errors.some((e) => String(e.err).includes("secret-ish upstream text"))).toBe(true);
+  });
+
+  it("keeps its own explanatory notes on error sections it creates itself", async () => {
+    const deps = fixtureDeps({ resolve: async () => { throw new Error("boom"); } });
+    const events = await collect(streamBrief(deps, { city: delhi, businessType: "cafe", key: key(1) }));
+    expect(sectionOf(events, "who").note).toContain("could not be reached");
+  });
+
   it("explains a rate limit in the note", async () => {
     const deps = fixtureDeps({ heatmap: () => Promise.reject(new RateLimitedError("429")) });
     const events = await collect(streamBrief(deps, { city: delhi, businessType: "cafe", key: key(1) }));
@@ -152,6 +171,20 @@ describe("streamBrief", () => {
     expect(ctx.businessType).toBe("cafe");
     expect(sectionOf(events, "campaign")).toMatchObject({ status: "ok", data: { ideas: [] } });
     expect(names(events).slice(-2)).toEqual(["campaign", "done"]);
+  });
+
+  it("turns a synchronously throwing campaign drafter into an error section and still finishes", async () => {
+    const deps = fixtureDeps({ draftCampaign: (() => { throw new Error("sync boom sk-secret"); }) as never });
+    const events = await collect(streamBrief(deps, { city: delhi, businessType: "cafe", key: key(1) }));
+    expect(sectionOf(events, "campaign")).toMatchObject({ status: "error", data: null, provenance: [] });
+    expect(JSON.stringify(events)).not.toContain("sk-secret");
+    expect(names(events).at(-1)).toBe("done");
+  });
+
+  it("sanitises an error section returned by the campaign drafter", async () => {
+    const deps = fixtureDeps({ draftCampaign: async () => ({ status: "error", data: null, provenance: [], note: "groq said sk-secret" }) });
+    const events = await collect(streamBrief(deps, { city: delhi, businessType: "cafe", key: key(1) }));
+    expect(JSON.stringify(events)).not.toContain("sk-secret");
   });
 
   it("turns a throwing campaign drafter into an error section", async () => {
@@ -261,12 +294,25 @@ describe("streamBrief", () => {
       expect(deps.qlooCalls.findTags).toBe(BUSINESS_TYPES.cafe.placeTagQueries.length);
     });
 
-    it("a failing tag lookup means fewer tags, not an error", async () => {
+    it("a failing tag lookup means fewer tags and a degraded section, not an error", async () => {
       const places = vi.fn(async (_e: string, _c: unknown, _t: string[]) => okVenues([venue("Blue Tokai")]));
       const deps = fixtureDeps({ places, findTags: async () => { throw new Error("qloo down"); } });
       const events = await collect(streamBrief(deps, { city: delhi, businessType: "cafe", key: key(1) }));
       expect(places.mock.calls[0][2]).toEqual([]);
-      expect(sectionOf(events, "venues").status).toBe("ok");
+      expect(sectionOf(events, "venues").status).toBe("degraded"); // see the caching test below
+    });
+
+    it("marks venues degraded and does not cache them when the tag lookup failed", async () => {
+      const deps = fixtureDeps({ places: async () => okVenues([venue("Blue Tokai")]), findTags: async () => { throw new Error("qloo down"); } });
+      const events = await collect(streamBrief(deps, { city: delhi, businessType: "cafe", key: key(1) }));
+      expect(sectionOf(events, "venues")).toMatchObject({ status: "degraded", note: "Venue category filter was unavailable; results are broader than usual." });
+      expect((sectionOf(events, "venues").data as Venue[]).map((v) => v.name)).toEqual(["Blue Tokai"]);
+      expect(deps.db.upserts.filter((u) => u.kind === "places")).toHaveLength(0);
+      // The next brief retries the tags and, once they work, caches the proper result.
+      const healthy = fixtureDeps({ db: deps.db, places: async () => okVenues([venue("Blue Tokai")]) });
+      const again = await collect(streamBrief(healthy, { city: delhi, businessType: "cafe", key: key(1) }));
+      expect(sectionOf(again, "venues").status).toBe("ok");
+      expect(deps.db.upserts.filter((u) => u.kind === "places")).toHaveLength(1);
     });
 
     it("does not look tags up at all when places is already cached", async () => {

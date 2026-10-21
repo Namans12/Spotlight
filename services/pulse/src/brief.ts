@@ -8,7 +8,7 @@ import { BUSINESS_TYPES, filterVenues } from "./businessTypes.js";
 import type { City } from "./cities.js";
 import type { EvidenceSql } from "./db/evidence.js";
 import { getNeighbourhoods, getTitleLocations, type LocationsSql } from "./db/locations.js";
-import { getEvidence, type EvidenceKind } from "./evidence.js";
+import { getEvidence, type EvidenceKind, type GetEvidenceOptions } from "./evidence.js";
 import { labelCell } from "./geo.js";
 import type { QlooClient } from "./qloo/client.js";
 import { RateLimitedError } from "./qloo/limiter.js";
@@ -51,8 +51,26 @@ const GENERIC_ERROR_NOTE = "This section could not be loaded just now. Try again
 const HOOK_LIMITS =
   "Built from public Wikipedia categories and Wikidata. Coverage varies by title, and India coverage is partial, so a missing record does not mean the title was not shot or set here.";
 
-const errorSection = (note: string): EvidenceSection<unknown> => ({ status: "error", data: null, provenance: [], note });
+// Error sections this module builds carry notes written here, so they are
+// exempt from the rewrite below; one that arrives from a client or drafter is not.
+const ownErrors = new WeakSet<object>();
+const errorSection = (note: string): EvidenceSection<unknown> => {
+  const s: EvidenceSection<unknown> = { status: "error", data: null, provenance: [], note };
+  ownErrors.add(s);
+  return s;
+};
 const emptySection = (note: string): EvidenceSection<unknown> => ({ status: "empty", data: null, provenance: [], note });
+
+/** The real Qloo client reports a failure as an error SECTION whose note is
+ *  "Qloo call failed: <upstream text>", and the campaign drafter may do the
+ *  same with a model provider's text. Neither belongs in a public stream, so
+ *  the note becomes a fixed sentence and the original goes to the log. */
+function sanitiseError(section: EvidenceSection<unknown>, context: string, report: (c: string, e: unknown) => void): EvidenceSection<unknown> {
+  if (section.status !== "error" || ownErrors.has(section)) return section;
+  const original = section.note ?? "";
+  report(context, new Error(original || "error section without a note"));
+  return { ...section, note: /rate.?limit|429|busy/i.test(original) ? RATE_LIMITED_NOTE : GENERIC_ERROR_NOTE };
+}
 
 function noteFor(err: unknown): string {
   return err instanceof RateLimitedError ? RATE_LIMITED_NOTE : GENERIC_ERROR_NOTE;
@@ -64,10 +82,11 @@ function noteFor(err: unknown): string {
 const TAGS_PER_QUERY = 2;
 const tagMemo = new WeakMap<QlooClient, Map<string, Promise<string[]>>>();
 
-async function placeTagIds(qloo: QlooClient, queries: string[], onError: (c: string, e: unknown) => void): Promise<string[]> {
+async function placeTagIds(qloo: QlooClient, queries: string[], onError: (c: string, e: unknown) => void): Promise<{ ids: string[]; failed: boolean }> {
   let memo = tagMemo.get(qloo);
   if (!memo) tagMemo.set(qloo, (memo = new Map()));
   const m = memo;
+  let failed = false;
   const perQuery = await Promise.all(queries.map((q) => {
     let p = m.get(q);
     if (!p) {
@@ -75,9 +94,9 @@ async function placeTagIds(qloo: QlooClient, queries: string[], onError: (c: str
       m.set(q, p);
       p.catch((err) => { m.delete(q); onError(`findTags(${q})`, err); });
     }
-    return p.catch(() => [] as string[]);
+    return p.catch(() => { failed = true; return [] as string[]; });
   }));
-  return [...new Set(perQuery.flat())];
+  return { ids: [...new Set(perQuery.flat())], failed };
 }
 
 type Hood = Awaited<ReturnType<typeof getNeighbourhoods>>[number];
@@ -128,11 +147,11 @@ export async function* streamBrief(deps: BriefDeps, req: BriefRequest): AsyncGen
   yield { type: "header", header };
 
   /** A Qloo-backed section, cached per (entity, city, kind). */
-  const cachedQloo = <T>(kind: EvidenceKind, withCity: boolean, fetch: (id: string) => Promise<EvidenceSection<T>>) =>
+  const cachedQloo = <T>(kind: EvidenceKind, withCity: boolean, fetch: (id: string) => Promise<EvidenceSection<T>>, opts: GetEvidenceOptions = {}) =>
     async (): Promise<EvidenceSection<unknown>> => {
       if (resolveFailed) return errorSection(RESOLVE_FAILED_NOTE);
       if (!entityId) return emptySection(NO_ENTITY_NOTE);
-      return getEvidence(sql, kind, entityId, withCity ? city : null, () => fetch(entityId), now());
+      return getEvidence(sql, kind, entityId, withCity ? city : null, () => fetch(entityId), now(), opts);
     };
 
   const runners: Partial<Record<BriefSectionKey, () => Promise<EvidenceSection<unknown>>>> = {
@@ -152,9 +171,18 @@ export async function* streamBrief(deps: BriefDeps, req: BriefRequest): AsyncGen
     },
 
     venues: async () => {
-      const raw = await cachedQloo<Venue[]>("places", true, async (id) =>
+      let unfiltered = false;
+      const raw = await cachedQloo<Venue[]>("places", true, async (id) => {
         // Looked up inside the fetch so a cache hit costs no tag calls.
-        qloo.places(id, city, await placeTagIds(qloo, spec.placeTagQueries, report)))();
+        const tags = await placeTagIds(qloo, spec.placeTagQueries, report);
+        const section = await qloo.places(id, city, tags.ids);
+        if (!tags.failed || section.status !== "ok") return section;
+        // Without its tag filter Qloo answers more broadly. Say so, and do
+        // not cache it: the next brief should retry the tags, not inherit
+        // three days of the stopgap.
+        unfiltered = true;
+        return { ...section, status: "degraded", note: "Venue category filter was unavailable; results are broader than usual." };
+      }, { skipPersist: () => unfiltered })();
       const venues = raw.data as Venue[] | null;
       if (!venues) return raw;
       const kept = filterVenues(venues, spec.venueBlocklist);
@@ -182,7 +210,9 @@ export async function* streamBrief(deps: BriefDeps, req: BriefRequest): AsyncGen
     const run = runners[k];
     // A section the business type lists but has no runner for is a bug here,
     // not an outage; say so plainly rather than stream nothing.
-    const result = run ? run().catch((err) => { report(`section ${k}`, err); return errorSection(noteFor(err)); }) : Promise.resolve(errorSection(GENERIC_ERROR_NOTE));
+    const result = run
+      ? run().then((s) => sanitiseError(s, `section ${k}`, report), (err) => { report(`section ${k}`, err); return errorSection(noteFor(err)); })
+      : Promise.resolve(errorSection(GENERIC_ERROR_NOTE));
     return result.then((s) => [k, s]);
   };
 
@@ -210,8 +240,11 @@ export async function* streamBrief(deps: BriefDeps, req: BriefRequest): AsyncGen
 
     if (spec.sections.includes("campaign")) {
       if (signal?.aborted) return;
-      const campaign = await deps.draftCampaign({ sections: { ...collected }, header, businessType })
-        .catch((err) => { report("section campaign", err); return errorSection(noteFor(err)); });
+      // Through a promise chain, so a drafter that throws before returning a
+      // promise is caught the same way as one that rejects.
+      const campaign = await Promise.resolve()
+        .then(() => deps.draftCampaign({ sections: { ...collected }, header, businessType }))
+        .then((s) => sanitiseError(s, "section campaign", report), (err) => { report("section campaign", err); return errorSection(noteFor(err)); });
       yield { type: "section", key: "campaign", section: campaign };
     }
     yield { type: "done" };

@@ -36,24 +36,60 @@ export function peekEvidence<T>(sql: EvidenceSql, kind: EvidenceKind, entityId: 
   return cached<T>(sql, kind, entityId, city, now);
 }
 
+export interface GetEvidenceOptions {
+  /** Called with the fetched section; true means "return it but do not store
+   *  it", for a stopgap answer (e.g. venues fetched without their tag filter)
+   *  that must not be served for three days. */
+  skipPersist?: (section: EvidenceSection<never>) => boolean;
+}
+
+// Concurrent requests for one uncached question would each call Qloo, and the
+// client's limiter queues them without re-checking the cache, so a burst on
+// the public endpoint would multiply Qloo calls. Callers for the same key
+// share one promise instead. The whole read-fetch-store sequence is inside it,
+// so a caller arriving just as the first finishes still cannot slip between
+// the cache read and the flight check.
+const inFlight = new Map<string, Promise<EvidenceSection<unknown>>>();
+
 /** Returns the cached section when fresh, else calls `fetch` and stores the
  *  answer. An `error` or `needs_input` result is returned to the caller but
  *  not stored, so it cannot displace an older good row or be served again.
- *  A fetch that throws propagates and stores nothing. A failed cache WRITE is
- *  logged and ignored: the caller already holds a good answer. */
-export async function getEvidence<T>(
+ *  A fetch that throws propagates (to every sharer) and stores nothing. A
+ *  failed cache WRITE is logged and ignored: the caller already holds a good
+ *  answer. Concurrent calls for one (entity, city, kind) share one fetch, and
+ *  so receive the first caller's result. */
+export function getEvidence<T>(
   sql: EvidenceSql,
   kind: EvidenceKind,
   entityId: string,
   city: City | null,
   fetch: () => Promise<EvidenceSection<T>>,
   now: Date = new Date(),
+  opts: GetEvidenceOptions = {},
+): Promise<EvidenceSection<T>> {
+  const flightKey = `${entityId}|${citySlug(city)}|${kind}`;
+  const existing = inFlight.get(flightKey);
+  if (existing) return existing as Promise<EvidenceSection<T>>;
+  // Cleared on settle, rejection included, so a failure is retried by the next call.
+  const p = readFetchStore(sql, kind, entityId, city, fetch, now, opts).finally(() => inFlight.delete(flightKey));
+  inFlight.set(flightKey, p);
+  return p;
+}
+
+async function readFetchStore<T>(
+  sql: EvidenceSql,
+  kind: EvidenceKind,
+  entityId: string,
+  city: City | null,
+  fetch: () => Promise<EvidenceSection<T>>,
+  now: Date,
+  opts: GetEvidenceOptions,
 ): Promise<EvidenceSection<T>> {
   const hit = await cached<T>(sql, kind, entityId, city, now);
   if (hit) return hit;
 
   const section = await fetch();
-  if (CACHEABLE.includes(section.status)) {
+  if (CACHEABLE.includes(section.status) && !opts.skipPersist?.(section as EvidenceSection<never>)) {
     try {
       await upsertEvidence(sql, {
         entityId,

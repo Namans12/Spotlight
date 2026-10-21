@@ -138,6 +138,69 @@ describe("getEvidence", () => {
   });
 });
 
+describe("getEvidence in-flight sharing", () => {
+  const deferred = <T>() => {
+    let resolve!: (v: T) => void;
+    let reject!: (e: unknown) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+
+  it("shares one fetch between concurrent callers for the same key, with one upsert", async () => {
+    const db = newDb();
+    const d = deferred<EvidenceSection<string[]>>();
+    const fetch = vi.fn(() => d.promise);
+    const a = getEvidence(fakeSql(db), "artists", "e1", null, fetch, NOW);
+    const b = getEvidence(fakeSql(db), "artists", "e1", null, fetch, NOW);
+    const c = getEvidence(fakeSql(db), "artists", "e1", null, fetch, NOW);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const s = section();
+    d.resolve(s);
+    const [ra, rb, rc] = await Promise.all([a, b, c]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(rb).toBe(ra);
+    expect(rc).toBe(ra);
+    expect(db.upserts).toHaveLength(1);
+  });
+
+  it("clears the entry when the fetch rejects, so a later call fetches again", async () => {
+    const db = newDb();
+    const d = deferred<EvidenceSection<string[]>>();
+    const first = vi.fn(() => d.promise);
+    const a = getEvidence(fakeSql(db), "artists", "e1", null, first, NOW);
+    const b = getEvidence(fakeSql(db), "artists", "e1", null, first, NOW);
+    d.reject(new Error("429"));
+    await expect(a).rejects.toThrow("429");
+    await expect(b).rejects.toThrow("429");
+    const second = vi.fn(async () => section());
+    expect((await getEvidence(fakeSql(db), "artists", "e1", null, second, NOW)).data).toEqual(["fresh"]);
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not share between different entity, city or kind", async () => {
+    const db = newDb();
+    const ds = [deferred<EvidenceSection<string[]>>(), deferred<EvidenceSection<string[]>>(), deferred<EvidenceSection<string[]>>(), deferred<EvidenceSection<string[]>>()];
+    const fetches = ds.map((d) => vi.fn(() => d.promise));
+    const calls = [
+      getEvidence(fakeSql(db), "artists", "e1", null, fetches[0], NOW),
+      getEvidence(fakeSql(db), "artists", "e2", null, fetches[1], NOW),
+      getEvidence(fakeSql(db), "places", "e1", delhi, fetches[2], NOW),
+      getEvidence(fakeSql(db), "places", "e1", getCity("mumbai")!, fetches[3], NOW),
+    ];
+    await vi.waitFor(() => fetches.forEach((f) => expect(f).toHaveBeenCalledTimes(1)));
+    ds.forEach((d) => d.resolve(section()));
+    await Promise.all(calls);
+    expect(db.upserts).toHaveLength(4);
+  });
+
+  it("skips persisting when the caller says the result is a stopgap", async () => {
+    const db = newDb();
+    const out = await getEvidence(fakeSql(db), "places", "e1", delhi, async () => section({ status: "degraded" }), NOW, { skipPersist: () => true });
+    expect(out.status).toBe("degraded");
+    expect(db.upserts).toHaveLength(0);
+  });
+});
+
 describe("peekEvidence", () => {
   it("returns a fresh cached section without calling anything else", async () => {
     const db = newDb();

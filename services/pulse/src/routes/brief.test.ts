@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BriefEvent } from "../../../../shared/types/pulse.js";
+import { createRateLimiter } from "../http/rateLimit.js";
 import { createRouter } from "../http/router.js";
 import { fixtureDeps, type FixtureOverrides } from "../testing/fakes.js";
 import { briefHandler } from "./brief.js";
@@ -19,7 +20,7 @@ async function start(over: FixtureOverrides = {}) {
   server = createServer((req, res) => { void route(req, res, new URL(req.url ?? "/", "http://pulse.local")); });
   await new Promise<void>((r) => server!.listen(0, "127.0.0.1", r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  return { deps, get: (qs: string) => fetch(`${base}/brief?${qs}`) };
+  return { deps, get: (qs: string, headers: Record<string, string> = {}) => fetch(`${base}/brief?${qs}`, { headers }) };
 }
 
 const GOOD = "city=delhi&type=cafe&mediaType=movie&tmdbId=1";
@@ -79,6 +80,86 @@ describe("GET /brief streaming", () => {
   });
 });
 
+describe("GET /brief known-title gate (R22a)", () => {
+  it("answers 404 unknown_title before any resolve, Qloo or header work", async () => {
+    const resolve = vi.fn();
+    const header = vi.fn();
+    const { get, deps } = await start({ isKnown: async () => false, resolve, header });
+    const res = await get(GOOD);
+    expect(res.status).toBe(404);
+    expect(res.headers.get("content-type")).toMatch(/application\/json/);
+    expect(await res.json()).toEqual({ error: "unknown_title" });
+    expect(resolve).not.toHaveBeenCalled();
+    expect(header).not.toHaveBeenCalled();
+    expect(Object.keys(deps.qlooCalls)).toEqual([]);
+  });
+
+  it("asks isKnown with the validated key, and streams when it says yes", async () => {
+    const isKnown = vi.fn(async () => true);
+    const { get } = await start({ isKnown });
+    const res = await get("city=delhi&type=cafe&mediaType=tv&tmdbId=42");
+    expect(res.status).toBe(200);
+    await res.text();
+    expect(isKnown).toHaveBeenCalledWith({ tmdbId: 42, mediaType: "tv" });
+  });
+
+  it("answers 503 when the known-title check itself fails, still before streaming", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { get } = await start({ isKnown: async () => { throw new Error("db down"); } });
+    const res = await get(GOOD);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "unavailable" });
+    log.mockRestore();
+  });
+
+  it("does not run the gate for requests that fail validation", async () => {
+    const isKnown = vi.fn(async () => true);
+    const { get } = await start({ isKnown });
+    await get("city=atlantis&type=cafe&mediaType=movie&tmdbId=1");
+    expect(isKnown).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /brief rate limit (R22b)", () => {
+  function limited(max = 30) {
+    let t = 1_000_000;
+    const limiter = createRateLimiter({ max, windowMs: 60_000, now: () => t });
+    return { limiter, advance: (ms: number) => { t += ms; } };
+  }
+
+  it("lets 30 through and answers the 31st 429 rate_limited with Retry-After, before any work", async () => {
+    const { limiter, advance } = limited();
+    const isKnown = vi.fn(async () => true);
+    const { get, deps } = await start({ rateLimiter: limiter, isKnown });
+    for (let i = 0; i < 30; i++) { advance(10); expect((await get(GOOD)).status).toBe(200); }
+    const callsBefore = { ...deps.qlooCalls };
+    const known = isKnown.mock.calls.length;
+    const res = await get(GOOD);
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: "rate_limited" });
+    expect(Number(res.headers.get("retry-after"))).toBeGreaterThanOrEqual(1);
+    expect(deps.qlooCalls).toEqual(callsBefore);
+    expect(isKnown.mock.calls.length).toBe(known);
+  });
+
+  it("keys on the rightmost X-Forwarded-For entry, so a spoofed leftmost one changes nothing", async () => {
+    const { limiter } = limited(2);
+    const { get } = await start({ rateLimiter: limiter });
+    const h = (spoof: string) => ({ "X-Forwarded-For": `${spoof}, 203.0.113.9` });
+    expect((await get(GOOD, h("1.1.1.1"))).status).toBe(200);
+    expect((await get(GOOD, h("2.2.2.2"))).status).toBe(200);
+    expect((await get(GOOD, h("3.3.3.3"))).status).toBe(429);
+    expect((await get(GOOD, { "X-Forwarded-For": "203.0.113.10" })).status).toBe(200);
+  });
+
+  it("does not spend the budget on requests that fail validation", async () => {
+    const { limiter } = limited(1);
+    const { get } = await start({ rateLimiter: limiter });
+    expect((await get("city=atlantis&type=cafe&mediaType=movie&tmdbId=1")).status).toBe(400);
+    expect((await get(GOOD)).status).toBe(200);
+  });
+});
+
 /** A minimal ServerResponse: enough surface for the handler, with a close the test fires. */
 function fakeRes() {
   const em = new EventEmitter() as EventEmitter & Record<string, unknown>;
@@ -102,7 +183,7 @@ describe("client disconnect", () => {
     const deps = fixtureDeps({ draftCampaign: draft, heatmap: () => slow });
     const handler = briefHandler(deps);
     const { res, written, em } = fakeRes();
-    const done = handler({} as IncomingMessage, res, new URL(`http://x/brief?${GOOD}`));
+    const done = handler({ headers: {}, socket: { remoteAddress: "127.0.0.1" } } as unknown as IncomingMessage, res, new URL(`http://x/brief?${GOOD}`));
     // Wait until at least the header has been written, then hang up.
     await vi.waitFor(() => expect(written.length).toBeGreaterThan(0));
     em.emit("close");

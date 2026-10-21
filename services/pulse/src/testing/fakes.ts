@@ -8,6 +8,8 @@ import type { EvidenceSection } from "../../../../shared/types/pulse.js";
 import { createFixtureClient } from "../qloo/fixtures.js";
 import type { QlooClient } from "../qloo/client.js";
 import type { BriefDeps } from "../brief.js";
+import { createRateLimiter, type RateLimiter } from "../http/rateLimit.js";
+import type { BriefRouteDeps } from "../routes/brief.js";
 
 export type Row = Record<string, unknown>;
 export interface Call { text: string; values: unknown[] }
@@ -65,11 +67,13 @@ export interface FixtureOverrides extends QlooOverrides {
   resolve?: BriefDeps["resolve"];
   header?: BriefDeps["header"];
   draftCampaign?: BriefDeps["draftCampaign"];
+  isKnown?: BriefRouteDeps["isKnown"];
+  rateLimiter?: RateLimiter;
   db?: FakeDb;
   now?: () => Date;
 }
 
-export interface FixtureDeps extends BriefDeps {
+export interface FixtureDeps extends BriefRouteDeps {
   db: FakeDb;
   /** How many times each QlooClient method was called. */
   qlooCalls: Record<string, number>;
@@ -79,7 +83,7 @@ export interface FixtureDeps extends BriefDeps {
 
 /** BriefDeps over the synthetic fixture client and an in-memory database. */
 export function fixtureDeps(over: FixtureOverrides = {}): FixtureDeps {
-  const { resolve, header, draftCampaign, db: givenDb, now, ...qlooOver } = over;
+  const { resolve, header, draftCampaign, isKnown, rateLimiter, db: givenDb, now, ...qlooOver } = over;
   const db = givenDb ?? newDb();
   const qlooCalls: Record<string, number> = {};
   const base = { ...createFixtureClient(), ...qlooOver } as unknown as Record<string, (...a: unknown[]) => unknown>;
@@ -93,6 +97,9 @@ export function fixtureDeps(over: FixtureOverrides = {}): FixtureDeps {
     resolve: resolve ?? (async () => ({ entityId: "fx-entity-1", method: "imdb" as const })),
     header: header ?? (async () => ({ title: "Fixture Film", posterUrl: "https://img.example/p.jpg", releaseDate: "2026-11-01" })),
     draftCampaign: draftCampaign ?? (async () => ({ status: "empty", data: null, provenance: [], note: "stub" } as EvidenceSection<unknown>)),
+    isKnown: isKnown ?? (async () => true),
+    // Generous by default so only the tests about limiting ever meet it.
+    rateLimiter: rateLimiter ?? createRateLimiter({ max: 100_000, windowMs: 60_000 }),
     ...(now ? { now } : {}),
     onError: (context, err) => { errors.push({ context, err }); },
     db,

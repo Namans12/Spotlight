@@ -5,6 +5,8 @@ import { corsHeaders } from "./http/cors.js";
 import { createRouter, type Handler } from "./http/router.js";
 import { createQlooClient } from "./qloo/client.js";
 import { getPool } from "./db/pool.js";
+import { isKnownTitle } from "./db/titles.js";
+import { createRateLimiter } from "./http/rateLimit.js";
 import { resolveTitle } from "./resolve.js";
 import { briefHandler } from "./routes/brief.js";
 import { createTitleLookup } from "./titleHeader.js";
@@ -19,6 +21,9 @@ const briefRoute = briefHandler({
   sql,
   qloo,
   resolve: (key) => resolveTitle(sql, qloo, key),
+  isKnown: (key) => isKnownTitle(sql, key),
+  // 30 briefs a minute per client: each one can cost Qloo calls on a public endpoint.
+  rateLimiter: createRateLimiter({ max: 30, windowMs: 60_000 }),
   header: createTitleLookup(sql, (mediaType, id) => tmdbDetail(mediaType, id)),
   // Replaced by the real drafter in a later task; until then the brief says so
   // rather than showing an empty box with no explanation.
