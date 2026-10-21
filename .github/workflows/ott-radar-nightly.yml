@@ -86,19 +86,6 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/seed_relations.py
 
-      # Release Pulse: which titles were filmed or set in each launch city,
-      # from Wikipedia categories + Wikidata (P915/P840). continue-on-error
-      # because this runs against the PRODUCTION database, which may not have
-      # migration 0016 yet: the script then prints one line and exits 0 without
-      # writing, but a Wikipedia/WDQS outage must not turn the whole nightly
-      # red either. It only ever touches title_locations, places and
-      # neighbourhoods. Needs no secret beyond DATABASE_URL.
-      - name: Sync filming locations for Release Pulse
-        continue-on-error: true
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: python scripts/sync_title_locations.py
-
       # Keeps calendar_entries populated past whatever the one-time editorial
       # CSV covered. Region-aware theatrical dates + TV premieres (scoped to
       # --tv-countries to avoid TMDB's crowdsourced global noise), idempotent,
@@ -212,3 +199,24 @@ jobs:
             # prerendered pages until the next successful deploy.
             echo "::warning::Deploy hook returned HTTP $code — new pages will not be prerendered until the next deploy."
           fi
+
+      # Release Pulse: which titles were filmed or set in each launch city,
+      # from Wikipedia categories + Wikidata (P915/P840).
+      #
+      # Deliberately the LAST step. It is optional data over the public
+      # Wikipedia / WDQS endpoints, so it must never delay the refresh steps
+      # above or the redeploy hook: placed last, a slow or hung run can only
+      # delay the end of the job. timeout-minutes caps that (the script also
+      # stops asking a source that has failed for two cities in a row), and
+      # continue-on-error keeps a failure from turning the nightly red.
+      #
+      # This runs against the PRODUCTION database, which may not have migration
+      # 0016 yet: the script then prints one line and exits 0 without writing.
+      # It only ever touches title_locations, places and neighbourhoods, and
+      # needs no secret beyond DATABASE_URL.
+      - name: Sync filming locations for Release Pulse
+        continue-on-error: true
+        timeout-minutes: 20
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/sync_title_locations.py

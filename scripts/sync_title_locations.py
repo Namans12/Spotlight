@@ -39,7 +39,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any, Callable
@@ -88,32 +90,111 @@ OOTY_QID = "Q9888"
 SUSPECT_PLACE_QIDS = frozenset({OOTY_QID})
 
 NEIGHBOURHOOD_CAP = 25
+SEED_PATH = ROOT / "data" / "pulse_neighbourhoods_seed.json"
 
-# Wikidata classes that count as a neighbourhood. Q123705 "neighbourhood" alone
-# is thin for Indian cities (Delhi 14, Mumbai 18), because Wikidata types a lot
-# of them as Q188509 "suburb" (Borivali, Chembur, Juhu in Mumbai) or Q3257686
-# "locality" (Marol, Oshiwara). Deliberately not Q486972 "human settlement" /
-# Q5084 "hamlet": those bring in villages and census towns, which are not
-# places a heatmap cell would be named after.
+# --- Neighbourhood search ---------------------------------------------------
 #
-# Direct P31 only, one query per class, class pattern first. The brief's
-# `P31/P279*` closure was tried first and WDQS timed out on it for Delhi (a
-# multi-class closure query kept hitting the 60 s ceiling); the same classes
-# asked directly and separately answer in seconds. The class pattern goes before
-# the containment one because with the city first the New York query (tens of
-# thousands of things are located in NYC) timed out, while class-first takes ~2 s.
-NEIGHBOURHOOD_CLASSES = ("Q123705", "Q188509", "Q3257686")
+# Why not "P131+ the city": Wikidata files an area under its district or tehsil
+# (Hauz Khas -> South Delhi district, Lajpat Nagar -> Jangpura tehsil, Colaba ->
+# Mumbai City district, Dadar -> Mumbai), and those chains never reach the city
+# item, so a containment query missed nearly every notable Indian area (Delhi
+# returned 15 rows, none of them Hauz Khas or Connaught Place). It is a recall
+# problem, not a ranking one. Instead each class is asked for within a radius of
+# the city centre (wikibase:around), which does not care how the area was filed,
+# and the candidates are ranked by how many Wikipedia editions have an article
+# (wikibase:sitelinks), which is what separates Colaba from a road with a
+# coordinate. Distance and name rules in neighbourhood_rows() throw out the rest.
+#
+# One query per class, class-first within the radius, each answering in 1-8 s; a
+# multi-class or city-first query timed out on WDQS. (qid, closure, why):
+#   closure=True asks P31/P279*, safe only because the radius bounds the set.
+NEIGHBOURHOOD_CLASSES: tuple[tuple[str, bool, str], ...] = (
+    # Q123705 neighbourhood. Closure, because New York files its areas under
+    # subclasses ("neighborhood of Manhattan", Q61297932: Harlem, SoHo, Chelsea).
+    ("Q123705", True, "neighbourhood"),
+    # Q188509 suburb: how Mumbai is typed (Bandra, Andheri, Juhu, Chembur).
+    ("Q188509", False, "suburb"),
+    # Q3257686 locality: Mumbai's Marol and Oshiwara, and similar small areas.
+    ("Q3257686", False, "locality"),
+    # Q2755753 area of London: London does not use "neighbourhood" at all
+    # (Soho, Camden Town, Brixton, Notting Hill are all typed this way).
+    ("Q2755753", False, "area of London"),
+    # Q738570 central business district: Connaught Place, which is a place
+    # people name a heatmap cell after but is typed as nothing else.
+    ("Q738570", False, "central business district"),
+    # Deliberately NOT Q486972 "human settlement": some editors type a real area
+    # that way (Dadar, Koramangala, Baga) but Wikidata also files every census
+    # town and village on a city's outskirts under it. In Delhi those outnumber
+    # the areas and, with ~25 slots, pushed out Karol Bagh and Hauz Khas (Loni,
+    # Nangloi Jat and Karawal Nagar took their places). The handful of areas that
+    # are typed that way come in through the seed file instead.
+)
 
-# Containers to search beside the city's own QIDs. Wikidata files London's
-# districts under Greater London (Q23306), not under "London" (Q84), which has
-# a single neighbourhood beneath it against ~60 under Greater London. Kept here
-# rather than in pulse_cities.json because it is only a search scope: a film
-# "set in Greater London" is not being claimed for the London city page.
-NEIGHBOURHOOD_EXTRA_CONTAINERS = {"london": ("Q23306",)}
+# Cities that need more classes because they have no neighbourhood layer in
+# Wikidata. Goa is a state: what people name there are towns and the villages
+# and census towns of its coast (Panaji, Margao, Calangute, Anjuna, Candolim).
+NEIGHBOURHOOD_EXTRA_CLASSES: dict[str, tuple[tuple[str, bool, str], ...]] = {
+    "goa": (
+        ("Q515", False, "city"),
+        ("Q3957", False, "town"),
+        ("Q56436498", False, "village in India"),
+        ("Q16830604", False, "census town of India"),
+    ),
+}
+
+# wikibase:around radius in km. Goa is ~100 km long and its centre is Panaji.
+NEIGHBOURHOOD_RADIUS_KM_DEFAULT = 25
+NEIGHBOURHOOD_RADIUS_KM = {"goa": 45}
+# A point further than this from the city centre is a bad coordinate or a wrong
+# place, whatever the query said.
+NEIGHBOURHOOD_MAX_DISTANCE_KM = 100
+
+# Labels that are streets or broad regions rather than areas.
+# " kaval" (Bengaluru's "<Name> Manavarthe Kaval" protected grazing land) and
+# " avenue" (Fifth Avenue outranks most real areas) are the ones that showed up
+# in the real data.
+NON_AREA_SUFFIXES = (" road", " marg", " street", " avenue", " suburbs", " kaval")
+
+# fullmatch and [0-9]: "$" would let a trailing newline through, and \d accepts
+# non-ASCII digits.
+_QID_RE = re.compile(r"Q[0-9]+")
+
 
 class SourceUnavailable(Exception):
     """A source gave no usable answer after retries. Not evidence of anything
-    about the data, only that we could not ask."""
+    about the data, only that we could not ask. `source` says which one
+    ("wikipedia" or "wdqs"), for the circuit breaker."""
+
+    def __init__(self, message: str, source: str = "wdqs"):
+        super().__init__(message)
+        self.source = source
+
+
+class CircuitBreaker:
+    """Stops asking a source that has failed for `limit` cities in a row.
+
+    A Wikipedia or WDQS outage makes every city burn its full retry budget
+    (minutes each); once two consecutive cities have failed on a source the
+    outage is not going to end mid-run, so the remaining cities skip it and the
+    step finishes inside its time budget."""
+
+    def __init__(self, limit: int = 2):
+        self.limit = limit
+        self._streak: dict[str, int] = {}
+        self.open: set[str] = set()
+
+    def blocked(self, *sources: str) -> bool:
+        return any(s in self.open for s in sources)
+
+    def record_city(self, failed: set[str], ok: set[str]) -> None:
+        """Call once per city: `failed` sources broke it, `ok` ones worked."""
+        for source in ok - failed:
+            self._streak[source] = 0
+        for source in failed:
+            self._streak[source] = self._streak.get(source, 0) + 1
+            if self._streak[source] >= self.limit and source not in self.open:
+                self.open.add(source)
+                print(f"  {source} failed for {self.limit} cities in a row; not trying it for the remaining cities")
 
 
 def load_cities() -> list[dict[str, Any]]:
@@ -254,21 +335,77 @@ def wikidata_rows(bindings: list[dict[str, Any]], kind: str) -> list[LocRow]:
     return rows
 
 
-def neighbourhood_rows(bindings: list[dict[str, Any]], city: str, cap: int = NEIGHBOURHOOD_CAP) -> list[NbRow]:
-    """Unique, named, located neighbourhoods, first `cap` by name. Alphabetical
-    is arbitrary but deterministic, so a re-run writes the same table. Items
-    without coordinates are skipped: the table allows NULLs but the heatmap
-    labeller needs both."""
-    by_name: dict[str, NbRow] = {}
+def valid_qid(value: str) -> bool:
+    """QIDs get interpolated into SPARQL text, so only the exact shape is let in."""
+    return bool(_QID_RE.fullmatch(value))
+
+
+def distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance (haversine)."""
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    a = math.sin((p2 - p1) / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(math.radians(lon2 - lon1) / 2) ** 2
+    return 6371.0 * 2 * math.asin(math.sqrt(a))
+
+
+def clean_label(label: str) -> str:
+    """Whitespace collapsed, trailing dots and similar stripped ("Paschim Vihar.."
+    -> "Paschim Vihar")."""
+    return re.sub(r"[\s.,;:\-\u2013\u2014]+$", "", " ".join(label.split()))
+
+
+def neighbourhood_rows(bindings: list[dict[str, Any]], city: dict[str, Any], cap: int = NEIGHBOURHOOD_CAP) -> list[NbRow]:
+    """The `cap` most notable named areas of a city, from WDQS bindings
+    (?item ?label ?coord ?sl).
+
+    Ranked by (-sitelinks, label, QID, point), so a re-run writes the same table
+    and no threshold stops a small city from getting rows. Dropped: no
+    coordinates (the labeller needs both), more than NEIGHBOURHOOD_MAX_DISTANCE_KM
+    from the centre, no English label, a label that is the city itself, and
+    streets/regions by label. Duplicates collapse by QID first (an item answers
+    under several classes), then by case-insensitive name, keeping the more
+    notable item, since the primary key is case-sensitive but two spellings of
+    one area on a map are not."""
+    candidates = []
     for b in bindings:
-        name = _val(b, "itemLabel")
         point = parse_point(_val(b, "coord"))
-        if not name or point is None:
+        name = clean_label(_val(b, "label") or "")
+        qid = _qid(_val(b, "item") or "")
+        if point is None or not name or not qid:
             continue
         if name[0] == "Q" and name[1:].isdigit():  # no English label
             continue
-        by_name.setdefault(name, (city, name, point[0], point[1]))
-    return [by_name[n] for n in sorted(by_name)][:cap]
+        if name.lower() == city["name"].lower() or name.lower().endswith(NON_AREA_SUFFIXES):
+            continue
+        if distance_km(city["lat"], city["lon"], *point) > NEIGHBOURHOOD_MAX_DISTANCE_KM:
+            continue
+        try:
+            sitelinks = int(_val(b, "sl") or 0)
+        except ValueError:
+            sitelinks = 0
+        candidates.append((-sitelinks, name, qid, point))
+    candidates.sort()
+
+    seen_qids: set[str] = set()
+    seen_names: set[str] = set()
+    rows: list[NbRow] = []
+    for _, name, qid, (lat, lon) in candidates:
+        if qid in seen_qids or name.lower() in seen_names:
+            continue
+        seen_qids.add(qid)
+        seen_names.add(name.lower())
+        rows.append((city["slug"], name, lat, lon))
+        if len(rows) == cap:
+            break
+    return rows
+
+
+def load_seed() -> dict[str, list[str]]:
+    """Curated notable-area QIDs per city for the places the classes cannot
+    reach. QIDs only: names and coordinates are still read from Wikidata."""
+    if not SEED_PATH.exists():
+        return {}
+    seed = json.loads(SEED_PATH.read_text(encoding="utf-8"))
+    return {slug: [q for q in qids if valid_qid(q)] for slug, qids in seed.items()}
 
 
 # --------------------------------------------------------------------------- #
@@ -295,7 +432,7 @@ def wdqs(session: requests.Session, query: str) -> list[dict[str, Any]]:
             if "HTTP 429" in str(err) and round_ < WDQS_THROTTLE_ROUNDS - 1:
                 rate_limit_gap(WDQS_THROTTLE_COOLDOWN_SECONDS * (round_ + 1))
                 continue
-            raise SourceUnavailable(f"WDQS: {err}") from err
+            raise SourceUnavailable(f"WDQS: {err}", "wdqs") from err
         finally:
             rate_limit_gap(WDQS_GAP_SECONDS)
     raise AssertionError("unreachable")  # pragma: no cover
@@ -329,7 +466,7 @@ def wikipedia_get(session: requests.Session, params: dict[str, Any]) -> dict[str
                 last = f"HTTP {response.status_code}"
         if attempt < WIKIPEDIA_ATTEMPTS - 1:
             rate_limit_gap(2**attempt)
-    raise SourceUnavailable(f"Wikipedia: {last}")
+    raise SourceUnavailable(f"Wikipedia: {last}", "wikipedia")
 
 
 def category_member_pages(session: requests.Session, category: str) -> list[dict[str, Any]]:
@@ -395,7 +532,9 @@ def tmdb_ids_for_qids(session: requests.Session, qids: list[str], cache: dict[st
     """Fill `cache` with {qid: [{'qid', 'tmdb_movie', 'tmdb_tv'}, ...]} for every
     QID not already in it. A QID with no TMDB property comes back as an empty
     list, so it is not asked about twice."""
-    todo = sorted({q for q in qids if q not in cache})
+    # Only well-formed QIDs reach the query text; Wikipedia's pageprops are
+    # data from the network, not something to paste into SPARQL unchecked.
+    todo = sorted({q for q in qids if q not in cache and valid_qid(q)})
     for i in range(0, len(todo), TMDB_LOOKUP_BATCH):
         batch = todo[i : i + TMDB_LOOKUP_BATCH]
         bindings = wdqs(session, QID_TO_TMDB_QUERY % " ".join(f"wd:{q}" for q in batch))
@@ -475,27 +614,51 @@ def fetch_place_names(session: requests.Session) -> dict[str, str]:
 
 
 NEIGHBOURHOOD_QUERY = """
-SELECT DISTINCT ?item ?itemLabel ?coord WHERE {
-  ?item wdt:P31 wd:%(cls)s .
-  { %(within)s }
-  ?item wdt:P625 ?coord .
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+SELECT DISTINCT ?item ?label ?coord ?sl WHERE {
+  SERVICE wikibase:around {
+    ?item wdt:P625 ?coord .
+    bd:serviceParam wikibase:center "Point(%(lon)s %(lat)s)"^^geo:wktLiteral .
+    bd:serviceParam wikibase:radius "%(radius)s" .
+  }
+  ?item %(path)s wd:%(cls)s .
+  ?item wikibase:sitelinks ?sl .
+  ?item rdfs:label ?label FILTER(LANG(?label) = "en")
 }
-ORDER BY ?itemLabel
+"""
+
+SEED_QUERY = """
+SELECT DISTINCT ?item ?label ?coord ?sl WHERE {
+  VALUES ?item { %s }
+  ?item wdt:P625 ?coord .
+  ?item wikibase:sitelinks ?sl .
+  ?item rdfs:label ?label FILTER(LANG(?label) = "en")
+}
 """
 
 
 def fetch_neighbourhood_bindings(session: requests.Session, city: dict[str, Any]) -> list[dict[str, Any]]:
-    """All classes for one city. If any class fails the whole city is reported
-    unavailable: a table rebuilt from some of the classes would silently shrink."""
-    # One UNION arm per container with the target inlined: a VALUES join made
-    # the New York query time out, an inlined target runs in ~2 s.
-    within = " UNION ".join(
-        f"{{ ?item wdt:P131+ wd:{q} }}" for q in [*city["qids"], *NEIGHBOURHOOD_EXTRA_CONTAINERS.get(city["slug"], ())]
-    )
+    """Candidates for one city: every class within the radius, plus the seed.
+    If any query fails the whole city is reported unavailable, since a table
+    rebuilt from some of the classes would silently shrink."""
+    slug = city["slug"]
     bindings: list[dict[str, Any]] = []
-    for cls in NEIGHBOURHOOD_CLASSES:
-        bindings.extend(wdqs(session, NEIGHBOURHOOD_QUERY % {"within": within, "cls": cls}))
+    for cls, closure, _why in (*NEIGHBOURHOOD_CLASSES, *NEIGHBOURHOOD_EXTRA_CLASSES.get(slug, ())):
+        bindings.extend(
+            wdqs(
+                session,
+                NEIGHBOURHOOD_QUERY
+                % {
+                    "lon": city["lon"],
+                    "lat": city["lat"],
+                    "radius": NEIGHBOURHOOD_RADIUS_KM.get(slug, NEIGHBOURHOOD_RADIUS_KM_DEFAULT),
+                    "path": "wdt:P31/wdt:P279*" if closure else "wdt:P31",
+                    "cls": cls,
+                },
+            )
+        )
+    seed = load_seed().get(slug, [])
+    if seed:
+        bindings.extend(wdqs(session, SEED_QUERY % " ".join(f"wd:{q}" for q in seed)))
     return bindings
 
 
@@ -570,25 +733,62 @@ def write_neighbourhoods(conn: Any, slug: str, rows: list[NbRow]) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def _half(label: str, slug: str, fetch: Callable[[], list[LocRow]]) -> list[LocRow] | None:
+def _half(
+    label: str, slug: str, fetch: Callable[[], list[LocRow]], failures: set[str], skip: bool
+) -> list[LocRow] | None:
+    """Run one half; None means "no usable answer" (failed or skipped by the
+    breaker). The failing source is added to `failures`."""
+    if skip:
+        print(f"  {slug}: {label} skipped (source marked unavailable this run)")
+        return None
     try:
         rows = fetch()
-        print(f"  {slug}: {label} gave {len(rows)} rows")
-        return rows
     except SourceUnavailable as err:
+        failures.add(err.source)
         print(f"  {slug}: {label} unavailable, skipping: {err}")
         return None
+    print(f"  {slug}: {label} gave {len(rows)} rows")
+    return rows
+
+
+def _stored(conn: Any, slug: str) -> list[LocRow]:
+    with conn.cursor() as cur:
+        old = stored_rows(cur, slug)
+    conn.rollback()  # a read, but psycopg opened a transaction for it
+    return old
 
 
 def sync_titles(conn: Any, cities: list[dict[str, Any]], dry_run: bool) -> int:
     session = new_session()
     names = fetch_place_names(session)
+    breaker = CircuitBreaker()
     written = failed = 0
 
     for city in cities:
         slug = city["slug"]
-        wikipedia = _half("Wikipedia half", slug, lambda: fetch_wikipedia_rows(session, city))
-        wikidata = _half("Wikidata half", slug, lambda: fetch_wikidata_rows(session, city))
+        failures: set[str] = set()
+        wikipedia = _half(
+            "Wikipedia half", slug, lambda: fetch_wikipedia_rows(session, city), failures, breaker.blocked("wikipedia", "wdqs")
+        )
+        wikidata = _half("Wikidata half", slug, lambda: fetch_wikidata_rows(session, city), failures, breaker.blocked("wdqs"))
+        breaker.record_city(
+            failures,
+            ({"wikipedia", "wdqs"} if wikipedia is not None else set()) | ({"wdqs"} if wikidata is not None else set()),
+        )
+
+        # A source that answers with nothing while rows from it are stored is
+        # far more likely broken (a renamed category, a changed query) than
+        # right, and trusting it would delete a city's data. Treat as failed.
+        stored: list[LocRow] | None = None
+        for source, rows in (("wikipedia", wikipedia), ("wikidata", wikidata)):
+            if rows == [] and conn is not None:
+                stored = _stored(conn, slug) if stored is None else stored
+                if carry_over(stored, source):
+                    print(f"  {slug}: {source} returned no rows but some are stored; keeping the stored rows")
+                    if source == "wikipedia":
+                        wikipedia = None
+                    else:
+                        wikidata = None
         if wikipedia is None and wikidata is None:
             failed += 1
             continue
@@ -600,9 +800,7 @@ def sync_titles(conn: Any, cities: list[dict[str, Any]], dry_run: bool) -> int:
                 # A dry run has no connection to read from, so it simply
                 # reports the half it has.
                 if conn is not None:
-                    with conn.cursor() as cur:
-                        old = stored_rows(cur, slug)
-                    conn.rollback()
+                    old = stored if stored is not None else _stored(conn, slug)
                     wikipedia = carry_over(old, "wikipedia") if wikipedia is None else wikipedia
                     wikidata = carry_over(old, "wikidata") if wikidata is None else wikidata
             rows = drop_suspect(merge_rows(wikidata or [], wikipedia or []))
@@ -627,22 +825,43 @@ def sync_titles(conn: Any, cities: list[dict[str, Any]], dry_run: bool) -> int:
     return 1 if written == 0 and failed else 0
 
 
+def has_neighbourhoods(conn: Any, slug: str) -> bool:
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM neighbourhoods WHERE city_slug = %s LIMIT 1", (slug,))
+        found = cur.fetchone() is not None
+    conn.rollback()
+    return found
+
+
 def sync_neighbourhoods(conn: Any, cities: list[dict[str, Any]], dry_run: bool) -> int:
     session = new_session()
+    breaker = CircuitBreaker()
     written = failed = 0
     for city in cities:
         slug = city["slug"]
+        if breaker.blocked("wdqs"):
+            failed += 1
+            print(f"  {slug}: neighbourhoods skipped (WDQS marked unavailable this run)")
+            continue
         try:
-            rows = neighbourhood_rows(fetch_neighbourhood_bindings(session, city), slug)
+            rows = neighbourhood_rows(fetch_neighbourhood_bindings(session, city), city)
         except SourceUnavailable as err:
             failed += 1
+            breaker.record_city({"wdqs"}, set())
             print(f"  {slug}: neighbourhoods unavailable, skipping: {err}")
             continue
+        breaker.record_city(set(), {"wdqs"})
         print(f"  {slug}: {len(rows)} neighbourhoods")
         for _, name, lat, lon in rows:
             print(f"      {name}  ({lat:.4f}, {lon:.4f})")
         if dry_run:
             written += 1
+            continue
+        if not rows and has_neighbourhoods(conn, slug):
+            # Same reasoning as for title_locations: an empty answer must not
+            # erase rows that an earlier run found.
+            failed += 1
+            print(f"  {slug}: no neighbourhoods returned but some are stored; keeping them")
             continue
         try:
             write_neighbourhoods(conn, slug, rows)
