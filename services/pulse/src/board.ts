@@ -175,6 +175,7 @@ export async function buildBoard(deps: BoardDeps, city: City, type: BusinessType
 
   const ranked: BoardCard[] = [];
   const noSignal: BoardCard[] = [];
+  const rankingCoverage: NonNullable<BoardResponse['rankingCoverage']> = [];
   let needsRank = false;
   for (const mediaType of ["movie", "tv"] as const) {
     const group = candidates.filter(c => c.card.mediaType === mediaType && entities.get(keyOf(c.card.mediaType, c.card.tmdbId))?.entityId);
@@ -182,7 +183,12 @@ export async function buildBoard(deps: BoardDeps, city: City, type: BusinessType
     if (ids.length === 0) continue;
     const ranking = await readBoardRank(sql, city, mediaType, ids, today);
     if (!ranking) needsRank = true;
-    const positions = new Map((ranking?.data ?? []).map((id, i) => [id.toLowerCase(), i + 1]));
+    const returned = [...new Set((ranking?.data ?? []).map(id => id.toLowerCase()))];
+    // A single result cannot establish a comparison. Do not promote it to
+    // "#1" and hide the rest of the calendar behind a collapsed strip.
+    const comparable = returned.length >= 2;
+    if (ranking) rankingCoverage.push({ mediaType, candidates: new Set(ids.map(id => id.toLowerCase())).size, returned: returned.length, comparable });
+    const positions = new Map((comparable ? returned : []).map((id, i) => [id, i + 1]));
     const ready = toScore.filter(c => c.card.mediaType === mediaType);
     const ordered = ready.sort((a, b) => (positions.get(a.entityId!.toLowerCase()) ?? Infinity) - (positions.get(b.entityId!.toLowerCase()) ?? Infinity));
     for (const c of ordered) {
@@ -197,7 +203,10 @@ export async function buildBoard(deps: BoardDeps, city: City, type: BusinessType
           ...(c.hook ? [`${c.hook.kind === "filmed" ? "shot" : "set"} in ${city.name}`] : [])].slice(0, 3).join(" · ");
         ranked.push({ ...c.card, score: null, why, localRank, rankTotal: positions.size });
       } else {
-        noSignal.push({ ...c.card, score: null, why: ranking ? "No comparable local ranking for this title" : "Local ranking unavailable; release order only" });
+        const why = [ranking ? "No comparable local ranking for this title" : "Local ranking unavailable; release order only",
+          ...(hood ? [`heatmap signal near ${hood}`] : []),
+          ...(c.hook ? [`${c.hook.kind === 'filmed' ? 'shot' : 'set'} in ${city.name}`] : [])].join(' · ');
+        noSignal.push({ ...c.card, score: null, why });
       }
     }
   }
@@ -206,7 +215,7 @@ export async function buildBoard(deps: BoardDeps, city: City, type: BusinessType
   const rankingBasis = ranked.length ? "qloo_shortlist" as const : "release_order" as const;
   if (!ranked.length) {
     ranked.push(...noSignal.splice(0).sort((a, b) => a.releaseDate.localeCompare(b.releaseDate) || a.tmdbId - b.tmdbId)
-      .map(c => ({ ...c, why: "Release order · no comparable local ranking" })));
+      .map(c => ({ ...c, why: ['Release order · no comparable local ranking', ...(c.why?.split(' · ').slice(1) ?? [])].join(' · ') })));
   }
   if (needsRank) { try { deps.enqueueRank?.(city); } catch (err) { report("enqueueRank", err); } }
 
@@ -215,5 +224,5 @@ export async function buildBoard(deps: BoardDeps, city: City, type: BusinessType
     try { deps.enqueueWarm(city, type, key); } catch (err) { report("enqueueWarm", err); }
   }
 
-  return { city: city.slug, cityName: city.name, businessType: type, ranked, pending, unresolved, noSignal, rankingBasis, rankingPending: needsRank };
+  return { city: city.slug, cityName: city.name, businessType: type, ranked, pending, unresolved, noSignal, rankingBasis, rankingPending: needsRank, rankingCoverage };
 }

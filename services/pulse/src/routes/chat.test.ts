@@ -62,7 +62,8 @@ describe("POST /chat streaming", () => {
     expect(res.headers.get("x-accel-buffering")).toBe("no");
     const ev = await events(res);
     expect(ev.map((e) => e.type)).toEqual(["tool", "tool_result", "message", "done"]);
-    expect(ev[2]).toEqual({ type: "message", text: "Theme it around X." });
+    expect(ev[2]).toEqual({type:'message',text:expect.stringContaining('Release order only')});
+    expect(JSON.stringify(ev)).not.toContain('Theme it around X.');
   });
 
   it("takes ONE usage slot per request, however many tool rounds it runs", async () => {

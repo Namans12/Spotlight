@@ -2,7 +2,7 @@
 // finishes, so the page can fill in while the slow Qloo calls are still out.
 
 import type {
-  BriefEvent, BriefHeader, BriefSectionKey, BusinessType, EvidenceSection, HeatCell, LocalHook, Provenance, Venue,
+  BriefEvent, BriefHeader, BriefSectionKey, BusinessType, EvidenceSection, HeatCell, LocalHook, Provenance, TagAffinity, Venue,
 } from "../../../shared/types/pulse.js";
 import { BUSINESS_TYPES, filterVenues } from "./businessTypes.js";
 import type { City } from "./cities.js";
@@ -12,6 +12,7 @@ import { getEvidence, type EvidenceKind, type GetEvidenceOptions } from "./evide
 import { labelCell } from "./geo.js";
 import type { QlooClient } from "./qloo/client.js";
 import { RateLimitedError } from "./qloo/limiter.js";
+import { foodThemes } from './qloo/recipes.js';
 import type { Resolution, TitleKey } from "./resolve.js";
 
 export interface TitleSummary { title: string; posterUrl: string | null; releaseDate: string | null }
@@ -204,7 +205,13 @@ export async function* streamBrief(deps: BriefDeps, req: BriefRequest): AsyncGen
       return { ...raw, data: kept };
     },
 
-    themes: cachedQloo("place_tags", true, (id) => fetchPlaceTags(qloo, city, id)),
+    themes: async () => {
+      const raw = await cachedQloo<TagAffinity[]>("place_tags",true,id=>fetchPlaceTags(qloo,city,id))();
+      if (!Array.isArray(raw.data)) return raw;
+      // Apply the current taxonomy to old private cache entries as well.
+      const data=foodThemes(raw.data as TagAffinity[]);
+      return {...raw,data,status:raw.status==='ok'&&data.length===0?'empty' as const:raw.status};
+    },
     artists: cachedQloo("artists", false, (id) => qloo.artists(id)),
     brands: cachedQloo("brands", false, (id) => qloo.brands(id)),
     trend: cachedQloo("trends", false, (id) => qloo.trends(id)),

@@ -1,8 +1,19 @@
 # Release Pulse — deployment preparation checkpoint, 2026-10-25
 
+Superseded by `2026-10-26-release-pulse-checkpoint.md`: product evaluation keeps
+deployment on hold, changes campaign/chat composition and moves the local DB.
+
 Resume here; the October 21 checkpoint is historical. Branch `feat/release-pulse`.
 Nothing has been pushed, deployed or submitted. User chose to continue Spotlight,
 requested ranking repair/live Qloo verification and remaining deployment prep.
+
+**October 26 update:** hold public deployment pending product acceptance. Read
+`docs/submission/product-validation.md` before resuming. Eight live Qloo controls
+and two real brief/baseline pairs found sparse city ranking and weak proposal
+feasibility. The old temporary DB lost required files; restored source data to
+`services/pulse/spike/out/pgdata`, localhost **54330**, database `spotlight_test`.
+The running service on 8799 uses that DB via an environment override; ignored
+.env was not edited. The Local state section below describes the earlier state.
 
 ## Completed
 

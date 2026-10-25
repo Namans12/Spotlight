@@ -41,6 +41,7 @@ const names = (rows: { name?: unknown }[], n: number, len: number) => rows.map((
 function summariseSection(key: BriefSectionKey, section: EvidenceSection<unknown>, p: Profile): Record<string, unknown> {
   const base: Record<string, unknown> = {
     status: section.status,
+    ...(['who','artists','brands'].includes(key)?{scope:'global'}:['venues','themes'].includes(key)?{scope:'city_venues'}:key==='where'?{scope:'city_heatmap'}:{}),
     ...(section.note && p.note > 0 ? { note: cleanText(section.note, p.note) } : {}),
     calls: [...new Set(section.provenance.map((x) => cleanText(x.call, 40)))].slice(0, p.calls),
   };
@@ -75,7 +76,7 @@ function summariseSection(key: BriefSectionKey, section: EvidenceSection<unknown
   }
 }
 
-const NOTE = "Numbers are Qloo's relative affinity scores, not shares of people. Name a section's 'calls' when you cite it.";
+const NOTE = "Relative scores, not shares. city_venues filters venues, not local fans; city_heatmap is affinity, not footfall. Name a section's 'calls' when citing it.";
 
 type KeyResult = { ok: true; key: TitleKey } | { ok: false; error: Record<string, unknown> };
 

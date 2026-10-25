@@ -5,8 +5,13 @@
 Release Pulse helps a café or D2C food brand explore upcoming releases and turn
 Qloo cultural insights into a campaign brief. It combines Spotlight’s India-first
 streaming/theatrical calendar with title resolution, geographic heatmaps,
-city-filtered venues, global artist/food-brand affinities and cited campaign copy.
+city-filtered venues, global artist/food-brand affinities and conditional trial plans.
 It also exposes the underlying tools to an in-app chat agent.
+
+**October 26: deployment is on hold.** The paired evaluation established source
+traceability, not a business advantage over the LLM-only arm. The model selects
+context and conservative trial templates; public chat renders tool facts rather
+than unchecked model advice. See [results](docs/submission/evaluation-results.md).
 
 > **Qloo Agentic Hackathon submission work.** Spotlight existed before the event.
 > Release Pulse was added on `feat/release-pulse` during October 2026: the separate
@@ -57,15 +62,17 @@ The board has **no weighted score**: all `score` values are `null`. Qloo ordinal
 ranks apply only within a fixed, same-type shortlist (up to ten films or ten TV
 shows) and one city signal; films and TV are never treated as comparable queries.
 The film slate reserves up to six theatrical candidates when available. Titles
-omitted from a returned rank appear in a collapsed strip; if none receive ranks,
+omitted from a usable returned rank appear in a collapsed strip; if fewer than
+two results per type can be compared,
 the board explicitly falls back to release order. Changing the business type
 changes brief filters, not Qloo’s city-only shortlist order. Heatmap values from
 separate requests never determine the order.
 
-**Current coverage limitation (October 25):** live Delhi and Mumbai boards each
-returned one ranked TV title, sixteen titles without comparable ranking and three
-unresolved titles. All six theatrical candidates were present in the unranked
-strip. Established-title probes also returned only one item per ranking call.
+**Current coverage limitation (October 26):** live Delhi and Mumbai slates each
+returned no comparable city ranks for 17 resolved titles; three were unresolved.
+All 17 resolved titles, including six theatrical candidates, remain visible in
+explicit release order. A single returned title also cannot establish a comparison.
+Established-title city probes returned only one item per ranking call.
 Successful API status therefore does not establish a useful multi-title comparison;
 this sparse result is under investigation. See [validation](docs/submission/validation.md).
 Trends returned empty in the original live spike and are not a demonstrated feature.
@@ -83,7 +90,8 @@ GET /brief?tmdbId=<known-id>&mediaType=movie&city=delhi&type=cafe
   -> recommended venue tags -> locally selected food/drink themes
   -> optional global demographic, artist and food/beverage brand evidence
   -> separate Wikipedia/Wikidata filmed/set-here evidence
-  -> bounded LLM campaign writer -> clauses reference available evidence IDs
+  -> model selects context and a bounded trial plan
+  -> source context copied verbatim; actions rendered from conditional templates
   -> stream sections and show uncited/unresolvable claims as Agent suggestion
 ```
 
@@ -122,8 +130,9 @@ accessed without those original watchlist APIs.
 
 See the [full deploy/seed runbook](docs/submission/deploy.md) for fresh database
 migrations, live catalog ingestion, CORS, provider settings, quotas, one-instance
-hosting and readiness checks. It explicitly distinguishes `/healthz` liveness from
-functional readiness. No deploy or paid resources are created by these files.
+hosting and readiness checks. `/healthz` checks process liveness; `/readyz`
+checks database/schema access with a bounded response. Neither verifies provider
+quality or data freshness. No deploy or paid resources are created by these files.
 
 ```bash
 npm run typecheck

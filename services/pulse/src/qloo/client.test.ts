@@ -210,13 +210,13 @@ describe("the harness-backed client", () => {
   it("derives place tags from the venues recommended for the city, and cites both calls", async () => {
     const { t, calls } = fakeTransport({
       qloo_recommend: [{ status: "ok", result_count: 2, results: [{ entity_id: "v-1", name: "A" }, { entity_id: "v-2", name: "B" }] }],
-      qloo_entity_tags: [{ status: "ok", result_count: 1, results: [{ id: "urn:tag:genre:place:fx-1", name: "Fixture Tag", affinity: 0.4 }] }],
+      qloo_entity_tags: [{ status: "ok", result_count: 1, results: [{ id: "urn:tag:genre:place:restaurant:fx-1", name: "Fixture Tag", affinity: 0.4 }] }],
     });
     const q = createHarnessQlooClient(t, { sleep: noSleep });
     const s = await q.placeTags("ent-1", delhi);
     expect(calls.map(c => c.name)).toEqual(["qloo_recommend", "qloo_entity_tags"]);
     expect(calls[1]?.args).toMatchObject({ entities: ["v-1", "v-2"], entity_type: "place" });
-    expect(s.data).toEqual([{ tagId: "urn:tag:genre:place:fx-1", name: "Fixture Tag", affinity: 0.4 }]);
+    expect(s.data).toEqual([{ tagId: "urn:tag:genre:place:restaurant:fx-1", name: "Fixture Tag", affinity: 0.4 }]);
     expect(s.provenance).toHaveLength(2);
   });
 
@@ -467,7 +467,7 @@ describe("a thin-signal title Qloo rejects with a contract error (L3)", () => {
   });
 
   it("does not touch a venue step that succeeded", async () => {
-    const { t } = fakeTransport({ qloo_recommend: [venuesOk], qloo_entity_tags: [{ status: "ok", results: [{ id: "urn:tag:genre:place:chinese", name: "Chinese", affinity: 0.5 }] }] });
+    const { t } = fakeTransport({ qloo_recommend: [venuesOk], qloo_entity_tags: [{ status: "ok", results: [{ id: "urn:tag:genre:place:restaurant:chinese", name: "Chinese", affinity: 0.5 }] }] });
     const s = await createHarnessQlooClient(t, { sleep: noSleep }).placeTags("ent-1", delhi);
     expect(s.status).toBe("ok");
   });
@@ -502,7 +502,7 @@ describe("place themes keep only food and drink tag families (L4)", () => {
 
   it("keeps each of the five food families", async () => {
     const ids = [
-      "urn:tag:specialty_dish:place:a", "urn:tag:genre:place:b", "urn:tag:cuisine:qloo:c",
+      "urn:tag:specialty_dish:place:a", "urn:tag:genre:place:restaurant:indian", "urn:tag:cuisine:qloo:c",
       "urn:tag:dining_option:qloo:d", "urn:tag:popular_food_item:qloo:e",
     ];
     const s = await themes(ids.map((id, i) => ({ id, name: `Name ${i}`, affinity: 0.9 - i / 10 })));
@@ -511,11 +511,19 @@ describe("place themes keep only food and drink tag families (L4)", () => {
 
   it("does not match a family by loose substring (genre:place must be the id's prefix)", async () => {
     const s = await themes([
-      { id: "urn:tag:genre:place:ok", name: "Ok", affinity: 0.1 },
+      { id: "urn:tag:genre:place:cafe", name: "Ok", affinity: 0.1 },
       { id: "urn:tag:genre:media:urn:tag:genre:place:", name: "Sneaky", affinity: 0.9 },
       { id: "x-urn:tag:cuisine:qloo:y", name: "Sneakier", affinity: 0.8 },
     ]);
     expect(s.data?.map((t) => t.name)).toEqual(["Ok"]);
+  });
+  it('excludes hotels and resort hotels even inside the place-genre family',async()=>{
+    const s=await themes([
+      {id:'urn:tag:genre:place:hotel',name:'Hotel'},
+      {id:'urn:tag:genre:place:hotel:resort',name:'Resort hotel'},
+      {id:'urn:tag:genre:place:restaurant:indian',name:'Indian'},
+    ]);
+    expect(s.data?.map(t=>t.name)).toEqual(['Indian']);
   });
 
   it("dedupes by lowercased name keeping the highest affinity, sorts by affinity, caps at 12", async () => {
@@ -536,8 +544,8 @@ describe("place themes keep only food and drink tag families (L4)", () => {
 
   it("puts a tag with no affinity after those that have one", async () => {
     const s = await themes([
-      { id: "urn:tag:genre:place:a", name: "No affinity" },
-      { id: "urn:tag:genre:place:b", name: "Has affinity", affinity: 0.1 },
+      { id: "urn:tag:genre:place:restaurant:a", name: "No affinity" },
+      { id: "urn:tag:genre:place:restaurant:b", name: "Has affinity", affinity: 0.1 },
     ]);
     expect(s.data?.map((t) => t.name)).toEqual(["Has affinity", "No affinity"]);
   });
@@ -549,7 +557,7 @@ describe("place themes keep only food and drink tag families (L4)", () => {
     ]);
     expect(s.status).toBe("empty");
     expect(s.data).toBeNull();
-    expect(s.note).toBe("No food or drink themes stood out for this audience in this city.");
+    expect(s.note).toBe("No food or drink themes stood out among the recommended venues in this city.");
     expect(s.provenance.map((p) => p.call)).toEqual(["recommend_places", "entity_tags"]);
   });
 

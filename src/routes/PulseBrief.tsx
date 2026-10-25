@@ -225,7 +225,7 @@ function BriefStream({ city, type, mediaType, tmdbId }: TitleParams) {
     switch (key) {
       case 'who':
         return (
-          <BriefSection {...common} lede={`How the audience for ${title} differs from the average audience.`} skeletonClass="h-56">
+          <BriefSection {...common} lede={`How the global audience for ${title} differs from average; not specific to this city.`} skeletonClass="h-56">
             {(data) => <AgeBars data={data as DemographicsData} />}
           </BriefSection>
         );

@@ -18,8 +18,8 @@ COPY services/pulse/src ./services/pulse/src
 ENV NODE_ENV=production PORT=8787
 USER node
 EXPOSE 8787
-# Liveness only: database/data/provider readiness is checked by the runbook.
+# Database/schema readiness. Provider/data freshness checks remain in the runbook.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8787)+'/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8787)+'/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 # Exec form avoids npx downloading anything or swallowing container signals.
 CMD ["./services/pulse/node_modules/.bin/tsx", "services/pulse/src/server.ts"]

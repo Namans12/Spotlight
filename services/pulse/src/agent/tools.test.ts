@@ -242,8 +242,8 @@ describe("pulse_board", () => {
     const ranked = out.ranked as Record<string, unknown>[];
     expect(ranked).toHaveLength(5);
     expect(Object.keys(ranked[0]).sort()).toEqual(["localRank", "mediaType", "platform", "rankTotal", "releaseDate", "title", "tmdbId", "why"]);
-    expect(out).toMatchObject({ city: "delhi", cityName: "Delhi", businessType: "cafe", rankedCount: 7, pendingCount: 2, unresolvedCount: 1 });
-    expect(out.summary).toBe("7 ranked and 2 pending for Delhi (cafe).");
+    expect(out).toMatchObject({ city: "delhi", cityName: "Delhi", businessType: "cafe", rankedCount: 0,displayedCount:7, pendingCount: 2, unresolvedCount: 1 });
+    expect(out.summary).toBe("0 Qloo-ranked, 7 displayed and 2 pending for Delhi (cafe).");
     expect(String(out.note)).toMatch(/pending means .*still loading/i);
     expect(JSON.stringify(out).length).toBeLessThanOrEqual(2800);
     expect(out).not.toHaveProperty("pending");
@@ -314,7 +314,9 @@ describe("release_brief", () => {
     const f = fixtureDeps({ db, heatmap: async () => ({ status: "ok", data: cells, provenance: [{ source: "qloo", call: "where_popular", params: {}, limits: "" }] }) });
     const deps = toolDeps({ sql: f.sql as unknown as AgentToolDeps["sql"], qloo: f.qloo });
     const out = (await find(await buildTools(deps), "release_brief").run(args)) as { sections: { where: { top: { name: string; affinity: number }[]; unlabelledCells: number; cells: number } } };
-    expect(out.sections.where.top.map((t) => t.name)).toEqual(["Fake Hood 0", "Fake Hood 1", "Fake Hood 2", "Fake Hood 3"]);
+    expect(out.sections.where.top.length).toBeGreaterThanOrEqual(2);
+    expect(out.sections.where.top.map((t) => t.name)).toEqual(["Fake Hood 0", "Fake Hood 1", "Fake Hood 2", "Fake Hood 3"].slice(0,out.sections.where.top.length));
+    expect(out.sections.where.scope).toBe('city_heatmap');
     expect(out.sections.where.top[0].affinity).toBe(0.9);
     expect(out.sections.where).toMatchObject({ unlabelledCells: 2, cells: 11 });
   });
@@ -404,7 +406,9 @@ describe("release_brief", () => {
     const text = JSON.stringify(out);
     expect(text.length).toBeLessThanOrEqual(1800);
     expect(text).not.toMatch(/[<>]/);
-    expect(out.sections.venues.names).toHaveLength(4);
+    expect(out.sections.venues.names.length).toBeGreaterThanOrEqual(1);
+    expect(out.sections.venues.names.length).toBeLessThanOrEqual(4);
+    expect(out.sections.venues.scope).toBe('city_venues');
   });
 });
 

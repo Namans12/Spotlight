@@ -2,6 +2,50 @@
 
 This is an evidence log, not a completed-launch claim. Update it as checks finish.
 
+**October 26: public deployment is on hold.** Fresh live checks found proposal
+feasibility failures and persistent sparse city ranking. The local temporary DB
+also failed despite a healthy liveness endpoint; source data was restored to a
+persistent gitignored directory. See [product validation](product-validation.md)
+for results, limitations, active local DB configuration and acceptance work.
+
+The completed paired runs, retained pilot failures, final-code follow-up and
+remaining value gap are in [evaluation results](evaluation-results.md).
+
+## October 26 final local engineering checks
+
+- Full service suite: **976 passed**, 51 files, including integration tests on
+  the separate clean pulse_itest database at localhost:54330.
+- Full frontend/root suite: **765 passed**, 50 files, on this host with
+  NODE_OPTIONS=--no-experimental-webstorage. Latest copy changes are included.
+- Full typecheck and production build passed. Build/prerender generated six
+  static routes; no claim of live title-page/API hosting follows from that.
+- Lint remains at the existing baseline: 65 errors plus four warnings. Do not
+  describe the whole repository as lint-clean. git diff --check passed.
+- Python files were unchanged in this round. The earlier 241-test pass is
+  historical; no new Python run is claimed here.
+- Real /readyz succeeds on the restored persistent DB. A separate key-loaded
+  service pointed at an unavailable local DB returned /healthz 200 and /readyz
+  503 (4ms), without leaking connection details. Unit tests cover a stalled
+  check's bounded response and concurrent probe sharing. The probe was stopped.
+- The service was restarted on final code. Its ignored local DATABASE_URL now
+  uses persistent ignored pgdata on 54330, rather than the damaged /tmp cluster.
+- Browser guest flow verified the fallback board, a real streamed brief,
+  removed hotel food tags, visible global scope and live baseline comparison.
+  Free-form chat failed a live test; its public rendering path was hardened
+  afterward. A repeated real NBC/Friends query invoked release_brief and visibly
+  completed with global demographics, city heatmap/venue scope, missing sections
+  and a conditional existing-product template. The earlier invented menu,
+  rights and footfall claims did not reach the final message.
+- The older Spotlight AI launcher overlapped the Pulse chat controls in the
+  integrated browser walkthrough. It is now hidden on Pulse routes; the
+  original assistant remains on other Spotlight routes.
+- Two simultaneous cached briefs for the same title both returned 200, eight
+  sections and done, in 32ms/18ms with identical campaigns. This checks cached
+  local concurrency only; it does not establish cold-provider or hosted capacity.
+
+Actual Linux container execution and hosted behavior remain unverified. Docker
+is not installed here. No public deployment was attempted.
+
 ## Container preparation — October 25, 2026
 
 - Added a repository-root-context `services/pulse/Dockerfile` and default-deny

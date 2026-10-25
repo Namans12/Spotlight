@@ -15,6 +15,7 @@ import { boardHandler } from "./routes/board.js";
 import { briefHandler } from "./routes/brief.js";
 import { chatHandler } from "./routes/chat.js";
 import { guessHandler } from "./routes/guess.js";
+import { readinessHandler } from "./routes/readiness.js";
 import { planNightHandler } from "./routes/planNight.js";
 import { titleLocationsHandler } from "./routes/titleLocations.js";
 import { warmHandler } from "./routes/warm.js";
@@ -134,6 +135,7 @@ const healthz: Handler = async (_req, res) => {
 
 const route = createRouter({
   "GET /healthz": healthz,
+  "GET /readyz": readinessHandler(() => sql`SELECT 1 FROM release_items, qloo_entities, qloo_evidence, pulse_usage LIMIT 0`),
   "GET /brief": briefRoute,
   "GET /guess": guessRoute,
   "GET /board": boardRoute,

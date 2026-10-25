@@ -111,7 +111,7 @@ export function chipsForId(id: string, bundle: SectionBundle, cityName: string):
 
   if (prefix === 'demo') {
     const bucket = (AGE_BUCKETS as readonly string[]).includes(rest) ? AGE_LABELS[rest as AgeBucket] : rest === 'male' || rest === 'female' ? rest : null;
-    const detail = bucket ? `Audience skews ${bucket} above average (relative, not a share of people)` : null;
+    const detail = bucket ? `Audience skews ${bucket} above average (global; relative, not a share of people)` : null;
     return [{ label: 'Qloo · demographics', detail }];
   }
 

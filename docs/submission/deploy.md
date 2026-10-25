@@ -1,6 +1,8 @@
 # Release Pulse deployment runbook
 
-Status: deployment preparation, not a deployment record. No live Pulse URL has
+Status: **public deployment on hold pending product evaluation**; see
+[evaluation plan](evaluation-plan.md) and [findings](product-validation.md).
+This is preparation, not a deployment record. No live Pulse URL has
 been published or verified by this document. Use a separate hackathon database,
 container service and Vercel project. Keep Spotlight's existing production project
 and customer database separate.
@@ -66,7 +68,8 @@ straightforward upgrade; no paid plan has been enabled.
 
 The in-memory Qloo limiter, request coalescing and route limits are process-local.
 Do not enable replicas/autoscaling without moving those controls to shared state.
-Disable scale-to-zero: `/warm` returns 202 before its background work completes.
+On a host that can sleep, use `/warm?wait=1`; background 202 acceptance does not
+establish that warming completed.
 Use the host's init-process option when available (local Docker: `--init`) so the
 Node process and its Qloo child are reaped on restart. Allow at least 30 seconds
 for process termination. Confirm an in-progress stream behaves correctly during
@@ -74,7 +77,7 @@ restart before calling the deployment ready.
 
 For Railway/Render/Fly or another container host: choose Docker deployment, build
 context `.`, Dockerfile path `services/pulse/Dockerfile`, one replica,
-health path `/healthz`, and TLS ingress. Host selection and any paid resources
+health path `/readyz`, and TLS ingress. Host selection and any paid resources
 remain an explicit owner decision; no provisioning is implied here.
 
 ## 1. Fresh database and release data
@@ -181,11 +184,14 @@ port to `PORT` if your env file overrides it. Do not bake the env file into an i
 
 ```bash
 curl -fsS http://localhost:8787/healthz
+curl -fsS http://localhost:8787/readyz
 ```
 
-Expected: `{"ok":true}`. **This is liveness only**: it does not check PostgreSQL,
-migrations, seeded titles, Qloo, TMDB or the LLM. Readiness requires all steps in
-the final checklist below. The source-only container-layout simulation cannot
+Expected: `{"ok":true}` for liveness and `{"ready":true}` for database/schema
+access. `/readyz` returns 503 within its response deadline when its check fails
+or stalls; concurrent probes share a pending check. It checks required tables,
+not seeded titles, Qloo, TMDB or the LLM. Functional readiness requires all steps
+in the final checklist below. The source-only container-layout simulation cannot
 verify the actual Linux image, host ingress, health scheduling or restart behavior.
 
 ## 4. Frontend and scheduled refresh
@@ -269,7 +275,7 @@ Vercel function proxy.
 - [ ] Build/run the actual Linux image and confirm healthy status as non-root.
 - [ ] Confirm schema and current catalog data on the isolated database.
 - [ ] Confirm trusted proxy client addresses and one replica (free hosting can sleep).
-- [ ] `/healthz` succeeds on the public service URL.
+- [ ] `/healthz` and `/readyz` succeed; `/readyz` returns 503 during DB failure and recovers afterward.
 - [ ] `/board?city=delhi&type=cafe` returns current titles; warm reports are useful.
 - [ ] Fresh browser opens `/pulse?city=delhi&type=cafe` without an intro/login wall.
 - [ ] Open a supported brief: evidence sections stream, source/limit labels render.

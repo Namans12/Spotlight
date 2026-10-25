@@ -228,6 +228,12 @@ export default function Pulse() {
       {data?.rankingBasis === 'release_order' && (
         <p className="text-xs text-muted-foreground">Release order · no comparable local ranking. Open a brief to check which audience evidence is available.</p>
       )}
+      {data?.rankingCoverage?.map(coverage => (
+        <p key={coverage.mediaType} className="text-xs text-muted-foreground">
+          Qloo returned {coverage.returned} of {coverage.candidates} {coverage.mediaType === 'movie' ? 'film' : 'TV'} candidates for the city signal.
+          {coverage.comparable ? ' Ranks apply only to the returned titles.' : ' At least two returned titles are needed for a comparison.'}
+        </p>
+      ))}
 
       {data?.rankingBasis === 'qloo_shortlist' && (['movie', 'tv'] as const).map((mediaType) => {
         const cards = data.ranked.filter((card) => card.mediaType === mediaType);

@@ -3,15 +3,9 @@
 // generator of AgentEvents, so the route can stream each step as it happens and
 // stop the work the moment the consumer stops reading.
 //
-// UNVERIFIED AGAINST LIVE GROQ. There was no Groq key while this was built, so
-// the loop has only run against local fakes that speak the OpenAI
-// chat-completions tool-calling format. Specifically unverified: that
-// openai/gpt-oss-120b on Groq emits well-formed `tool_calls` (valid JSON in
-// `arguments`, names from the offered list, at most a few per turn) and keeps
-// to the schemas given; that it accepts the harness's JSON Schemas as function
-// parameters unchanged; that a `tool` message needs no `name` field; and how
-// often it answers with an empty message after reasoning. Everything it sends
-// is therefore treated as untrusted: arguments are parsed and sanitised, an
+// Live Groq tool calling has been exercised. Free-form final advice failed
+// product evaluation, so the public chat route supplies a tool-data renderer.
+// Everything the model sends is still treated as untrusted: arguments are parsed and sanitised, an
 // unknown tool or bad arguments become a tool error it can recover from, and an
 // empty or failed reply ends the stream with a fixed sentence.
 //
@@ -23,7 +17,7 @@
 // over budget is not run: the model is told so and answers with what it has.
 //
 // Nothing in a model reply, tool error or exception reaches the user as text of
-// its own: the user sees the model's final message, short summaries built from
+// its own: the public user sees the final evidence summary, short summaries built from
 // tool results (sanitize.ts), and fixed sentences for failures. The real cause
 // of a failure goes to `onError`, which the server logs.
 
@@ -35,6 +29,8 @@ import { parseArguments, sanitiseArgs, summarise, truncateResult } from "./sanit
 import type { AgentTool } from "./tools.js";
 
 export interface AgentOptions {
+  /** Public routes supply a tool-data renderer; model prose is then discarded. */
+  renderFinal?: () => string;
   /** Aborted when the client has gone: no further model call or tool starts, and one in flight is told to stop. */
   signal?: AbortSignal;
   /** Per tool call; 25 s unless a test says otherwise. */
@@ -174,6 +170,11 @@ export async function* runAgent(llm: LlmClient, tools: AgentTool[], history: Cha
 
       const calls = usableCalls(reply.tool_calls);
       if (calls.length === 0) {
+        if(opts.renderFinal) {
+          yield {type:'message',text:opts.renderFinal()};
+          yield {type:'done'};
+          return;
+        }
         const text = (reply.content ?? "").trim();
         if (!text) {
           // A model that spent its budget thinking: not an answer.

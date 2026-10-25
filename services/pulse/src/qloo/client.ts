@@ -34,7 +34,7 @@ export interface QlooClient {
   close?(): Promise<void>;
 }
 
-export const NO_FOOD_THEMES_NOTE = "No food or drink themes stood out for this audience in this city.";
+export const NO_FOOD_THEMES_NOTE = "No food or drink themes stood out among the recommended venues in this city.";
 
 const STATUSES: readonly EvidenceStatus[] = ["ok", "empty", "needs_input", "partial", "degraded", "error"];
 

@@ -87,7 +87,7 @@ export function failureLine(err: unknown): FailureLine {
 export function suggestedPrompts(cityName: string, type: BusinessType, title?: string): string[] {
   const noun = type === 'cafe' ? 'café' : type === 'd2c_food' ? 'brand' : businessTypeLabel(type).toLowerCase();
   const prompts = [`Which release should my ${cityName} ${noun} theme this weekend around?`];
-  if (title) prompts.push(`Who is the audience for ${title} in ${cityName}?`);
-  prompts.push(`Plan a screening-night special for Friday at my ${cityName} ${noun}.`);
+  if (title) prompts.push(`What global audience and ${cityName} venue evidence is available for ${title}?`);
+  prompts.push(`Plan a discussion-night trial using existing products at my ${cityName} ${noun}.`);
   return prompts;
 }

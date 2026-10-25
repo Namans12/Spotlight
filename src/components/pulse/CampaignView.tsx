@@ -23,6 +23,8 @@ export function CampaignView({ campaign, bundle = {}, cityName, ideaHeading: Hea
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">All ideas are agent proposals. References show supporting context, not verification of the generated wording or outcomes.</p>
+      <p className="text-xs text-muted-foreground">The agent selects context and a trial plan. Cited context is copied from the evidence; actions use conservative templates.</p>
+      <p className="text-xs text-muted-foreground">Planning assumptions: existing products, owned channels and a small trial. Confirm menu fit and margins before acting; no media rights or partnerships are assumed.</p>
       {(campaign.ideas ?? []).map((idea, i) => (
         <article key={`${idea.kind}-${i}`} className="space-y-2 rounded-xl border border-border bg-card p-3.5">
           <header className="space-y-0.5">

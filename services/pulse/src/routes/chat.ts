@@ -1,4 +1,5 @@
 import { runAgent } from "../agent/loop.js";
+import { evidenceAnswerCollector } from '../agent/evidenceAnswer.js';
 import type { AgentTool } from "../agent/tools.js";
 import { readJsonBody } from "../http/body.js";
 import { clientAddress, type RateLimiter } from "../http/rateLimit.js";
@@ -121,7 +122,8 @@ export function chatHandler(deps: ChatRouteDeps): Handler {
         stream.write({ type: "done" });
         return;
       }
-      const events = runAgent(llm, tools, history, deps.maxRounds, { signal: stream.signal, toolTimeoutMs: deps.toolTimeoutMs, deadlineMs: deps.deadlineMs, timers: deps.timers, onError: report });
+      const evidence=evidenceAnswerCollector(tools);
+      const events = runAgent(llm, evidence.tools, history, deps.maxRounds, {renderFinal:evidence.answer, signal: stream.signal, toolTimeoutMs: deps.toolTimeoutMs, deadlineMs: deps.deadlineMs, timers: deps.timers, onError: report });
       for await (const event of events) {
         if (!stream.write(event)) break; // the client is gone; leaving the loop also stops the generator
       }

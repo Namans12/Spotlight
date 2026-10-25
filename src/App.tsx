@@ -2,7 +2,7 @@ import { Suspense, lazy } from 'react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { queryClient } from '@/lib/queryClient';
 import { WatchlistProvider } from '@/contexts/WatchlistContext';
 import { WebMcpBridge } from '@/webmcp/WebMcpBridge';
@@ -15,6 +15,10 @@ import { RouteErrorBoundary } from '@/components/system/RouteErrorBoundary';
 import { RouteFallback } from '@/components/system/RouteFallback';
 
 const Home = lazy(() => import('./routes/Home'));
+function SpotlightAgent() {
+  const {pathname}=useLocation();
+  return pathname==='/pulse'||pathname.startsWith('/pulse/')?null:<AgentChat />;
+}
 const Calendar = lazy(() => import('./routes/Calendar'));
 const Pulse = lazy(() => import('./routes/Pulse'));
 const PulseBrief = lazy(() => import('./routes/PulseBrief'));
@@ -39,12 +43,12 @@ function NotFound() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <WebMcpBridge />
-    <AgentChat />
     <WatchlistProvider>
       <TooltipProvider>
         <IntroGate>
           <Toaster />
           <BrowserRouter>
+            <SpotlightAgent />
             <AutoGuestSession />
             {/* Boundary sits above Suspense so it catches a *rejected* lazy
                 import (a stale chunk after a deploy), which Suspense itself

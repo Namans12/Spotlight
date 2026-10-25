@@ -216,6 +216,16 @@ describe("streamBrief", () => {
     expect(deps.qlooCalls).toEqual(after1);
     expect(sectionOf(events, "who").status).toBe("ok");
   });
+  it('removes hotel genres from previously cached food themes without spending another Qloo call',async()=>{
+    const deps=fixtureDeps();
+    await collect(streamBrief(deps,{city:delhi,businessType:'cafe',key:key(1)}));
+    const row=deps.db.evidence.get('fx-entity-1|delhi|place_tags')!;
+    row.payload={status:'ok',data:[{tagId:'urn:tag:genre:place:hotel',name:'Hotel',affinity:1},{tagId:'urn:tag:specialty_dish:place:coffee',name:'Coffee',affinity:0.8}],provenance:[]};
+    const before={...deps.qlooCalls};
+    const events=await collect(streamBrief(deps,{city:delhi,businessType:'cafe',key:key(1)}));
+    expect(sectionOf(events,'themes').data.map((t:{name:string})=>t.name)).toEqual(['Coffee']);
+    expect(deps.qlooCalls).toEqual(before);
+  });
 
   describe("where", () => {
     const centre = { name: "Fixture Centre", lat: delhi.lat, lon: delhi.lon };

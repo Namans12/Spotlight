@@ -284,6 +284,9 @@ export function foodThemes(tags: TagAffinity[]): TagAffinity[] {
   const byName = new Map<string, TagAffinity>();
   for (const t of tags) {
     if (!FOOD_TAG_PREFIXES.some((p) => t.tagId.startsWith(p))) continue;
+    // genre:place also contains hotels, resorts, shops and other non-food
+    // businesses. A broad family match previously labeled hotels as food.
+    if (t.tagId.startsWith('urn:tag:genre:place:') && !/^urn:tag:genre:place:(restaurant|cafe|coffee_shop|bakery|dessert|dessert_shop|bar)(:|$)/.test(t.tagId)) continue;
     const k = t.name.trim().toLowerCase();
     const held = byName.get(k);
     if (!held || score(t) > score(held)) byName.set(k, t);

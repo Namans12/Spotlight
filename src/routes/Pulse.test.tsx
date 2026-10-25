@@ -61,6 +61,14 @@ afterEach(() => {
 });
 
 describe('Pulse board: states', () => {
+  it('shows sparse returned/requested coverage without labeling release order a Qloo rank',async()=>{
+    vi.mocked(fetchBoard).mockResolvedValue(board({ranked:[card({score:null,why:'Release order · no comparable local ranking'})],rankingBasis:'release_order',rankingCoverage:[{mediaType:'movie',candidates:10,returned:1,comparable:false}]}));
+    renderPulse();
+    expect(await screen.findByText(/Qloo returned 1 of 10 film candidates/)).toBeVisible();
+    expect(screen.getByText(/At least two returned titles/)).toBeVisible();
+    expect(screen.getByRole('list',{name:'Releases in release order for Delhi'})).toBeVisible();
+    expect(screen.queryByRole('list',{name:'Films ranked for Delhi'})).not.toBeInTheDocument();
+  });
   it('shows only the picker, with the one-line explanation, when there is no profile', () => {
     renderPulse('/pulse');
     expect(screen.getByLabelText('City')).toBeInTheDocument();

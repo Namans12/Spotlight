@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { BriefSectionKey, Campaign, DemographicsData, EvidenceSection, HeatCell, LocalHook, NamedEntity, TagAffinity, Venue } from "../../../shared/types/pulse.js";
 import {
-  buildBundle, downgradeUncited, draftCampaign, draftWithoutQloo, FALLBACK_IDEA, validateCampaign, type EvidenceFact,
+  buildBundle, campaignQualityIssues, composeCampaign, downgradeUncited, draftCampaign, draftWithoutQloo, FALLBACK_IDEA, isFallback, validateCampaign, type EvidenceFact,
 } from "./campaign.js";
 import { createGroqClient, LlmError } from "./llm/client.js";
 import { fakeLlm } from "./testing/llm.js";
@@ -21,6 +21,44 @@ const ctx = { title: "Dune", cityName: "Delhi", businessType: "cafe" as const, r
 const badJson = "this is not json";
 const citesUnknown = json(ideas(["venue:zzz"]));
 const valid = json(ideas(["venue:a"]));
+
+describe('campaign feasibility regressions', () => {
+  it('copies source facts rather than the model interpretation, and renders uncited bounded actions',()=>{
+    const selection:Campaign={groundedBy:'qloo',ideas:[{kind:'special',title:'product_spotlight',timing:'Tomorrow: guaranteed profits',clauses:[{text:'People in Delhi love corn-spiced lattes; we have a signed partner',evidence:['tag:corn']}]}]};
+    const result=composeCampaign(selection,[{id:'tag:corn',label:'Qloo · tags',fact:'Theme among Qloo-recommended venues in Delhi: corn'}]);
+    expect(result.ideas[0].title).toBe('Existing-product spotlight');
+    expect(result.ideas[0].timing).toBe('Next suitable day after owner review');
+    expect(result.ideas[0].clauses[0]).toEqual({text:'Theme among Qloo-recommended venues in Delhi: corn',evidence:['tag:corn']});
+    expect(result.ideas[0].clauses[1].evidence).toEqual([]);
+    expect(JSON.stringify(result)).not.toMatch(/latte|signed partner|guaranteed profits/);
+  });
+  it('does not preserve invented source ids, titles or action wording',()=>{
+    const selection:Campaign={groundedBy:'none',ideas:[{kind:'event',title:'Screen an episode',timing:'Today',clauses:[{text:'Use an official account',evidence:['unknown']}]}]};
+    const result=composeCampaign(selection,[]);
+    expect(result.ideas[0].title).toBe('Short discussion and vote');
+    expect(result.ideas[0].clauses).toHaveLength(1);
+    expect(result.ideas[0].clauses[0].evidence).toEqual([]);
+    expect(campaignQualityIssues(result)).toEqual([]);
+  });
+  const screening = json({ideas:[idea('special'),idea('social'),idea('event',[],{clauses:[{text:'Host a premiere screening on the official page',evidence:[]}]})]});
+  it.each(['qloo','baseline'])('revises a structurally valid but unsupported proposal in %s',async arm=>{
+    const llm=fakeLlm([screening,json(ideas())]);
+    const campaign=arm==='qloo'?await draftCampaign(llm,bundle,ctx):await draftWithoutQloo(llm,ctx);
+    expect(llm.calls).toHaveLength(2);
+    expect(llm.calls[1].at(-1)?.content).toContain('not a screening');
+    expect(campaignQualityIssues(campaign)).toEqual([]);
+  });
+  it('never returns the rejected proposal when every retry repeats it',async()=>{
+    const result=await draftWithoutQloo(fakeLlm([screening,screening,screening]),ctx);
+    expect(isFallback(result)).toBe(true);
+  });
+  it('does not use a rejected draft after a provider failure',async()=>{
+    const llm=fakeLlm([screening]);
+    const first=llm.chat.bind(llm);let calls=0;
+    llm.chat=async(...args)=>{if(calls++===0)return first(...args);throw new LlmError('rate_limited','busy');};
+    await expect(draftWithoutQloo(llm,ctx)).rejects.toMatchObject({kind:'rate_limited'});
+  });
+});
 
 describe("validateCampaign", () => {
   const ids = new Set(["venue:a"]);
@@ -405,9 +443,9 @@ describe("buildBundle", () => {
 
   it("demographics: the top 2 positive age buckets and the gender skew, as relative statements", () => {
     expect(facts.filter((f) => f.id.startsWith("demo:")).map((f) => f.id)).toEqual(["demo:25_to_29", "demo:24_and_younger", "demo:female"]);
-    expect(byId("demo:25_to_29")).toEqual({ id: "demo:25_to_29", label: "Qloo · demographics", fact: "Audience skews 25–29 above average (relative, not a share)" });
+    expect(byId("demo:25_to_29")).toEqual({ id: "demo:25_to_29", label: "Qloo · demographics", fact: "Audience skews 25–29 above average (global; relative, not a share)" });
     expect(byId("demo:24_and_younger")!.fact).toContain("24 and younger");
-    expect(byId("demo:female")!.fact).toBe("Audience skews female above average (relative, not a share)");
+    expect(byId("demo:female")!.fact).toBe("Audience skews female above average (global; relative, not a share)");
   });
 
   it("demographics: says nothing when no bucket is above average", () => {

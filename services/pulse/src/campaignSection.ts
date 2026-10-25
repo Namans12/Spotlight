@@ -39,7 +39,7 @@ const ERROR_NOTES: Record<LlmErrorKind, string> = {
   bad_response: "The AI writer returned something unusable — the evidence above is unaffected.",
 };
 const LIMIT_REACHED_NOTE = "The AI writer has reached its limit for now — the evidence above is unaffected. Try again later.";
-const WRITER_LIMITS = "Drafted by an AI model from the evidence listed above; every cited claim links to that evidence, uncited clauses are the model's own suggestions.";
+const WRITER_LIMITS = "AI proposals using existing products and owned channels. References identify supporting context; citation checks do not verify wording, feasibility, rights or outcomes. Confirm menu fit and margins before acting.";
 
 const withoutData = (status: "empty" | "degraded", note: string): EvidenceSection<unknown> => ({ status, data: null, provenance: [], note });
 

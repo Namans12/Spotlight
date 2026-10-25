@@ -710,7 +710,7 @@ describe('Pulse brief: Ask Pulse', () => {
     expect(ask).toHaveClass('min-h-11');
     await user.click(ask);
     const dialog = await screen.findByRole('dialog', { name: 'Ask Pulse' });
-    expect(within(dialog).getByRole('button', { name: 'Who is the audience for Saffron Nights in Delhi?' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'What global audience and Delhi venue evidence is available for Saffron Nights?' })).toBeInTheDocument();
   });
 
   it('has no audience prompt before the title has loaded', async () => {
@@ -719,7 +719,7 @@ describe('Pulse brief: Ask Pulse', () => {
     renderBrief();
     await user.click(screen.getByRole('button', { name: 'Ask Pulse' }));
     const dialog = await screen.findByRole('dialog', { name: 'Ask Pulse' });
-    expect(within(dialog).queryByRole('button', { name: /Who is the audience/ })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: /What global audience/ })).not.toBeInTheDocument();
   });
 });
 

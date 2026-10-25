@@ -101,25 +101,25 @@ describe('PulseChat: a turn', () => {
 describe('PulseChat: suggested prompts', () => {
   it('seeds the café wording with the city, and no title prompt without a title', () => {
     renderChat();
-    expect(screen.getAllByRole('button', { name: /^(Which|Who|Plan) / }).map((b) => b.textContent)).toEqual([
+    expect(screen.getAllByRole('button', { name: /^(Which|What|Plan) / }).map((b) => b.textContent)).toEqual([
       'Which release should my Delhi café theme this weekend around?',
-      'Plan a screening-night special for Friday at my Delhi café.',
+      'Plan a discussion-night trial using existing products at my Delhi café.',
     ]);
   });
 
   it('says "brand" for a D2C business, and adds the audience prompt when there is a title', () => {
     renderChat({ city: 'mumbai', type: 'd2c_food', title: 'Saffron Nights' });
-    expect(screen.getAllByRole('button', { name: /^(Which|Who|Plan) / }).map((b) => b.textContent)).toEqual([
+    expect(screen.getAllByRole('button', { name: /^(Which|What|Plan) / }).map((b) => b.textContent)).toEqual([
       'Which release should my Mumbai brand theme this weekend around?',
-      'Who is the audience for Saffron Nights in Mumbai?',
-      'Plan a screening-night special for Friday at my Mumbai brand.',
+      'What global audience and Mumbai venue evidence is available for Saffron Nights?',
+      'Plan a discussion-night trial using existing products at my Mumbai brand.',
     ]);
   });
 
   it('clicking one sends it and hides the suggestions', async () => {
     const user = renderChat({ title: 'Saffron Nights' });
-    await user.click(screen.getByRole('button', { name: 'Who is the audience for Saffron Nights in Delhi?' }));
-    expect(chat.last.messages).toEqual([{ role: 'user', content: 'Who is the audience for Saffron Nights in Delhi?' }]);
+    await user.click(screen.getByRole('button', { name: 'What global audience and Delhi venue evidence is available for Saffron Nights?' }));
+    expect(chat.last.messages).toEqual([{ role: 'user', content: 'What global audience and Delhi venue evidence is available for Saffron Nights?' }]);
     expect(screen.queryByRole('list', { name: 'Suggested questions' })).not.toBeInTheDocument();
   });
 
@@ -417,7 +417,7 @@ describe('PulseChatLauncher', () => {
     const dialog = screen.getByRole('dialog', { name: 'Ask Pulse' });
     expect(dialog).toHaveAccessibleDescription(/releases/);
     expect(within(dialog).getByRole('textbox', { name: 'Ask Pulse a question' })).toHaveFocus();
-    expect(within(dialog).getByRole('button', { name: 'Who is the audience for Saffron Nights in Delhi?' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'What global audience and Delhi venue evidence is available for Saffron Nights?' })).toBeInTheDocument();
   });
 
   it('Escape closes it, returns focus to the launcher and drops the conversation', async () => {

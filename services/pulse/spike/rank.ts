@@ -7,7 +7,7 @@ import postgres from 'postgres';
 import { loadConfig } from '../src/config.js';
 import { createQlooClient } from '../src/qloo/client.js';
 import { resolveTitle } from '../src/resolve.js';
-import { warmCity } from '../src/warm.js';
+import { warmBoardRanks, warmCity } from '../src/warm.js';
 import { listCandidates, buildBoard } from '../src/board.js';
 import { getCity } from '../src/cities.js';
 
@@ -28,9 +28,11 @@ try {
   if (process.argv.includes('--warm')) {
     const result = await warmCity({ sql, qloo, resolve: key => resolveTitle(sql, qloo, key), onError: report }, city, 'cafe');
     console.log(JSON.stringify({ city: slug, warm: result }));
+  } else if(process.argv.includes('--rank-only')) {
+    await warmBoardRanks({sql,qloo,resolve:key=>resolveTitle(sql,qloo,key),onError:report},city,candidates);
   }
   const board = await buildBoard({ sql, enqueueWarm: () => {} }, city, 'cafe');
-  console.log(JSON.stringify({ city: slug, ranked: board.ranked.length, noSignal: board.noSignal?.length,
+  console.log(JSON.stringify({ city: slug, displayed:board.ranked.length,ranked:board.ranked.filter(card=>card.localRank!==undefined).length,coverage:board.rankingCoverage,noSignal: board.noSignal?.length,
     pending: board.pending.length, unresolved: board.unresolved.length,
     rankingBasis: board.rankingBasis, rankingPending: board.rankingPending,
     allScoresNull: board.ranked.every(c => c.score === null),

@@ -68,7 +68,7 @@ describe("makeDraftCampaign ordering", () => {
       source: "spotlight",
       call: "campaign_writer",
       params: { model: "m-1", evidenceFacts: "3" },
-      limits: "Drafted by an AI model from the evidence listed above; every cited claim links to that evidence, uncited clauses are the model's own suggestions.",
+      limits: "AI proposals using existing products and owned channels. References identify supporting context; citation checks do not verify wording, feasibility, rights or outcomes. Confirm menu fit and margins before acting.",
     }]);
     expect(llm.calls).toHaveLength(1);
     expect(takeUsage).toHaveBeenCalledTimes(1);

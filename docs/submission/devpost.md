@@ -4,13 +4,17 @@
 verified facts before publishing. Final product wording must match the deployed
 revision. Do not attach raw Qloo responses, cache exports or local secret files.
 
+**October 26 hold:** product acceptance is incomplete. See
+[evaluation results](evaluation-results.md). Do not publish this draft as a
+claim of validated campaign effectiveness or reliable local release ranking.
+
 ## Project name
 
 Release Pulse
 
 ## Tagline
 
-Turn upcoming entertainment releases into evidence-backed campaign ideas for a local business.
+Inspect cultural evidence around entertainment themes and plan a small business trial.
 
 ## Inspiration / problem
 
@@ -31,7 +35,8 @@ evidence sections arrive. A brief can include a within-city heatmap, city-filter
 venue recommendations, venue-derived food themes, global artist/food-brand
 affinities, and global audience skew when available.
 
-The campaign writer turns the available material into draft copy. Campaign clauses
+The model selects context and conservative trial plans. Cited text is copied from
+the supplied evidence; actions use conditional templates. Campaign clauses
 link to supporting evidence IDs; unresolvable references render as **Agent
 suggestion**. All campaign ideas are labelled agent proposals: a reference supplies
 context, not proof of the generated wording or a promised outcome. A “Compare without Qloo” panel shows an LLM-only draft, making the
@@ -46,11 +51,11 @@ The board removes numeric scores entirely. It requests Qloo ordinal ordering
 within a fixed same-type shortlist and city signal: at most ten films or ten TV
 shows, with up to six film slots reserved for theatrical releases. Film and TV
 queries remain separate. Omitted titles are collapsed as lacking comparable rank;
-if no ranks are returned, the board labels its fallback as release order.
+if fewer than two results can be compared per type, the board labels its fallback as release order.
 
-Live October 25 checks returned only one ranked TV title for each of the Delhi
-and Mumbai current-release boards; sixteen titles lacked comparable ranks and
-three did not resolve. Six theatrical candidates were present but unranked.
+Live October 26 checks returned no comparable city ranks for the Delhi
+and Mumbai current-release boards. Each shows 17 resolved titles in release
+order and three unresolved; six theatrical candidates remain accessible.
 Established-title probes were also sparse. This is a coverage/response limitation
 under investigation, not proof of rich audience comparison. Do not present the
 board as a demand estimate or the suggested ordering as a forecast of campaign
@@ -69,8 +74,9 @@ authenticated HTTP (`/entities` and `/search`) because the pinned harness cannot
 perform the required shapes; the insight workflows run through the official tool
 server. We describe that boundary rather than calling the entire integration MCP.
 
-Qloo relationships ground the evidence portion of the brief. The creative angle
-and copy remain model-generated suggestions for review. City-filtered venues are
+Qloo relationships ground the evidence portion of the brief. Plans remain
+conditional templates selected by the model. Public chat renders tool evidence,
+not unchecked generated marketing advice. City-filtered venues are
 not proof that every cultural affinity is specific to that city.
 
 ## How we built it

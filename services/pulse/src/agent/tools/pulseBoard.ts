@@ -29,6 +29,7 @@ export function pulseBoardTool(deps: AgentToolDeps): AgentTool {
       const board = await buildBoard({ sql: deps.sql, enqueueWarm: deps.enqueueWarm, enqueueRank: deps.enqueueRank, onError: deps.onError }, city.city, type.businessType, deps.now?.());
       const pending = board.pending.length;
       const unresolved = board.unresolved.length;
+      const rankedCount=board.ranked.filter(card=>card.localRank!==undefined).length;
       const notes = [
         board.ranked.length === 0
           ? "No release is ranked yet for this city and business type."
@@ -37,7 +38,7 @@ export function pulseBoardTool(deps: AgentToolDeps): AgentTool {
         ...(unresolved > 0 ? [`${unresolved} not found in Qloo, left out.`] : []),
       ];
       return {
-        summary: `${board.ranked.length} ranked and ${pending} pending for ${board.cityName} (${type.businessType}).`,
+        summary: `${rankedCount} Qloo-ranked, ${board.ranked.length} displayed and ${pending} pending for ${board.cityName} (${type.businessType}).`,
         city: board.city,
         cityName: board.cityName,
         businessType: board.businessType,
@@ -51,7 +52,9 @@ export function pulseBoardTool(deps: AgentToolDeps): AgentTool {
           rankTotal: c.rankTotal,
           why: c.why === null ? null : cleanText(c.why, WHY_MAX),
         })),
-        rankedCount: board.ranked.length,
+        rankedCount,
+        displayedCount: board.ranked.length,
+        rankingCoverage:board.rankingCoverage,
         pendingCount: pending,
         pendingTitles: board.pending.slice(0, 3).map((c) => cleanText(c.title, 50)),
         unresolvedCount: unresolved,
