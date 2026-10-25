@@ -86,7 +86,7 @@ not proof that every cultural affinity is specific to that city.
   return explicit retry/unavailable states.
 
 The frontend belongs on a separate Vercel project; the long-lived agent runs in
-one always-on container. This avoids placing Qloo’s persistent tool server and
+one container (the recommended free host may sleep). This avoids placing Qloo’s persistent tool server and
 long-running streams inside Vercel serverless functions.
 
 ## What is new for this hackathon

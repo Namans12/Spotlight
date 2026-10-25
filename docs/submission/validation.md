@@ -59,7 +59,8 @@ performance result. Trends were empty. See
 - Resolve or clearly retain the sparse ranking limitation; no rich multi-title
   comparison has been demonstrated by the current live rank responses.
 - Actual Docker image build/run and restart behavior.
-- Owner-selected container host/database/frontend project and model quota budget.
+- Create the recommended Render Free / Neon Free / Vercel Hobby resources.
+  Owner selected Groq free tier; existing caps retained. No resources created yet.
 - Public frontend/service URLs and current release data freshness.
 - Proxy trust/CORS/streaming behavior under the selected host.
 - Fresh-browser guest flow, brief, comparison, chat, empty/error/retry states.
@@ -79,3 +80,12 @@ review findings were addressed; see the October 25 checkpoint for scope.
 The browser walkthrough verified direct Pulse entry, the sparse board, streamed
 brief and corrected provenance labels. This is local verification; hosted
 concurrency, ingress and actual Linux container behavior remain pending.
+
+## Free-first hosting preparation
+
+Owner chose Groq free tier and prioritized free hosting. Added render.yaml
+for a single free Docker service with secret prompts; no account/resources
+created. The scheduled warm now waits for Delhi/Mumbai results with bounded
+timeouts. Both YAML files parsed, required free/service/secret settings were
+checked, and the warm shell script passed bash syntax validation. This is local
+configuration validation, not a successful Render Blueprint import/deployment.

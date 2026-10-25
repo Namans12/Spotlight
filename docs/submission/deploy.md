@@ -5,10 +5,59 @@ been published or verified by this document. Use a separate hackathon database,
 container service and Vercel project. Keep Spotlight's existing production project
 and customer database separate.
 
+## Free-first choice (selected October 25)
+
+Keep Groq free-tier defaults: 300 global drafts/chat turns daily, 12 chat turns
+and 20 campaigns per session. These are application caps, not guarantees of
+provider capacity; a chat turn may use multiple model requests. Queuing and
+rate-limit pacing remain enabled. The owner may switch providers later.
+
+Recommended stack: **Render Free Docker web service + Vercel Hobby hackathon
+frontend + separate Neon Free project**. This is a non-commercial hackathon demo;
+check plan eligibility/limits for any later commercial use.
+
+- [Render Free](https://render.com/docs/free) supports Docker-backed web services,
+  but sleeps after 15 idle minutes and reports roughly one-minute startup.
+  It includes 750 running hours per workspace/month and has usage/traffic limits.
+  It is not an always-on production service. Other services share the allowance.
+- [Neon Free](https://neon.com/pricing) provides durable PostgreSQL within its
+  storage/compute allowance. Use it rather than Render's expiring free database.
+  Scaling to zero can add a separate database startup delay.
+- [Vercel Hobby](https://vercel.com/docs/plans/hobby) hosts the existing frontend
+  and original APIs; the Qloo child process stays in the Render container.
+- [Railway Free](https://docs.railway.com/pricing/plans) has $1/month resource
+  credit. Its eligible new-account trial is temporary; do not assume continuous
+  hosting fits that credit without measuring actual usage.
+- Hugging Face Docker Spaces are not the default here: the current official docs
+  require a paid plan for compute Spaces, and the documented outbound-port policy
+  does not include PostgreSQL's 5432 used by our current driver. It would require
+  additional eligibility/network/storage changes, not a drop-in free host.
+
+`render.yaml` prepares one Free service and secret prompts. In Render, connect the
+chosen public repository and **select the branch containing this work**; it has
+not been pushed yet. Keep the repo root as build context and use
+`services/pulse/Dockerfile`. Set secrets in Render, never in YAML. The generated
+`PULSE_WARM_SECRET` must be copied privately into the hackathon GitHub secret.
+The frontend origin must exactly match `PULSE_ALLOWED_ORIGINS`.
+
+Because the free instance sleeps, do not use fire-and-forget warming as a
+reliability guarantee. The scheduled workflow now warms Delhi and Mumbai via
+`/warm?wait=1&city=...`, with bounded timeouts and checked reports. Evidence remains
+in Neon across sleeps; the in-process campaign cache, limiter counters and MCP
+connection restart. Never set `QLOO_FIXTURES=1` to hide a cold start or outage.
+
+The first board request may exceed its existing 16-second client timeout while
+Render wakes. The page offers retry; allow roughly a minute, then retry. Check
+this on the real host before submission and explain it in judge instructions.
+This is a tradeoff of the recommended free-first setup, not a claim of instant
+availability. Do not add artificial pings to defeat the free host's sleep policy.
+If this materially hurts the demo, an approved paid always-on instance is the
+straightforward upgrade; no paid plan has been enabled.
+
 ## Architecture and host settings
 
 - SPA and existing `api/` endpoints: separate Vercel project, repository root.
-- Pulse: **one always-on Node container**, built from the repository root using
+- Pulse: **one Node container (Render Free may sleep)**, built from the repository root using
   `services/pulse/Dockerfile`; internal port `8787` or the host's injected `PORT`.
 - PostgreSQL: separate Neon database or branch; share its connection string only
   between this hackathon deployment's API, Pulse service and sync worker.
@@ -24,7 +73,7 @@ for process termination. Confirm an in-progress stream behaves correctly during
 restart before calling the deployment ready.
 
 For Railway/Render/Fly or another container host: choose Docker deployment, build
-context `.`, Dockerfile path `services/pulse/Dockerfile`, one replica, no sleep,
+context `.`, Dockerfile path `services/pulse/Dockerfile`, one replica,
 health path `/healthz`, and TLS ingress. Host selection and any paid resources
 remain an explicit owner decision; no provisioning is implied here.
 
@@ -164,7 +213,7 @@ LLM caps; monitor them during judging.
 
 In the hackathon repository's GitHub settings, set `PULSE_URL` as a variable and
 `PULSE_WARM_SECRET` as a secret. The existing `ott-radar.yml` workflow invokes
-`POST /warm` after its data refresh. Review every workflow's `DATABASE_URL` and
+`POST /warm?wait=1&city=...` for Delhi and Mumbai after its data refresh. Review every workflow's `DATABASE_URL` and
 message-delivery secrets before enabling it: the hackathon worker must refresh
 the hackathon database without sending production notifications. The nightly
 workflow also needs the appropriate isolated database. Warm manually after any
@@ -219,7 +268,7 @@ Vercel function proxy.
 
 - [ ] Build/run the actual Linux image and confirm healthy status as non-root.
 - [ ] Confirm schema and current catalog data on the isolated database.
-- [ ] Confirm trusted proxy client addresses and one always-on replica.
+- [ ] Confirm trusted proxy client addresses and one replica (free hosting can sleep).
 - [ ] `/healthz` succeeds on the public service URL.
 - [ ] `/board?city=delhi&type=cafe` returns current titles; warm reports are useful.
 - [ ] Fresh browser opens `/pulse?city=delhi&type=cafe` without an intro/login wall.

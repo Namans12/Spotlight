@@ -80,12 +80,15 @@ Recorded against real Qloo on October 25 (no fixtures):
 
 ## Next steps / external decisions
 
-1. Resolve deployment host, separate Neon DB and separate Vercel project. Async
-   questions asked; no answer received yet. No paid resources were created.
-2. Choose paid Groq, another OpenAI-compatible provider, or keep free caps.
-   Existing provider/caps retained; paid tiers raise limits, not remove all caps.
+1. Owner chose Groq free tier and prioritizes free hosting. Recommendation:
+   Render Free Docker + Vercel Hobby + separate Neon Free project. render.yaml
+   prepares that configuration; no accounts/resources created. Free Render sleeps
+   after 15 idle minutes; first request can take about a minute. Scheduled warm
+   now waits for Delhi/Mumbai completion rather than using background acceptance.
+2. Keep existing Groq free provider/caps, per owner decision. Reconsider only if
+   live usage proves insufficient; paid tiers raise limits, not remove all caps.
 3. Build/run actual Docker image, migrate/seed fresh release data, set correct
-   CORS and proxy trust, run one always-on instance, verify both brief NDJSON and
+   CORS and proxy trust, run one instance (Render Free may sleep), verify both brief NDJSON and
    chat SSE through hosting ingress. Follow docs/submission/deploy.md.
 4. Invalidate old private evidence cache once before warming the upgraded app;
    old recipe/provenance text must not survive deployment. Runbook has commands.
@@ -100,7 +103,8 @@ Recorded against real Qloo on October 25 (no fixtures):
 Postgres `/tmp/pulse-pg` port 54329 was restored/started; `spotlight_test` is real
 local data, `pulse_itest` is clean for tests. Existing non-Qloo backup remains at
 `services/pulse/spike/out/pulse-local-data.sql` (gitignored), and has not been
-replaced with any Qloo-derived dump. Service/Vite started for live QA at
-8799/8080; check final chat message for whether left running or stopped.
+replaced with any Qloo-derived dump. Service/Vite are left running for local review at
+8799/8080; Postgres is also running. Stop only these Spotlight processes when
+finished. The unrelated Navikenz Vite process remains untouched.
 Unrelated Navikenz services were not touched. Keys remain in ignored env files;
 no raw Qloo cache/output is intended for source control or container context.
