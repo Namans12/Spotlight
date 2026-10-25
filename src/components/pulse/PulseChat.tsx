@@ -104,7 +104,9 @@ export function PulseChat({ city, type, title, autoFocus = false }: PulseChatPro
 
   const ask = (text: string) => {
     stuck.current = true;
-    return chat.send(text);
+    const sent = chat.send(text);
+    inputRef.current?.focus();
+    return sent;
   };
 
   const submit = () => {
@@ -163,7 +165,7 @@ export function PulseChat({ city, type, title, autoFocus = false }: PulseChatPro
         )}
 
         {chat.items.map((item, i) => (
-          <Message key={item.id} item={item} last={i === chat.items.length - 1} onRetry={chat.retry} busy={chat.streaming} />
+          <Message key={item.id} item={item} last={i === chat.items.length - 1} onRetry={() => { chat.retry(); inputRef.current?.focus(); }} busy={chat.streaming} />
         ))}
 
         {chat.streaming && (
@@ -203,7 +205,7 @@ export function PulseChat({ city, type, title, autoFocus = false }: PulseChatPro
         />
         <div className="flex items-center justify-end gap-2">
           {chat.streaming && (
-            <button type="button" onClick={chat.stop} className={cn(BUTTON, 'bg-secondary text-foreground hover:bg-card-hover')}>
+            <button type="button" onClick={() => { chat.stop(); inputRef.current?.focus(); }} className={cn(BUTTON, 'bg-secondary text-foreground hover:bg-card-hover')}>
               <Square size={12} aria-hidden />
               Stop
             </button>

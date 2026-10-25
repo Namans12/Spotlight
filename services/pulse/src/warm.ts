@@ -7,6 +7,8 @@
 import type { BusinessType, EvidenceSection } from "../../../shared/types/pulse.js";
 import { fetchHeatmap, fetchPlaceTags } from "./brief.js";
 import { listCandidates, type BoardDeps, type BoardSql } from "./board.js";
+import { fetchBoardRank } from "./boardRank.js";
+import { getCachedEntities } from "./db/entities.js";
 import { BUSINESS_TYPES } from "./businessTypes.js";
 import { allCities, type City } from "./cities.js";
 import { getEvidence, type EvidenceKind } from "./evidence.js";
@@ -78,6 +80,7 @@ export async function warmCity(deps: WarmDeps, city: City, _type: BusinessType):
     const outcome = await warmTitle(deps, city, { tmdbId: c.card.tmdbId, mediaType: c.card.mediaType });
     out[outcome] += 1;
   }
+  try { await warmBoardRanks(deps, city, candidates); } catch (err) { report(deps, `warm rank ${city.slug}`, err); out.failed += 1; }
   return out;
 }
 
@@ -157,5 +160,40 @@ export function createWarmQueue(opts: WarmQueueOptions = {}): WarmQueue {
 export function createBackgroundWarmer(deps: WarmDeps, queue: WarmQueue): BoardDeps["enqueueWarm"] {
   return (city, type, key) => {
     queue.enqueue(`${city.slug}|${key.tmdbId}|${key.mediaType}|${type}`, () => warmTitle(deps, city, key));
+  };
+}
+
+/** Refresh the city/type slates after title resolution. Never compare ranks
+ * from distinct media types or split one type into several requests. */
+export async function warmBoardRanks(deps: WarmDeps, city: City, slate?: Awaited<ReturnType<typeof listCandidates>>): Promise<void> {
+  const now = deps.now?.() ?? new Date();
+  const candidates = slate ?? await listCandidates(deps.sql, city, now);
+  const entities = await getCachedEntities(deps.sql, candidates.map(c => ({ tmdbId: c.card.tmdbId, mediaType: c.card.mediaType })));
+  let failed = false;
+  for (const type of ['movie', 'tv'] as const) {
+    const ids = candidates.filter(c => c.card.mediaType === type).flatMap(c => {
+      const e = entities.get(`${type}:${c.card.tmdbId}`);
+      return e?.entityId && !e.notFound ? [e.entityId] : [];
+    });
+    if (!ids.length) continue;
+    try {
+      const section = await fetchBoardRank(deps.sql, deps.qloo, city, type, ids, now);
+      if (section.status === 'error' || section.status === 'needs_input') throw new Error(`Board ${type} ranking unavailable (${section.status}).`);
+    } catch (err) { failed = true; report(deps, `warm rank ${city.slug}/${type}`, err); }
+  }
+  if (failed) throw new Error('One or more local ranking slates could not be refreshed.');
+
+}
+
+/** Failed ranks cool down between public polls; successful reads use the DB
+ * cache. Queue capacity and coalescing are shared with title warming. */
+export function createBackgroundRanker(deps: WarmDeps, queue: WarmQueue): NonNullable<BoardDeps['enqueueRank']> {
+  const retryAt = new Map<string, number>();
+  return city => {
+    if ((retryAt.get(city.slug) ?? 0) > Date.now()) return;
+    queue.enqueue(`rank|${city.slug}`, async () => {
+      try { await warmBoardRanks(deps, city); retryAt.delete(city.slug); }
+      catch (err) { retryAt.set(city.slug, Date.now() + 30_000); report(deps, `warm rank ${city.slug}`, err); }
+    });
   };
 }

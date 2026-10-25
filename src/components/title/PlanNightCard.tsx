@@ -80,7 +80,7 @@ function Results({ data, title, inviteTitle, mediaType, country, onRetry, busy }
       <div>
         {venues.length > 0 ? (
           <>
-            <h3 className="mb-2 text-sm font-semibold text-foreground">{`Fans of ${title} in ${cityName} over-index on these spots`}</h3>
+            <h3 className="mb-2 text-sm font-semibold text-foreground">{`Qloo-recommended venues in ${cityName} for ${title}`}</h3>
             <ul className="divide-y divide-border">
               {venues.map((v, i) => (
                 <li key={`${v.entityId}-${i}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2 first:pt-0 last:pb-0">
@@ -101,8 +101,8 @@ function Results({ data, title, inviteTitle, mediaType, country, onRetry, busy }
       <div>
         {names.length > 0 ? (
           <>
-            <h3 className="mb-2 text-sm font-semibold text-foreground">…and these artists</h3>
-            <ul aria-label={`Artists fans of ${title} over-index on`} className="flex flex-wrap gap-2">
+            <h3 className="mb-2 text-sm font-semibold text-foreground">Qloo-recommended artists (global affinities)</h3>
+            <ul aria-label={`Global artist recommendations for ${title}`} className="flex flex-wrap gap-2">
               {names.map((a, i) => (
                 <li key={`${a.entityId}-${i}`} className="rounded-full border border-border bg-secondary px-3 py-1 text-xs font-medium text-foreground">
                   {a.name}
@@ -219,13 +219,9 @@ function Failure({ error, onRetry, busy }: { error: unknown; onRetry: () => void
 }
 
 /**
- * "Plan the night": the places and artists that fans of this title, in a city
- * the visitor picks, over-index on, plus an invite text they can send
- * themselves. Collapsed until asked: the answer spends the service's Qloo
- * budget, so nothing is fetched until the form is submitted.
- *
- * Statements are about audiences in aggregate ("fans of ⟨title⟩ in ⟨City⟩
- * over-index on…"), never about individuals. Everything is rendered as text.
+ * Qloo venue recommendations filtered to the selected city, global artist
+ * affinities and a shareable invite. Nothing is fetched until the visitor asks.
+ * A venue location filter does not establish the location of the title's fans.
  */
 export function PlanNightCard(props: PlanNightCardProps) {
   if (!pulseConfigured()) return null;
@@ -305,7 +301,7 @@ function PlanNightCardForTitle({ mediaType, tmdbId, title }: PlanNightCardProps)
           <div>
             {/* One short announcement when the answer lands, rather than making the whole result a live region. */}
             <p role="status" className="sr-only">
-              {query.data ? `Places and artists for ${query.data.cityName} are ready.` : ''}
+              {query.data ? `Venue recommendations in ${query.data.cityName} and global artist affinities are ready.` : ''}
             </p>
             {query.isPending ? (
               <div role="status" aria-busy="true" className="space-y-2">

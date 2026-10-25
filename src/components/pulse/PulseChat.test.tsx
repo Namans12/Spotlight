@@ -242,7 +242,8 @@ describe('PulseChat: failures', () => {
     const line = screen.getByText(sentence);
     expect(line).toHaveAttribute('role', 'status');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    if (err instanceof PulseApiError && err.code === 'too_many_streams') expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    else expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
     expect(screen.getByText('my question')).toBeInTheDocument();
   });
 
@@ -458,5 +459,39 @@ describe('PulseChatLauncher', () => {
     render(<PulseChatLauncher city="delhi" type="cafe" />);
     await user.click(screen.getByRole('button', { name: 'Ask Pulse' }));
     expect(screen.getByRole('dialog')).toHaveClass('right-0');
+  });
+});
+
+describe('Pulse chat responsive and focus regressions', () => {
+  it('keeps an open conversation and stream when crossing the desktop breakpoint', async () => {
+    const listeners = new Set<() => void>();
+    const query = { matches: true, media: '(min-width: 48rem)', addEventListener: (_: string, listener: () => void) => listeners.add(listener), removeEventListener: (_: string, listener: () => void) => listeners.delete(listener) };
+    vi.stubGlobal('matchMedia', () => query);
+    const user = userEvent.setup();
+    render(<PulseChatLauncher city="delhi" type="cafe" />);
+    await user.click(screen.getByRole('button', { name: 'Ask Pulse' }));
+    await user.type(screen.getByRole('textbox'), 'keep this{Enter}');
+    const signal = chat.last.signal!;
+    act(() => { query.matches = false; for (const listener of [...listeners]) listener(); });
+    expect(screen.getByRole('dialog')).toHaveClass('bottom-0');
+    expect(screen.getByText('keep this')).toBeInTheDocument();
+    expect(signal.aborted).toBe(false);
+    act(() => chat.last.emit({ type: 'message', text: 'still connected' }));
+    expect(screen.getByText('still connected')).toBeInTheDocument();
+    act(() => { query.matches = true; for (const listener of [...listeners]) listener(); });
+    expect(screen.getByRole('dialog')).toHaveClass('right-0');
+    expect(screen.getByText('still connected')).toBeInTheDocument();
+  });
+
+  it('focuses the question after a suggested prompt, Stop, and Try again', async () => {
+    const user = renderChat();
+    await user.click(screen.getByRole('button', { name: 'Which release should my Delhi café theme this weekend around?' }));
+    expect(screen.getByRole('textbox')).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Stop' }));
+    expect(screen.getByRole('textbox')).toHaveFocus();
+    await ask(user, 'try this');
+    await act(async () => chat.last.fail(new TypeError('lost connection')));
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(screen.getByRole('textbox')).toHaveFocus();
   });
 });

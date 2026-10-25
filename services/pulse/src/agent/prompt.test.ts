@@ -11,7 +11,7 @@ describe("systemPrompt", () => {
     expect(text).toMatch(/no addresses/i);
   });
   it("carries the copy rule verbatim", () => {
-    expect(text).toContain("Fans of <title> in <City> over-index on <Y>. Never 'your customers', never 'you will', never a probability about a person.");
+    expect(text).toContain("Describe Qloo associations, never individual preferences. A city venue filter is not a city audience signal.");
   });
   it("makes the model name the Qloo call behind every number and report gaps plainly", () => {
     expect(text).toContain("Name the Qloo call behind every number you state");

@@ -14,7 +14,7 @@ export function pulseBoardTool(deps: AgentToolDeps): AgentTool {
       type: "function",
       function: {
         name: "pulse_board",
-        description: "Rank this week's film and TV releases for one city and business type by how closely each release's audience lines up with the city, from Qloo evidence Spotlight has already cached. Returns the top 5 with a score and a one-line reason. Releases still being loaded are counted as pending.",
+        description: "Read this week's releases, ordered within separate film and TV shortlists by Qloo's city signal. Returns up to 5 with within-type ranks and reasons; no demand scores. If local ranking is unavailable, returns explicit release order. Pending means still loading.",
         parameters: { type: "object", properties: { city: citySchema(), business_type: businessTypeSchema() }, required: ["city", "business_type"], additionalProperties: false },
       },
     },
@@ -26,13 +26,13 @@ export function pulseBoardTool(deps: AgentToolDeps): AgentTool {
 
       // The same read the board page polls: cache only, and titles that still
       // need a look are queued for the background warmer, not fetched here.
-      const board = await buildBoard({ sql: deps.sql, enqueueWarm: deps.enqueueWarm, onError: deps.onError }, city.city, type.businessType, deps.now?.());
+      const board = await buildBoard({ sql: deps.sql, enqueueWarm: deps.enqueueWarm, enqueueRank: deps.enqueueRank, onError: deps.onError }, city.city, type.businessType, deps.now?.());
       const pending = board.pending.length;
       const unresolved = board.unresolved.length;
       const notes = [
         board.ranked.length === 0
           ? "No release is ranked yet for this city and business type."
-          : `Ranked by how closely each release's audience lines up with ${board.cityName} (the score is relative, not a probability).`,
+          : board.rankingBasis === "qloo_shortlist" ? "Qloo ranks films and TV in separate fixed shortlists. Ranks are not comparable across types or cities, and do not predict attendance." : "Release order only: no comparable Qloo local ranking is available.",
         "Pending means still loading, so no rank yet; say that, never guess a rank.",
         ...(unresolved > 0 ? [`${unresolved} not found in Qloo, left out.`] : []),
       ];
@@ -47,13 +47,16 @@ export function pulseBoardTool(deps: AgentToolDeps): AgentTool {
           mediaType: c.mediaType,
           releaseDate: c.releaseDate,
           platform: c.platform === null ? null : cleanText(c.platform, 40),
-          score: c.score,
+          localRank: c.localRank,
+          rankTotal: c.rankTotal,
           why: c.why === null ? null : cleanText(c.why, WHY_MAX),
         })),
         rankedCount: board.ranked.length,
         pendingCount: pending,
         pendingTitles: board.pending.slice(0, 3).map((c) => cleanText(c.title, 50)),
         unresolvedCount: unresolved,
+        noSignalCount: board.noSignal?.length ?? 0,
+        rankingBasis: board.rankingBasis,
         note: notes.join(" "),
       };
     },

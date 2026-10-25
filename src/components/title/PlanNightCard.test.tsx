@@ -97,18 +97,18 @@ describe('PlanNightCard results', () => {
     expect(loading).toHaveAttribute('aria-busy', 'true');
   });
 
-  it('uses the exact copy-rule headings, then lists places and artists as text', async () => {
+  it('labels city-filtered venues and global artist affinities accurately', async () => {
     vi.mocked(fetchPlanNight).mockResolvedValue(response());
     renderCard();
     await plan();
-    expect(await screen.findByRole('heading', { name: 'Fans of Saffron Nights in Delhi over-index on these spots' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '…and these artists' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Qloo-recommended venues in Delhi for Saffron Nights' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Qloo-recommended artists (global affinities)' })).toBeInTheDocument();
     const places = screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(places[0]).toContain('Cafe 1');
     expect(places[0]).toContain('12 Khan Market');
     expect(screen.getByLabelText('Price level 2 of 4')).toBeInTheDocument();
     expect(screen.getByText('Cafe 2')).toBeInTheDocument();
-    const chips = within(screen.getByRole('list', { name: 'Artists fans of Saffron Nights over-index on' })).getAllByRole('listitem');
+    const chips = within(screen.getByRole('list', { name: 'Global artist recommendations for Saffron Nights' })).getAllByRole('listitem');
     expect(chips.map((c) => c.textContent)).toEqual(['Artist 1', 'Artist 2']);
   });
 
@@ -125,7 +125,7 @@ describe('PlanNightCard results', () => {
     vi.mocked(fetchPlanNight).mockResolvedValue(response({ title: null }));
     renderCard({ title: null });
     await plan();
-    expect(await screen.findByRole('heading', { name: 'Fans of this title in Delhi over-index on these spots' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Qloo-recommended venues in Delhi for this title' })).toBeInTheDocument();
   });
 
   it('shows the sources and their limits', async () => {
@@ -195,8 +195,8 @@ describe('PlanNightCard states', () => {
     await plan();
     expect((await screen.findAllByText('Qloo has no entity for this title yet, so there is no taste data for it.')).length).toBe(2);
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
-    expect(screen.queryByRole('heading', { name: /over-index on these spots/ })).toBeNull();
-    expect(screen.queryByRole('heading', { name: '…and these artists' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: /Qloo-recommended venues/ })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Qloo-recommended artists (global affinities)' })).toBeNull();
     // The invite still works without places.
     expect(screen.getByLabelText('Invite text')).toHaveValue('Movie night? Saffron Nights. Want to go?');
   });
@@ -207,9 +207,9 @@ describe('PlanNightCard states', () => {
     renderCard();
     await plan();
     expect(await screen.findByText('No places to show for this one.')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /over-index on these spots/ })).toBeNull();
+    expect(screen.queryByRole('heading', { name: /Qloo-recommended venues/ })).toBeNull();
     // The artists section has rows, so its heading is drawn.
-    expect(screen.getByRole('heading', { name: '…and these artists' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Qloo-recommended artists (global affinities)' })).toBeInTheDocument();
   });
 
   it('treats a degraded section with no data like an empty one: its note, no heading', async () => {
@@ -218,7 +218,7 @@ describe('PlanNightCard states', () => {
     renderCard();
     await plan();
     expect(await screen.findByText('Qloo answered only part of this.')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /over-index on these spots/ })).toBeNull();
+    expect(screen.queryByRole('heading', { name: /Qloo-recommended venues/ })).toBeNull();
   });
 
   it('treats an empty data array like no rows', async () => {
@@ -226,7 +226,7 @@ describe('PlanNightCard states', () => {
     renderCard();
     await plan();
     expect(await screen.findByText('No artists to show for this one.')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '…and these artists' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Qloo-recommended artists (global affinities)' })).toBeNull();
   });
 
   it('shows a degraded note alongside the data', async () => {
@@ -243,7 +243,7 @@ describe('PlanNightCard states', () => {
     renderCard();
     const user = await plan();
     expect(await screen.findByText('This section could not be loaded just now. Try again shortly.')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /over-index on these spots/ })).toBeNull();
+    expect(screen.queryByRole('heading', { name: /Qloo-recommended venues/ })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('Cafe 1')).toBeInTheDocument();
     expect(fetchPlanNight).toHaveBeenCalledTimes(2);
@@ -255,9 +255,9 @@ describe('inviteText', () => {
 
   it('with a title: names the title, the city and the first two places only', () => {
     expect(inviteText('Saffron Nights', 'Delhi', two)).toBe(
-      'Movie night? Saffron Nights — fans of it in Delhi love spots like Cafe 1 and Cafe 2. Want to go?',
+      'Movie night? Saffron Nights — Qloo suggested Cafe 1 and Cafe 2 in Delhi for this title. Want to go?',
     );
-    expect(inviteText('Saffron Nights', 'Delhi', [venue(1)])).toBe('Movie night? Saffron Nights — fans of it in Delhi love spots like Cafe 1. Want to go?');
+    expect(inviteText('Saffron Nights', 'Delhi', [venue(1)])).toBe('Movie night? Saffron Nights — Qloo suggested Cafe 1 in Delhi for this title. Want to go?');
     expect(inviteText('Saffron Nights', 'Delhi', [])).toBe('Movie night? Saffron Nights. Want to go?');
   });
 
@@ -266,15 +266,15 @@ describe('inviteText', () => {
   });
 
   it.each([null, undefined, '', '   '])('without a title (%j): leaves the title out cleanly', (blank) => {
-    expect(inviteText(blank, 'Delhi', two)).toBe('Movie night in Delhi? Fans of this film love spots like Cafe 1 and Cafe 2. Want to go?');
-    expect(inviteText(blank, 'Delhi', two, 'tv')).toBe('Movie night in Delhi? Fans of this show love spots like Cafe 1 and Cafe 2. Want to go?');
-    expect(inviteText(blank, 'Delhi', [venue(1)], 'movie')).toBe('Movie night in Delhi? Fans of this film love spots like Cafe 1. Want to go?');
+    expect(inviteText(blank, 'Delhi', two)).toBe('Movie night in Delhi? Qloo suggested Cafe 1 and Cafe 2 for this film. Want to go?');
+    expect(inviteText(blank, 'Delhi', two, 'tv')).toBe('Movie night in Delhi? Qloo suggested Cafe 1 and Cafe 2 for this show. Want to go?');
+    expect(inviteText(blank, 'Delhi', [venue(1)], 'movie')).toBe('Movie night in Delhi? Qloo suggested Cafe 1 for this film. Want to go?');
     expect(inviteText(blank, 'Delhi', [], 'tv')).toBe('Movie night in Delhi? Want to go?');
     expect(inviteText(blank, 'Delhi', [], 'movie')).toBe('Movie night in Delhi? Want to go?');
   });
 
   it('ignores blank place names', () => {
-    expect(inviteText('T', 'Delhi', [venue(1, { name: ' ' }), venue(2)])).toBe('Movie night? T — fans of it in Delhi love spots like Cafe 2. Want to go?');
+    expect(inviteText('T', 'Delhi', [venue(1, { name: ' ' }), venue(2)])).toBe('Movie night? T — Qloo suggested Cafe 2 in Delhi for this title. Want to go?');
   });
 });
 
@@ -283,8 +283,8 @@ describe('PlanNightCard without a title', () => {
     vi.mocked(fetchPlanNight).mockResolvedValue(response({ title: null }));
     renderCard({ title: null, mediaType: 'tv' });
     await plan();
-    expect(await screen.findByRole('heading', { name: 'Fans of this title in Delhi over-index on these spots' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Invite text')).toHaveValue('Movie night in Delhi? Fans of this show love spots like Cafe 1 and Cafe 2. Want to go?');
+    expect(await screen.findByRole('heading', { name: 'Qloo-recommended venues in Delhi for this title' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Invite text')).toHaveValue('Movie night in Delhi? Qloo suggested Cafe 1 and Cafe 2 for this show. Want to go?');
   });
 });
 
@@ -325,7 +325,7 @@ describe('PlanNightCard across titles', () => {
     expect((screen.getByLabelText('City') as HTMLSelectElement).value).toBe('');
     expect(screen.getByRole('button', { name: 'Show me places' })).toBeDisabled();
     expect(screen.queryByText('Title A Cafe')).toBeNull();
-    expect(screen.queryByRole('heading', { name: /over-index/ })).toBeNull();
+    expect(screen.queryByRole('heading', { name: /Qloo-recommended/ })).toBeNull();
     expect(screen.queryByLabelText('Invite text')).toBeNull();
 
     rerender(<Wrapper client={client} tmdbId={1} title="Title A" />);
@@ -368,7 +368,7 @@ describe('PlanNightCard across titles', () => {
 });
 
 describe('PlanNightCard invite', () => {
-  const TEXT = 'Movie night? Saffron Nights — fans of it in Delhi love spots like Cafe 1 and Cafe 2. Want to go?';
+  const TEXT = 'Movie night? Saffron Nights — Qloo suggested Cafe 1 and Cafe 2 in Delhi for this title. Want to go?';
 
   // navigator.share is read when the card renders; userEvent.setup() installs
   // its own clipboard on navigator, so that stub goes on after it.

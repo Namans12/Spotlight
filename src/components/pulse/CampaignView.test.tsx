@@ -72,9 +72,9 @@ describe('EvidenceChip', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('The venue: Blue Door Cafe');
   });
 
-  it('an id the bundle cannot resolve is a plain label chip, not a dead button', () => {
+  it('an id the bundle cannot resolve is an agent suggestion, not a dead button', () => {
     render(<EvidenceChip id="venue:nope" bundle={bundle} cityName="Delhi" />);
-    expect(screen.getByText('Qloo · places')).toBeInTheDocument();
+    expect(screen.getByText('Agent suggestion')).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
@@ -82,5 +82,13 @@ describe('EvidenceChip', () => {
     render(<EvidenceChip id="hook:filmed" bundle={bundle} cityName="Delhi" />);
     expect(screen.getByText('Wikipedia · Films shot in Delhi')).toBeInTheDocument();
     expect(screen.getByText('Wikidata · filming location')).toBeInTheDocument();
+  });
+});
+
+describe('Campaign proposal attribution', () => {
+  it('labels creative clauses as proposals even when their references resolve', () => {
+    render(<CampaignView campaign={campaign([{ text: 'Invent a themed drink', evidence: ['venue:v1'] }])} bundle={bundle} cityName="Delhi" />);
+    expect(screen.getByText('All ideas are agent proposals. References show supporting context, not verification of the generated wording or outcomes.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Qloo · places/ })).toBeInTheDocument();
   });
 });

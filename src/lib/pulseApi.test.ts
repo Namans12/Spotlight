@@ -410,3 +410,38 @@ describe('fetchTitleLocations and fetchPlanNight', () => {
     await expect(api.fetchPlanNight({ city: 'delhi', mediaType: 'movie', tmdbId: 5 })).rejects.toMatchObject({ status: 404, code: 'unknown_title' });
   });
 });
+
+describe('stream resilience', () => {
+  it('uses secure random bytes when randomUUID is unavailable', async () => {
+    const secure = vi.fn((bytes: Uint8Array) => { bytes.fill(42); return bytes; });
+    vi.stubGlobal('crypto', { getRandomValues: secure });
+    const api = await loadApi();
+    expect(api.pulseSessionId()).toBe('2a'.repeat(16));
+    expect(secure).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an oversized unterminated stream line', async () => {
+    const api = await loadApi();
+    fetchMock.mockResolvedValue(streamResponse(['x'.repeat(1024 * 1024 + 1)]));
+    await expect(api.streamBrief(params, vi.fn())).rejects.toThrow(/buffer limit/);
+  });
+
+  it('caps multi-line SSE frames even when every individual line is small', async () => {
+    const api = await loadApi();
+    fetchMock.mockResolvedValue(streamResponse(['data: '.padEnd(600_000, 'x') + '\n', 'data: '.padEnd(600_000, 'x') + '\n']));
+    await expect(api.streamChat([{ role: 'user', content: 'go' }], vi.fn())).rejects.toThrow(/buffer limit/);
+  });
+
+  it('delivers earlier events and propagates a mid-stream transport failure', async () => {
+    const api = await loadApi();
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({ start(value) { controller = value; } });
+    fetchMock.mockResolvedValue(new Response(body));
+    const events: AgentEvent[] = [];
+    const finished = api.streamChat([{ role: 'user', content: 'go' }], (event) => events.push(event));
+    controller.enqueue(enc.encode('data: {"type":"message","text":"partial"}\n\n'));
+    await vi.waitFor(() => expect(events).toHaveLength(1));
+    controller.error(new TypeError('connection lost'));
+    await expect(finished).rejects.toThrow('connection lost');
+  });
+});

@@ -213,7 +213,7 @@ describe('usePulseChat: failures', () => {
   ])('maps %s to its sentence', async (code, status, text) => {
     const line = await sentence(new PulseApiError(status, code));
     expect(line.text).toBe(text);
-    expect(line.retry).toBeFalsy();
+    expect(line.retry).toBe(code === 'too_many_streams');
   });
 
   it('rate_limited names the wait when known, and omits it when not', async () => {
@@ -284,5 +284,51 @@ describe('usePulseChat: reset', () => {
     act(() => chat.last.emit({ type: 'message', text: 'answer' }));
     expect(setItem).not.toHaveBeenCalled();
     setItem.mockRestore();
+  });
+});
+
+describe('usePulseChat: interrupted attempts', () => {
+  it('marks unfinished tools on Stop and ignores late results after reset', () => {
+    const { result } = renderHook(() => usePulseChat());
+    act(() => { result.current.send('go'); });
+    const old = chat.last;
+    act(() => old.emit({ type: 'tool', name: 'pulse_board', args: '{}' }));
+    act(() => result.current.stop());
+    expect(result.current.items[1]).toMatchObject({ result: 'Stopped before it finished' });
+    act(() => result.current.reset());
+    act(() => old.emit({ type: 'message', text: 'late answer' }));
+    expect(result.current.items).toEqual([]);
+  });
+
+  it('offers a retry after a clean stream end without done', async () => {
+    const { result } = renderHook(() => usePulseChat());
+    act(() => { result.current.send('go'); });
+    act(() => chat.last.emit({ type: 'tool', name: 'pulse_board', args: '{}' }));
+    await act(async () => chat.last.end());
+    expect(result.current.items[1]).toMatchObject({ result: 'Stopped before it finished' });
+    expect(result.current.items[2]).toMatchObject({ retry: true, text: expect.stringMatching(/connection ended/) });
+  });
+
+  it('retries a late failure by removing the partial answer and all attempt tools', async () => {
+    const { result } = renderHook(() => usePulseChat());
+    act(() => { result.current.send('go'); });
+    act(() => chat.last.emit({ type: 'tool', name: 'pulse_board', args: '{}' }));
+    act(() => chat.last.emit({ type: 'message', text: 'partial answer' }));
+    await act(async () => chat.last.fail(new TypeError('connection lost')));
+    expect(result.current.items[1]).toMatchObject({ result: 'Stopped before it finished' });
+    act(() => result.current.retry());
+    expect(chat.last.messages).toEqual([{ role: 'user', content: 'go' }]);
+    expect(kinds(result.current.items)).toEqual(['user']);
+  });
+
+  it('ignores events after done, including an old stream after a new send', () => {
+    const { result } = renderHook(() => usePulseChat());
+    act(() => { result.current.send('one'); });
+    const old = chat.last;
+    act(() => old.emit({ type: 'done' }));
+    act(() => { result.current.send('two'); });
+    act(() => old.emit({ type: 'message', text: 'late answer' }));
+    expect(textOf(result.current.items)).toEqual(['one', 'two']);
+    expect(result.current.streaming).toBe(true);
   });
 });

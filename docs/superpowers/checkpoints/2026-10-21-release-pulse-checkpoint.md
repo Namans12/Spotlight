@@ -1,5 +1,7 @@
 # Release Pulse: checkpoint (paused 2026-10-21)
 
+> Superseded: resume from [October 25 deployment-preparation checkpoint](2026-10-25-release-pulse-checkpoint.md). This document preserves the earlier pause state.
+
 Qloo Agentic Hackathon entry. **Deadline: 31 Oct 2026, 9:15 am IST** (30 Oct, 11:45 pm ET).
 Branch: `feat/release-pulse` (local only, **nothing pushed**). This file is the resume
 point: read it first, then the ledger next to it.

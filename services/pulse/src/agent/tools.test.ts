@@ -237,13 +237,13 @@ describe("pulse_board", () => {
   }
 
   it("returns the top 5 ranked releases, compacted, with counts and what pending means", async () => {
-    const deps = boardDeps(12, 3, 2);
+    const deps = boardDeps(7, 2, 1);
     const out = (await find(await buildTools(deps), "pulse_board").run({ city: "delhi", business_type: "cafe" })) as Record<string, unknown>;
     const ranked = out.ranked as Record<string, unknown>[];
     expect(ranked).toHaveLength(5);
-    expect(Object.keys(ranked[0]).sort()).toEqual(["mediaType", "platform", "releaseDate", "score", "title", "tmdbId", "why"]);
-    expect(out).toMatchObject({ city: "delhi", cityName: "Delhi", businessType: "cafe", rankedCount: 12, pendingCount: 3, unresolvedCount: 2 });
-    expect(out.summary).toBe("12 ranked and 3 pending for Delhi (cafe).");
+    expect(Object.keys(ranked[0]).sort()).toEqual(["localRank", "mediaType", "platform", "rankTotal", "releaseDate", "title", "tmdbId", "why"]);
+    expect(out).toMatchObject({ city: "delhi", cityName: "Delhi", businessType: "cafe", rankedCount: 7, pendingCount: 2, unresolvedCount: 1 });
+    expect(out.summary).toBe("7 ranked and 2 pending for Delhi (cafe).");
     expect(String(out.note)).toMatch(/pending means .*still loading/i);
     expect(JSON.stringify(out).length).toBeLessThanOrEqual(2800);
     expect(out).not.toHaveProperty("pending");

@@ -7,9 +7,9 @@
  *   artist:<id>  brand:<id>  hook:<filmed|set>
  *
  * The SPA has the same sections, so every id can be mapped to its label and,
- * when the section is on hand, to the underlying fact. A clause that cites
- * nothing is the model's own idea and says so; so is a `hook:` id the hook
- * section cannot confirm.
+ * when the section is on hand, to the underlying context. Resolving an id
+ * checks the reference, not the generated proposal. Missing or unresolvable
+ * references are labelled Agent suggestion.
  */
 import type {
   AgeBucket, BriefSectionKey, EvidenceSection, HeatCell, LocalHook, NamedEntity, TagAffinity, Venue,
@@ -98,7 +98,7 @@ type NamedRow = Record<string, unknown>;
 
 const SIMPLE: Record<string, { label: string; section: BriefSectionKey; idKey: string; what: string }> = {
   venue: { label: 'Qloo · places', section: 'venues', idKey: 'entityId', what: 'The venue' },
-  tag: { label: 'Qloo · tags', section: 'themes', idKey: 'tagId', what: 'The place theme' },
+  tag: { label: 'Qloo · tags', section: 'themes', idKey: 'tagId', what: 'Food theme among recommended venues' },
   artist: { label: 'Qloo · artists', section: 'artists', idKey: 'entityId', what: 'The artist' },
   brand: { label: 'Qloo · brands', section: 'brands', idKey: 'entityId', what: 'The brand' },
 };
@@ -118,7 +118,7 @@ export function chipsForId(id: string, bundle: SectionBundle, cityName: string):
   if (prefix === 'heat') {
     const i = Number.parseInt(rest, 10);
     const hood = Number.isInteger(i) && i >= 0 ? topNeighbourhoods(arrayOf<HeatCell>(bundle.where), 3)[i] : undefined;
-    return [{ label: 'Qloo · heatmap', detail: hood ? `Fans over-index around ${hood.name}` : null }];
+    return [{ label: 'Qloo · heatmap', detail: hood ? `Heatmap affinity near ${hood.name}` : null }];
   }
 
   if (prefix === 'hook') {
@@ -139,7 +139,7 @@ export function chipsForId(id: string, bundle: SectionBundle, cityName: string):
       (r) => idPart((r as unknown as NamedRow)[simple.idKey]) === rest,
     );
     const name = row ? tidy((row as unknown as NamedRow).name) : '';
-    return [{ label: simple.label, detail: name ? `${simple.what}: ${name}` : null }];
+    return name ? [{ label: simple.label, detail: `${simple.what}: ${name}` }] : [{ label: AGENT_SUGGESTION, detail: null }];
   }
 
   return [];

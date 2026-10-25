@@ -54,7 +54,7 @@ describe('HeatMap', () => {
 
   it('is a labelled map group (not an image: its controls are interactive), with circles of at least 6 px', () => {
     render(<HeatMap cells={[cell(28.6, 77.2, 0.9, 'Saket'), cell(28.7, 77.3, 0.1)]} title="Saffron Nights" cityName="Delhi" />);
-    const group = screen.getByRole('group', { name: 'Heatmap of where fans of Saffron Nights are concentrated in Delhi' });
+    const group = screen.getByRole('group', { name: 'Qloo heatmap affinity for Saffron Nights around Delhi' });
     expect(group).toHaveAttribute('aria-roledescription', 'map');
     const radii = screen.getAllByTestId('circle').map((c) => Number(c.dataset.radius));
     expect(Math.min(...radii)).toBeGreaterThanOrEqual(6);

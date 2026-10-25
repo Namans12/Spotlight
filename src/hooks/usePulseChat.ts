@@ -57,6 +57,11 @@ export function usePulseChat(): PulseChatState {
     };
   }, []);
 
+  const finishTools = useCallback(() => {
+    commit(itemsRef.current.map((item) => item.kind === 'tool' && item.result === undefined
+      ? { ...item, result: 'Stopped before it finished' } : item));
+  }, [commit]);
+
   const endTurn = useCallback((ac: AbortController) => {
     if (abortRef.current !== ac) return;
     abortRef.current = null;
@@ -80,13 +85,14 @@ export function usePulseChat(): PulseChatState {
           append({ kind: 'assistant', text: e.text });
           break;
         case 'error':
-          append({ kind: 'system', text: e.text, tone: 'muted' });
+          finishTools();
+          append({ kind: 'system', text: e.text, tone: 'muted', retry: true });
           break;
         case 'done':
           break; // the turn ends when the stream does
       }
     },
-    [append, commit],
+    [append, commit, finishTools],
   );
 
   const run = useCallback(() => {
@@ -94,26 +100,38 @@ export function usePulseChat(): PulseChatState {
     const ac = new AbortController();
     abortRef.current = ac;
     setStreaming(true);
+    let completed = false;
+    let reportedError = false;
     streamChat(
       wire,
       (e) => {
-        if (ac.signal.aborted) return;
+        if (ac.signal.aborted || abortRef.current !== ac || !mounted.current) return;
+        if (reportedError && e.type !== 'done') return;
+        if (e.type === 'done') completed = true;
+        if (e.type === 'error') reportedError = true;
         onEvent(e);
         if (e.type === 'done') endTurn(ac);
       },
       ac.signal,
     ).then(
-      () => endTurn(ac),
+      () => {
+        if (!ac.signal.aborted && abortRef.current === ac && !completed && !reportedError) {
+          finishTools();
+          append({ kind: 'system', text: 'The connection ended before Pulse finished. Try again.', tone: 'muted', retry: true });
+        }
+        endTurn(ac);
+      },
       (err) => {
         // An abort is the user's own Stop, a reset or an unmount: nothing to report.
-        if (!ac.signal.aborted) {
+        if (!ac.signal.aborted && abortRef.current === ac && mounted.current && !reportedError) {
+          finishTools();
           const line = failureLine(err);
           append({ kind: 'system', text: line.text, tone: 'muted', retry: line.retry });
         }
         endTurn(ac);
       },
     );
-  }, [append, endTurn, onEvent]);
+  }, [append, endTurn, finishTools, onEvent]);
 
   const send = useCallback(
     (text: string) => {
@@ -132,16 +150,19 @@ export function usePulseChat(): PulseChatState {
     const ac = abortRef.current;
     if (!ac) return;
     ac.abort();
+    finishTools();
     append({ kind: 'system', text: 'Stopped', tone: 'muted' });
     endTurn(ac);
-  }, [append, endTurn]);
+  }, [append, endTurn, finishTools]);
 
   const retry = useCallback(() => {
     if (abortRef.current) return;
     const list = itemsRef.current;
-    const lastText = [...list].reverse().find((i) => i.kind === 'user' || i.kind === 'assistant');
-    if (lastText?.kind !== 'user') return;
-    commit(list.filter((i) => !(i.kind === 'system' && i.retry)));
+    if (!list.some((item) => item.kind === 'system' && item.retry)) return;
+    const at = list.length - 1 - [...list].reverse().findIndex((item) => item.kind === 'user');
+    if (at < 0) return;
+    // Remove every partial answer/tool line from the failed attempt.
+    commit(list.slice(0, at + 1));
     run();
   }, [commit, run]);
 

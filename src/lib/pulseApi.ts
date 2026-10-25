@@ -58,7 +58,8 @@ let memorySessionId: string | null = null;
 function randomId(): string {
   const c = globalThis.crypto;
   if (c?.randomUUID) return c.randomUUID();
-  return Array.from({ length: 4 }, () => Math.random().toString(36).slice(2, 10)).join('');
+  if (!c?.getRandomValues) throw new Error('Secure random generation is unavailable.');
+  return Array.from(c.getRandomValues(new Uint8Array(16)), (value) => value.toString(16).padStart(2, '0')).join('');
 }
 
 /** An anonymous, random id the service hashes to count a visitor's daily
@@ -224,7 +225,7 @@ export async function fetchTitleLocations(mediaType: 'movie' | 'tv', tmdbId: num
   return (await res.json()) as TitleLocationEntry[];
 }
 
-/** The places and artists fans of a title over-index on in one city. Spends
+/** City-filtered venue recommendations and global artist affinities for a title. Spends
  *  the service's Qloo budget, so it is only called on an explicit request. */
 export async function fetchPlanNight(
   params: { city: string; mediaType: 'movie' | 'tv'; tmdbId: number },
@@ -247,9 +248,13 @@ export async function fetchPlanNight(
  * so a multibyte character cut between two network chunks is held back until
  * its second half arrives, instead of becoming two replacement characters.
  */
+const MAX_STREAM_BUFFER = 1024 * 1024;
+
 async function* readLines(res: Response, signal?: AbortSignal): AsyncGenerator<string> {
   if (!res.body) {
-    for (const line of (await res.text()).split(/\r?\n/)) yield line;
+    const text = await res.text();
+    if (text.length > MAX_STREAM_BUFFER) throw new Error('Pulse stream exceeded the buffer limit.');
+    for (const line of text.split(/\r?\n/)) yield line;
     return;
   }
   const reader = res.body.getReader();
@@ -265,10 +270,12 @@ async function* readLines(res: Response, signal?: AbortSignal): AsyncGenerator<s
       buffer += decoder.decode(value, { stream: true });
       let nl: number;
       while ((nl = buffer.indexOf('\n')) !== -1) {
+        if (nl > MAX_STREAM_BUFFER) throw new Error('Pulse stream exceeded the buffer limit.');
         const line = buffer.slice(0, nl);
         buffer = buffer.slice(nl + 1);
         yield line.endsWith('\r') ? line.slice(0, -1) : line;
       }
+      if (buffer.length > MAX_STREAM_BUFFER) throw new Error('Pulse stream exceeded the buffer limit.');
     }
     buffer += decoder.decode();
     if (buffer !== '') yield buffer.endsWith('\r') ? buffer.slice(0, -1) : buffer;
@@ -309,10 +316,12 @@ export async function streamChat(
 ): Promise<void> {
   const res = await pulseFetch('/chat', { body: { messages }, signal });
   let data: string[] = [];
+  let frameLength = 0;
   const dispatch = () => {
     if (data.length === 0) return;
     const event = parseFrame<AgentEvent>(data.join('\n'), 'SSE');
     data = [];
+    frameLength = 0;
     if (!event) return;
     if (signal?.aborted) throw abortError();
     onEvent(event);
@@ -320,7 +329,11 @@ export async function streamChat(
   for await (const line of readLines(res, signal)) {
     if (line === '') dispatch(); // a blank line ends an event
     else if (line.startsWith(':')) continue; // comment: the server's keep-alive ping
-    else if (line.startsWith('data:')) data.push(line.slice(line.startsWith('data: ') ? 6 : 5));
+    else if (line.startsWith('data:')) {
+      frameLength += line.length;
+      if (frameLength > MAX_STREAM_BUFFER) throw new Error('Pulse stream exceeded the buffer limit.');
+      data.push(line.slice(line.startsWith('data: ') ? 6 : 5));
+    }
     // event:, id: and retry: are not used by this server.
   }
   dispatch(); // a stream that ends without its final blank line

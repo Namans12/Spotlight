@@ -26,6 +26,7 @@ export interface AgentToolDeps {
   /** True when Spotlight already knows the title (release data, or resolved before). */
   isKnown: (key: TitleKey) => Promise<boolean>;
   enqueueWarm: BoardDeps["enqueueWarm"];
+  enqueueRank?: BoardDeps["enqueueRank"];
   /** Fixtures mode: the fixture client's stand-in harness tool is offered too. */
   fixtures?: boolean;
   now?: () => Date;

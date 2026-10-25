@@ -37,7 +37,7 @@ export function PulseChatLauncher({ city, type, title }: { city: string; type: B
         // Radix would focus the first control; the question box is the one that matters.
         onOpenAutoFocus={(e) => e.preventDefault()}
         className={cn(
-          'flex flex-col gap-0 overflow-hidden p-0',
+          'flex flex-col gap-0 overflow-hidden p-0 [&>button]:flex [&>button]:size-11 [&>button]:items-center [&>button]:justify-center [&>button]:right-1 [&>button]:top-1',
           desktop ? 'w-full sm:max-w-md' : 'h-[85dvh] rounded-t-2xl',
         )}
       >

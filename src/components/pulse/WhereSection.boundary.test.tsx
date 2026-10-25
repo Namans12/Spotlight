@@ -27,7 +27,7 @@ describe('WhereSection: a failing map', () => {
         <WhereSection cells={cells} title="Saffron Nights" cityName="Delhi" />
       </div>,
     );
-    expect(await screen.findByText('The map couldn’t load — the list below is the same data')).toBeInTheDocument();
+    expect(await screen.findByText('The map couldn’t load. Reload the page to try again. Named areas, when available, are listed below.')).toBeInTheDocument();
     expect(screen.getByText('Saket')).toBeInTheDocument();
     expect(screen.getByText('rest of the brief')).toBeInTheDocument();
   });

@@ -582,7 +582,7 @@ describe("food and beverage brands (L5)", () => {
     }]);
     expect(s.data).toEqual([{ entityId: "b-1", name: "Fixture Brand 1", affinity: 0.4 }]);
     expect(s.provenance[0]?.params).toEqual({ entity_id: "ent-1", target_type: "brand", include_tags: BRAND_FOOD_TAG });
-    expect(s.provenance[0]?.limits).toBe("Food & beverage brands that fans of this title over-index on, not endorsements or sales figures.");
+    expect(s.provenance[0]?.limits).toBe("Global food & beverage brand recommendations for this title signal, not city-specific preferences, endorsements or sales figures.");
   });
 
   it("leaves artist recommendations untagged", async () => {

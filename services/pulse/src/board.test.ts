@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { EvidenceSection, HeatCell } from "../../../shared/types/pulse.js";
 import { buildBoard, listCandidates } from "./board.js";
+import { rankKey } from "./boardRank.js";
 import { getCity } from "./cities.js";
 import { boardSql, newBoardDb, seedEvidence, type BoardDb } from "./testing/boardFakes.js";
 
@@ -13,6 +14,16 @@ const rel = (id: number, date: string, popularity = 1, title = `Fake Release ${i
   ({ tmdb_id: id, media_type: mediaType, title, release_date: date, popularity });
 
 describe("listCandidates", () => {
+  it("reserves six nearest theatrical slots without exceeding ten films or ten shows", async () => {
+    const db=newBoardDb({
+      releases:[...Array.from({length:20},(_,i)=>rel(i+1,"2026-10-23",100-i)),...Array.from({length:12},(_,i)=>rel(101+i,"2026-10-23",100-i,"Show","tv"))],
+      calendar:Array.from({length:8},(_,i)=>({tmdb_id:501+i,media_type:"movie" as const,title:"Theatre",release_date:`2026-10-${22+i}`,entry_type:"Movie",platform_or_distributor:"PVR"})),
+    });
+    const out=await listCandidates(boardSql(db),delhi,TODAY);
+    expect(out.filter(c=>c.card.mediaType==="movie")).toHaveLength(10);
+    expect(out.filter(c=>c.card.mediaType==="tv")).toHaveLength(10);
+    expect(out.filter(c=>c.card.kind==="theatrical").map(c=>c.card.tmdbId)).toEqual([501,502,503,504,505,506]);
+  });
   it("keeps releases from today-3 to today+14 inclusive and drops the day either side", async () => {
     const db = newBoardDb({ releases: [
       rel(1, "2026-10-17"), rel(2, "2026-10-18"), rel(3, "2026-10-21"), rel(4, "2026-11-04"), rel(5, "2026-11-05"),
@@ -97,17 +108,17 @@ describe("listCandidates", () => {
     expect(out.map((c) => c.card.title)).toEqual(["Fake Early"]);
   });
 
-  it("takes the 20 most popular, with calendar-only rows counting as popularity 0", async () => {
+  it("caps a single movie slate at ten while preserving theatrical slots", async () => {
     const releases = Array.from({ length: 22 }, (_, i) => rel(100 + i, "2026-10-25", i + 1)); // popularity 1..22
     const db = newBoardDb({
       releases,
       calendar: [{ tmdb_id: 500, media_type: "movie", title: "Fake Cal Only", release_date: "2026-10-25", entry_type: "Movie", platform_or_distributor: "PVR" }],
     });
     const out = await listCandidates(boardSql(db), delhi, TODAY);
-    expect(out).toHaveLength(20);
+    expect(out).toHaveLength(10);
     expect(out[0].card.tmdbId).toBe(121);
     expect(out[0].popularity).toBe(22);
-    expect(out.map((c) => c.card.tmdbId)).not.toContain(500);
+    expect(out.map((c) => c.card.tmdbId)).toContain(500);
     expect(out.map((c) => c.card.tmdbId)).not.toContain(100); // popularity 1, the least popular release
     expect(out.map((c) => c.card.tmdbId)).not.toContain(101);
     const small = await listCandidates(boardSql(newBoardDb({ calendar: db.calendar })), delhi, TODAY);
@@ -158,16 +169,53 @@ function setup(init: Partial<BoardDb> = {}) {
   const enqueueWarm = vi.fn();
   const onError = vi.fn();
   const deps = { sql: boardSql(db), enqueueWarm, onError };
-  const resolved = (id: number, entityId: string) =>
-    db.entities.push({ tmdb_id: id, media_type: "movie", qloo_entity_id: entityId, method: "imdb", not_found: false, resolved_at: daysAgo(1) });
+  const rank = (ids: string[], returned = ids, type: "movie" | "tv" = "movie") => seedEvidence(db, rankKey(type, ids), "delhi", "board_rank", ok(returned), daysAgo(1));
+  const resolved = (id: number, entityId: string, mediaType: "movie" | "tv" = "movie") => {
+    db.entities.push({ tmdb_id: id, media_type: mediaType, qloo_entity_id: entityId, method: "imdb", not_found: false, resolved_at: daysAgo(1) });
+    rank(db.entities.filter(e => e.media_type === mediaType && e.qloo_entity_id).map(e => String(e.qloo_entity_id)), undefined, mediaType);
+  };
   const missed = (id: number, ageDays: number) =>
     db.entities.push({ tmdb_id: id, media_type: "movie", qloo_entity_id: null, method: null, not_found: true, resolved_at: daysAgo(ageDays) });
   const heat = (entityId: string, ...affinities: number[]) => seedEvidence(db, entityId, "delhi", "heatmap", ok(cells(...affinities)), daysAgo(1));
   const tags = (entityId: string, ...names: string[]) => seedEvidence(db, entityId, "delhi", "place_tags", tagSection(...names), daysAgo(1));
-  return { db, deps, enqueueWarm, onError, resolved, missed, heat, tags };
+  return { db, deps, enqueueWarm, onError, resolved, missed, heat, tags, rank };
 }
 
 describe("buildBoard buckets", () => {
+  it("uses a single-query rank even when independent heatmaps strongly disagree", async () => {
+    const s = setup({ releases: [rel(1, "2026-10-22"), rel(2, "2026-10-22")] });
+    s.resolved(1,"a"); s.resolved(2,"b"); s.rank(["a","b"],["b","a"]);
+    s.heat("a",100); s.heat("b",0.001);
+    const board=await buildBoard(s.deps,delhi,"cafe",TODAY);
+    expect(board.ranked.map(c=>c.tmdbId)).toEqual([2,1]);
+    expect(board.ranked.map(c=>c.localRank)).toEqual([1,2]);
+    expect(board.rankingBasis).toBe("qloo_shortlist");
+  });
+  it("moves omitted candidates into noSignal without inventing ranks", async () => {
+    const s=setup({ releases: [rel(1,"2026-10-22"),rel(2,"2026-10-22")] });
+    s.resolved(1,"a");s.resolved(2,"b");s.rank(["a","b"],["b"]);
+    const board=await buildBoard(s.deps,delhi,"cafe",TODAY);
+    expect(board.ranked.map(c=>c.tmdbId)).toEqual([2]);
+    expect(board.noSignal?.map(c=>c.tmdbId)).toEqual([1]);
+    expect(board.noSignal?.[0].score).toBeNull();
+    expect(board.pending).toEqual([]); // heatmap absence cannot block ranking
+  });
+  it("queues missing ranks and exposes rank work so the frontend keeps polling", async () => {
+    const s=setup({ releases: [rel(1,"2026-10-22")] });s.resolved(1,"a");s.db.evidence.clear();
+    const enqueueRank=vi.fn();
+    const board=await buildBoard({...s.deps,enqueueRank},delhi,"cafe",TODAY);
+    expect(enqueueRank).toHaveBeenCalledWith(delhi);
+    expect(board).toMatchObject({rankingBasis:"release_order",rankingPending:true,pending:[]});
+    expect(board.ranked[0].score).toBeNull();
+    expect(board.ranked[0].localRank).toBeUndefined();
+  });
+  it("keeps movie and TV ranks independent even with the same TMDB id", async () => {
+    const s=setup({ releases:[rel(1,"2026-10-22",1,"Film","movie"),rel(1,"2026-10-22",1,"Show","tv")] });
+    s.resolved(1,"movie-id");s.resolved(1,"tv-id","tv");
+    const board=await buildBoard(s.deps,delhi,"cafe",TODAY);
+    expect(board.ranked.map(c=>[c.mediaType,c.localRank])).toEqual([["movie",1],["tv",1]]);
+  });
+
   it("ranks a resolved title with heatmap evidence and says why", async () => {
     const s = setup({
       releases: [rel(1, "2026-10-22", 10, "Fake Alpha"), rel(2, "2026-10-23", 5, "Fake Beta")],
@@ -180,9 +228,9 @@ describe("buildBoard buckets", () => {
     const board = await buildBoard(s.deps, delhi, "cafe", TODAY);
     expect(board).toMatchObject({ city: "delhi", cityName: "Delhi", businessType: "cafe", pending: [], unresolved: [] });
     expect(board.ranked.map((c) => c.title)).toEqual(["Fake Alpha", "Fake Beta"]);
-    expect(board.ranked[0].why).toBe("#1 of 2 for Delhi audiences · strongest around Hauz Khas · shot in Chandni Chowk");
-    expect(board.ranked[0].score).toBeCloseTo(0.55 + 0.1 + 0.1, 2);
-    expect(board.ranked[1].why).toMatch(/^#2 of 2 for Delhi audiences/);
+    expect(board.ranked[0].why).toBe("#1 of 2 films in Qloo’s Delhi shortlist · heatmap signal near Hauz Khas · shot in Delhi");
+    expect(board.ranked[0].score).toBeNull();
+    expect(board.ranked[1].why).toMatch(/^#2 of 2 films in Qloo’s Delhi shortlist/);
     expect(s.enqueueWarm).not.toHaveBeenCalled();
   });
 
@@ -190,9 +238,9 @@ describe("buildBoard buckets", () => {
     const s = setup({ releases: [rel(1, "2026-10-22")] });
     s.resolved(1, "fx-a");
     const board = await buildBoard(s.deps, delhi, "cafe", TODAY);
-    expect(board.ranked).toEqual([]);
-    expect(board.pending).toHaveLength(1);
-    expect(board.pending[0]).toMatchObject({ tmdbId: 1, score: null, why: null });
+    expect(board.ranked).toHaveLength(1);
+    expect(board.pending).toHaveLength(0);
+    expect(board.ranked[0]).toMatchObject({ tmdbId: 1, score: null, localRank: 1 });
     expect(s.enqueueWarm).toHaveBeenCalledTimes(1);
     expect(s.enqueueWarm).toHaveBeenCalledWith(delhi, "cafe", { tmdbId: 1, mediaType: "movie" });
   });
@@ -201,7 +249,7 @@ describe("buildBoard buckets", () => {
     const s = setup({ releases: [rel(1, "2026-10-22")] });
     s.resolved(1, "fx-a");
     seedEvidence(s.db, "fx-a", "delhi", "heatmap", ok(cells(0.5)), daysAgo(3.5));
-    expect((await buildBoard(s.deps, delhi, "cafe", TODAY)).pending).toHaveLength(1);
+    expect((await buildBoard(s.deps, delhi, "cafe", TODAY)).ranked).toHaveLength(1);
   });
 
   it("puts a title with no qloo_entities row in pending and queues it", async () => {
@@ -218,7 +266,7 @@ describe("buildBoard buckets", () => {
     const board = await buildBoard(s.deps, delhi, "cafe", TODAY);
     expect(board.unresolved).toHaveLength(1);
     expect(board.unresolved[0]).toMatchObject({ title: "Fake Unknown", score: null, why: null });
-    expect(board.ranked.every((c) => c.score !== null && c.why !== null)).toBe(true);
+    expect(board.ranked.every((c) => c.score === null && c.why !== null)).toBe(true);
     expect(board.ranked.map((c) => c.title)).toEqual(["Fake Known"]);
     expect(s.enqueueWarm).not.toHaveBeenCalled();
   });
@@ -232,14 +280,16 @@ describe("buildBoard buckets", () => {
     expect(s.enqueueWarm).toHaveBeenCalledTimes(1);
   });
 
-  it("ranks a title whose heatmap came back empty, with local affinity 0, and no NaN", async () => {
+  it("keeps release order with no numeric scores when both rank and heatmap are empty", async () => {
     const s = setup({ releases: [rel(1, "2026-10-22"), rel(2, "2026-10-22")] });
     s.resolved(1, "fx-a"); s.resolved(2, "fx-b");
     seedEvidence(s.db, "fx-a", "delhi", "heatmap", { status: "empty", data: null, provenance: [], note: "none" }, daysAgo(1));
     seedEvidence(s.db, "fx-b", "delhi", "heatmap", { status: "empty", data: null, provenance: [], note: "none" }, daysAgo(1));
+    s.rank(["fx-a", "fx-b"], []);
     const board = await buildBoard(s.deps, delhi, "cafe", TODAY);
+    expect(board.rankingBasis).toBe("release_order");
     expect(board.ranked).toHaveLength(2);
-    board.ranked.forEach((c) => { expect(Number.isFinite(c.score)).toBe(true); expect(c.why).toContain("no local signal yet"); });
+    board.ranked.forEach((c) => expect(c.score).toBeNull());
     expect(board.pending).toEqual([]);
   });
 
@@ -250,7 +300,7 @@ describe("buildBoard buckets", () => {
     s.tags("fx-a", "Cafe", "Coffee Shop", "Bakery", "Gym");
     const board = await buildBoard(s.deps, delhi, "cafe", TODAY);
     expect(board.ranked.map((c) => c.tmdbId)).toEqual([1, 2]);
-    expect(board.ranked[0].score!).toBeGreaterThan(board.ranked[1].score!);
+    expect(board.ranked.every(c => c.score === null)).toBe(true);
     expect(s.enqueueWarm).toHaveBeenCalledTimes(1);
     expect(s.enqueueWarm).toHaveBeenCalledWith(delhi, "cafe", { tmdbId: 2, mediaType: "movie" });
   });
@@ -266,7 +316,7 @@ describe("buildBoard buckets", () => {
       { lat: 28.5245, lon: 77.2066, geohash: "b", affinity: 0.9, popularity: 0 },
     ]), daysAgo(1));
     const board = await buildBoard(s.deps, delhi, "cafe", TODAY);
-    expect(board.ranked[0].why).toContain("strongest around Saket");
+    expect(board.ranked[0].why).toContain("heatmap signal near Saket");
     expect(s.db.calls.filter((c) => c.text.includes("FROM neighbourhoods"))).toHaveLength(1);
   });
 
@@ -274,7 +324,7 @@ describe("buildBoard buckets", () => {
     const s = setup({ releases: [rel(1, "2026-10-22")], fail: { neighbourhoods: true } });
     s.resolved(1, "fx-a"); s.heat("fx-a", 0.5);
     const board = await buildBoard(s.deps, delhi, "cafe", TODAY);
-    expect(board.ranked[0].why).toContain("strong local affinity");
+    expect(board.ranked[0].why).toContain("Qloo’s Delhi shortlist");
     expect(s.onError).toHaveBeenCalled();
   });
 
@@ -282,7 +332,7 @@ describe("buildBoard buckets", () => {
     const s = setup({ releases: [rel(1, "2026-10-22")] });
     s.resolved(1, "fx-a");
     seedEvidence(s.db, "fx-a", "mumbai", "heatmap", ok(cells(0.9)), daysAgo(1));
-    expect((await buildBoard(s.deps, delhi, "cafe", TODAY)).pending).toHaveLength(1);
+    expect((await buildBoard(s.deps, delhi, "cafe", TODAY)).ranked).toHaveLength(1);
   });
 
   it("an all-empty city ranks every card, none pending", async () => {
@@ -315,6 +365,6 @@ describe("buildBoard buckets", () => {
     s.heat("fx-a", 0.9); s.heat("fx-b", 0.2);
     s.tags("fx-a", "Cafe", "Gym", "Spa");
     const board = await buildBoard(s.deps, delhi, "cafe", TODAY);
-    for (const c of board.ranked) expect(c.score).toBe(Math.round(c.score! * 1000) / 1000);
+    for (const c of board.ranked) expect(c.score).toBeNull();
   });
 });

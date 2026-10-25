@@ -18,7 +18,7 @@ import { guessHandler } from "./routes/guess.js";
 import { planNightHandler } from "./routes/planNight.js";
 import { titleLocationsHandler } from "./routes/titleLocations.js";
 import { warmHandler } from "./routes/warm.js";
-import { createBackgroundWarmer, createWarmQueue, warmCities, type WarmDeps } from "./warm.js";
+import { createBackgroundRanker, createBackgroundWarmer, createWarmQueue, warmCities, type WarmDeps } from "./warm.js";
 import { createTitleLookup } from "./titleHeader.js";
 import { takeUsage } from "./usage.js";
 
@@ -57,6 +57,7 @@ const briefRoute = briefHandler({
 const warmDeps: WarmDeps = { sql, qloo, resolve: (key) => resolveTitle(sql, qloo, key), onError: logError };
 const warmQueue = createWarmQueue({ onError: (key, err) => logError(`warm ${key}`, err) });
 const enqueueWarm = createBackgroundWarmer(warmDeps, warmQueue);
+const enqueueRank = createBackgroundRanker(warmDeps, warmQueue);
 
 const guessRoute = guessHandler({
   // Its own, stricter limiter than the brief's: every guess is a model call.
@@ -85,6 +86,7 @@ const chatRoute = chatHandler({
     header: titleHeader,
     isKnown: (key) => isKnownTitle(sql, key),
     enqueueWarm,
+    enqueueRank,
     fixtures: config.qlooFixtures,
     onError: logError,
   }),
@@ -94,6 +96,7 @@ const chatRoute = chatHandler({
 const boardRoute = boardHandler({
   sql,
   enqueueWarm,
+  enqueueRank,
   // Its own limiter: polling the board must not spend a client's brief budget.
   rateLimiter: createRateLimiter({ max: 30, windowMs: 60_000 }),
   onError: logError,

@@ -143,14 +143,14 @@ describe('Pulse brief: streaming', () => {
       section('themes', ok([{ tagId: 't1', name: 'Rooftop', affinity: 0.2 }])),
       section('where', ok([cell('Hauz Khas', 0.9)])),
     );
-    expect(sectionTitles()).toEqual(['Who', 'Where', 'Venues', 'Themes', 'Artists', 'Local hook', 'Campaign ideas']);
+    expect(sectionTitles()).toEqual(['Who', 'Where', 'Venues', 'Venue food themes', 'Global artists', 'Local hook', 'Campaign ideas']);
   });
 
   it('shows Brands and no Venues for a d2c_food brief', async () => {
     const s = controlledStream();
     renderBrief('/pulse/delhi/movie/999700001?type=d2c_food');
     await s.emit(header$(header({ businessType: 'd2c_food' })), section('brands', ok([{ entityId: 'b1', name: 'Blue Tokai', affinity: 0.4 }])));
-    expect(sectionTitles()).toEqual(['Who', 'Where', 'Themes', 'Brands', 'Artists', 'Local hook', 'Campaign ideas']);
+    expect(sectionTitles()).toEqual(['Who', 'Where', 'Venue food themes', 'Global food and drink brands', 'Global artists', 'Local hook', 'Campaign ideas']);
     expect(screen.getByText('Blue Tokai')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 2, name: 'Venues' })).not.toBeInTheDocument();
   });
@@ -192,7 +192,7 @@ describe('Pulse brief: streaming', () => {
     const list = screen.getByText('Bare Cafe').closest('li') as HTMLElement;
     expect(list).toBeInTheDocument();
     expect(within(list).queryByLabelText(/Price level/)).not.toBeInTheDocument();
-    expect(screen.getByText(/Fans of Saffron Nights in Delhi over-index on these places/)).toBeInTheDocument();
+    expect(screen.getByText(/Qloo-recommended venues in Delhi for Saffron Nights/)).toBeInTheDocument();
   });
 
   it('shows address, price marks (₹ in India) and tags when the data has them', async () => {
@@ -208,7 +208,7 @@ describe('Pulse brief: streaming', () => {
     expect(within(li).getByText('coffee')).toBeInTheDocument();
   });
 
-  it('phrases the lists as what fans over-index on, never about "your customers"', async () => {
+  it('distinguishes venue tags from global artist recommendations', async () => {
     const s = controlledStream();
     renderBrief();
     await s.emit(
@@ -216,8 +216,8 @@ describe('Pulse brief: streaming', () => {
       section('themes', ok([{ tagId: 't1', name: 'Rooftop', affinity: 0.2 }])),
       section('artists', ok([{ entityId: 'a1', name: 'Prateek Kuhad', affinity: 0.3 }])),
     );
-    expect(screen.getByText('Fans of Saffron Nights in Delhi over-index on these place themes…')).toBeInTheDocument();
-    expect(screen.getByText('Fans of Saffron Nights over-index on these artists…')).toBeInTheDocument();
+    expect(screen.getByText('Food themes among recommended venues in Delhi.')).toBeInTheDocument();
+    expect(screen.getByText('Qloo-recommended artists for Saffron Nights (global affinities).')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/your customers/i);
   });
 });
@@ -233,7 +233,7 @@ describe('Pulse brief: where', () => {
     const map = await screen.findByTestId('heatmap');
     expect(map).toHaveAttribute('data-cells', '6');
     expect(map).toHaveAttribute('data-title', 'Saffron Nights');
-    const list = screen.getByText('Strongest around').parentElement as HTMLElement;
+    const list = screen.getByText('Highest affinity among displayed areas').parentElement as HTMLElement;
     expect(within(list).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Hauz Khas', 'Connaught Place', 'Khan Market']);
   });
 
@@ -501,7 +501,7 @@ describe('Pulse brief: without Qloo', () => {
     await ready();
     await user.click(screen.getByRole('button', { name: 'Compare without Qloo' }));
     expect(await screen.findByText('What an LLM guesses with no taste data')).toBeInTheDocument();
-    expect(screen.getByText('Grounded in Qloo taste data')).toBeInTheDocument();
+    expect(screen.getByText('Agent proposals with Qloo context')).toBeInTheDocument();
     expect(await screen.findByText('Guessed special')).toBeInTheDocument();
     expect(fetchGuess).toHaveBeenCalledTimes(1);
     expect(vi.mocked(fetchGuess).mock.calls[0][0]).toEqual({ city: 'delhi', type: 'cafe', mediaType: 'movie', tmdbId: 999700001 });
@@ -579,13 +579,13 @@ describe('Pulse brief: without Qloo', () => {
     expect(region).toContainElement(screen.getByText('Serve a saffron latte'));
   });
 
-  it('labels the left column "Grounded in Qloo taste data" only for a real, ok, qloo-grounded draft', async () => {
+  it('labels the left column "Agent proposals with Qloo context" only for a real, ok, qloo-grounded draft', async () => {
     const user = userEvent.setup();
     vi.mocked(fetchGuess).mockResolvedValue(guess);
     await ready();
     await user.click(screen.getByRole('button', { name: 'Compare without Qloo' }));
-    expect(await screen.findByRole('heading', { name: 'Grounded in Qloo taste data' })).toBeInTheDocument();
-    expect(screen.queryByText('Qloo-grounded draft')).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Agent proposals with Qloo context' })).toBeInTheDocument();
+    expect(screen.queryByText('Agent proposal draft')).not.toBeInTheDocument();
   });
 
   it('a degraded campaign gets a neutral heading and its note, not the grounded claim', async () => {
@@ -596,8 +596,8 @@ describe('Pulse brief: without Qloo', () => {
     await s.emit(header$(), section('campaign', withStatus('degraded', 'The campaign writer isn’t configured on this deployment.')), done);
     await s.end();
     await user.click(screen.getByRole('button', { name: 'Compare without Qloo' }));
-    expect(await screen.findByRole('heading', { name: 'Qloo-grounded draft' })).toBeInTheDocument();
-    expect(screen.queryByText('Grounded in Qloo taste data')).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Agent proposal draft' })).toBeInTheDocument();
+    expect(screen.queryByText('Agent proposals with Qloo context')).not.toBeInTheDocument();
     expect(screen.getAllByText('The campaign writer isn’t configured on this deployment.')).toHaveLength(1);
   });
 
@@ -610,8 +610,8 @@ describe('Pulse brief: without Qloo', () => {
     await s.emit(header$(), section('campaign', ok(placeholder)), done);
     await s.end();
     await user.click(screen.getByRole('button', { name: 'Compare without Qloo' }));
-    expect(await screen.findByRole('heading', { name: 'Qloo-grounded draft' })).toBeInTheDocument();
-    expect(screen.queryByText('Grounded in Qloo taste data')).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Agent proposal draft' })).toBeInTheDocument();
+    expect(screen.queryByText('Agent proposals with Qloo context')).not.toBeInTheDocument();
   });
 
   it('announces the guess in a polite live region that is on the page before the result arrives', async () => {
@@ -720,5 +720,21 @@ describe('Pulse brief: Ask Pulse', () => {
     await user.click(screen.getByRole('button', { name: 'Ask Pulse' }));
     const dialog = await screen.findByRole('dialog', { name: 'Ask Pulse' });
     expect(within(dialog).queryByRole('button', { name: /Who is the audience/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('Pulse brief: campaign retry in comparison', () => {
+  it('keeps the grounded campaign retry available when compare mode is open', async () => {
+    const user = userEvent.setup();
+    const stream = controlledStream();
+    vi.mocked(fetchGuess).mockResolvedValue(guess);
+    renderBrief();
+    await stream.emit(header$(), section('campaign', withStatus('error', 'Writer failed')), done);
+    await stream.end();
+    await user.click(screen.getByRole('button', { name: 'Compare without Qloo' }));
+    await screen.findByText('Guessed special');
+    await user.click(screen.getByRole('button', { name: 'Retry campaign' }));
+    expect(streamBrief).toHaveBeenCalledTimes(2);
+    expect(fetchGuess).toHaveBeenCalledTimes(1);
   });
 });

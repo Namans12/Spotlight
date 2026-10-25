@@ -52,8 +52,8 @@ describe('chip labels by id prefix', () => {
     expect(AGENT_SUGGESTION).toBe('Agent suggestion');
   });
 
-  it('an id the bundle cannot resolve still renders its label chip, with no detail', () => {
-    expect(chipsForId('venue:gone', bundle, 'Delhi')).toEqual([{ label: 'Qloo · places', detail: null }]);
+  it('unresolved named evidence is an agent suggestion', () => {
+    expect(chipsForId('venue:gone', bundle, 'Delhi')).toEqual([{ label: AGENT_SUGGESTION, detail: null }]);
     expect(chipsForId('heat:2', {}, 'Delhi')).toEqual([{ label: 'Qloo · heatmap', detail: null }]);
   });
 
@@ -163,5 +163,12 @@ describe('chipsForEvidence', () => {
       'Wikipedia · Films set in Delhi',
       'Wikidata · narrative location',
     ]);
+  });
+});
+
+describe('Evidence scope wording', () => {
+  it('describes heatmap context without asserting an audience baseline', () => {
+    const b: SectionBundle = { where: ok([cell('Saket', 0.5)]) };
+    expect(chipsForId('heat:0', b, 'Delhi')).toEqual([{ label: 'Qloo · heatmap', detail: 'Heatmap affinity near Saket' }]);
   });
 });

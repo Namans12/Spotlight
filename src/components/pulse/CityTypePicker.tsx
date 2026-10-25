@@ -49,9 +49,10 @@ export function CityTypePicker({ city, type, onSubmit, onCancel, notice }: CityT
           <div className="relative">
             <select
               id={selectId}
+              autoFocus
               value={draftCity}
               onChange={(e) => setDraftCity(e.target.value)}
-              className="h-control w-full appearance-none rounded-lg border border-border bg-secondary pl-3 pr-9 text-xs font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="min-h-11 h-control w-full appearance-none rounded-lg border border-border bg-secondary pl-3 pr-9 text-xs font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="" disabled>
                 Choose a city

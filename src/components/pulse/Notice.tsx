@@ -11,12 +11,12 @@ export function Notice({ icon, title, children }: { icon: React.ReactNode; title
   );
 }
 
-export function RetryButton({ onClick, busy }: { onClick: () => void; busy?: boolean }) {
+export function RetryButton({ onClick, busy, disabled }: { onClick: () => void; busy?: boolean; disabled?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={busy}
+      disabled={busy || disabled}
       className="mt-1 inline-flex h-control min-h-11 items-center gap-1.5 rounded-lg bg-secondary px-3 text-xs font-semibold text-foreground hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
     >
       {busy ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}

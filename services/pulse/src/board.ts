@@ -14,7 +14,8 @@ import { getPopularity } from "./db/titles.js";
 import { peekEvidence } from "./evidence.js";
 import { labelCell } from "./geo.js";
 import { notFoundIsStale, type TitleKey } from "./resolve.js";
-import { roundScore, scoreCandidates, whyLine, type Candidate } from "./score.js";
+import type { Candidate } from "./score.js";
+import { MAX_RANK_OPTIONS, readBoardRank } from "./boardRank.js";
 
 /** One statement type serves every read the board makes. */
 export type BoardSql = EvidenceSql;
@@ -23,12 +24,13 @@ export interface BoardDeps {
   sql: BoardSql;
   /** Asks for a title's resolution and evidence to be fetched in the background. */
   enqueueWarm: (city: City, type: BusinessType, key: TitleKey) => void;
+  enqueueRank?: (city: City) => void;
   onError?: (context: string, err: unknown) => void;
 }
 
 const DAYS_BACK = 3;
 const DAYS_AHEAD = 14;
-const BOARD_SIZE = 20;
+const THEATRICAL_SLOTS = 6;
 const TOP_TAG_NAMES = 10;
 const DAY_MS = 86_400_000;
 
@@ -49,8 +51,8 @@ function bestHook(rows: TitleLocation[] | undefined, city: City): LocalHook | nu
   return { kind: best.kind, placeName: city.name, landmark: best.landmark, source: best.source };
 }
 
-/** Releases from three days ago to two weeks ahead, deduped, the 20 most
- *  popular. The calendar read is the one the Calendar page uses, so `kind`
+/** Releases from three days ago to two weeks ahead, deduped, at most ten
+ *  per media type with reserved theatrical slots. The calendar read is the one the Calendar page uses, so `kind`
  *  and `mediaType` are derived the same way (never from the stored
  *  is_theatrical). Rows with no TMDB id cannot be resolved to a Qloo entity
  *  and are dropped. */
@@ -80,10 +82,18 @@ export async function listCandidates(sql: BoardSql, city: City, today: Date): Pr
 
   const keys: TitleKey[] = [...best.values()].map((r) => ({ tmdbId: r.tmdbId!, mediaType: r.mediaType! }));
   const popularity = await getPopularity(sql, keys);
-  const top = [...best.values()]
+  const ordered = [...best.values()]
     .map((row) => ({ row, popularity: popularity.get(keyOf(row.mediaType!, row.tmdbId!)) ?? 0 }))
-    .sort((a, b) => b.popularity - a.popularity || a.row.releaseDate.localeCompare(b.row.releaseDate) || a.row.tmdbId! - b.row.tmdbId!)
-    .slice(0, BOARD_SIZE);
+    .sort((a, b) => b.popularity - a.popularity || a.row.releaseDate.localeCompare(b.row.releaseDate) || a.row.tmdbId! - b.row.tmdbId!);
+  // Qloo's public rank tool accepts at most ten options of a single type.
+  // Reserve up to six film slots for theatrical releases, then fill the
+  // remainder by popularity. Never split a type across incomparable queries.
+  const films = ordered.filter(x => x.row.mediaType === "movie");
+  const theatre = films.filter(x => x.row.kind === "theatrical")
+    .sort((a, b) => a.row.releaseDate.localeCompare(b.row.releaseDate) || a.row.tmdbId! - b.row.tmdbId!).slice(0, THEATRICAL_SLOTS);
+  const chosen = new Set(theatre.map(x => x.row.tmdbId));
+  const top = [...films.filter(x => !chosen.has(x.row.tmdbId)).slice(0, MAX_RANK_OPTIONS - theatre.length), ...theatre,
+    ...ordered.filter(x => x.row.mediaType === "tv").slice(0, MAX_RANK_OPTIONS)];
 
   const hooks = await getTitleLocationsBatch(sql, top.map((t) => ({ tmdbId: t.row.tmdbId!, mediaType: t.row.mediaType! })), city.slug);
   return top.map(({ row, popularity: pop }): Candidate => ({
@@ -136,10 +146,9 @@ export async function buildBoard(deps: BoardDeps, city: City, type: BusinessType
       peekEvidence<RawCell[]>(sql, "heatmap", entity.entityId, city, today),
       peekEvidence<TagAffinity[]>(sql, "place_tags", entity.entityId, city, today),
     ]);
-    if (!heatmap) { pending.push(unscored(c)); wanted.push(key); return; }
-    if (!tags) wanted.push(key); // ranks without business fit for now; the next poll will have it
+    if (!heatmap || !tags) wanted.push(key); // optional brief evidence must not block a valid local rank
 
-    const cells = (heatmap.data ?? []).filter((x) => Number.isFinite(x.affinity));
+    const cells = (heatmap?.data ?? []).filter((x) => Number.isFinite(x.affinity));
     const scored: Candidate = {
       ...c,
       entityId: entity.entityId,
@@ -164,20 +173,47 @@ export async function buildBoard(deps: BoardDeps, city: City, type: BusinessType
     try { hoods = await getNeighbourhoods(sql, city.slug); } catch (err) { report("neighbourhoods", err); }
   }
 
-  const ranked = scoreCandidates(toScore, type).map((s, i, all): BoardCard => {
-    const cells = cellsOf.get(s.candidate) ?? [];
-    const strongest = cells.reduce<RawCell | null>((m, x) => (m === null || x.affinity > m.affinity ? x : m), null);
-    const topHood = strongest ? labelCell(strongest, hoods) : null;
-    return {
-      ...s.candidate.card,
-      score: roundScore(s.score),
-      why: whyLine(s, i + 1, all.length, city.name, topHood),
-    };
-  });
+  const ranked: BoardCard[] = [];
+  const noSignal: BoardCard[] = [];
+  let needsRank = false;
+  for (const mediaType of ["movie", "tv"] as const) {
+    const group = candidates.filter(c => c.card.mediaType === mediaType && entities.get(keyOf(c.card.mediaType, c.card.tmdbId))?.entityId);
+    const ids = group.map(c => entities.get(keyOf(c.card.mediaType, c.card.tmdbId))!.entityId!);
+    if (ids.length === 0) continue;
+    const ranking = await readBoardRank(sql, city, mediaType, ids, today);
+    if (!ranking) needsRank = true;
+    const positions = new Map((ranking?.data ?? []).map((id, i) => [id.toLowerCase(), i + 1]));
+    const ready = toScore.filter(c => c.card.mediaType === mediaType);
+    const ordered = ready.sort((a, b) => (positions.get(a.entityId!.toLowerCase()) ?? Infinity) - (positions.get(b.entityId!.toLowerCase()) ?? Infinity));
+    for (const c of ordered) {
+      const localRank = positions.get(c.entityId!.toLowerCase());
+      const cells = cellsOf.get(c) ?? [];
+      const strongest = cells.reduce<RawCell | null>((m, x) => (m === null || x.affinity > m.affinity ? x : m), null);
+      const hood = strongest ? labelCell(strongest, hoods) : null;
+      if (localRank !== undefined) {
+        const noun = mediaType === "movie" ? "films" : "TV shows";
+        const why = [`#${localRank} of ${positions.size} ${noun} in Qloo’s ${city.name} shortlist`,
+          ...(hood ? [`heatmap signal near ${hood}`] : []),
+          ...(c.hook ? [`${c.hook.kind === "filmed" ? "shot" : "set"} in ${city.name}`] : [])].slice(0, 3).join(" · ");
+        ranked.push({ ...c.card, score: null, why, localRank, rankTotal: positions.size });
+      } else {
+        noSignal.push({ ...c.card, score: null, why: ranking ? "No comparable local ranking for this title" : "Local ranking unavailable; release order only" });
+      }
+    }
+  }
+  // A failure or sparse response must not leave an empty page or counterfeit
+  // a demand score. Keep the calendar usable with an explicit fallback.
+  const rankingBasis = ranked.length ? "qloo_shortlist" as const : "release_order" as const;
+  if (!ranked.length) {
+    ranked.push(...noSignal.splice(0).sort((a, b) => a.releaseDate.localeCompare(b.releaseDate) || a.tmdbId - b.tmdbId)
+      .map(c => ({ ...c, why: "Release order · no comparable local ranking" })));
+  }
+  if (needsRank) { try { deps.enqueueRank?.(city); } catch (err) { report("enqueueRank", err); } }
 
+  noSignal.sort(byOrder);
   for (const key of wanted) {
     try { deps.enqueueWarm(city, type, key); } catch (err) { report("enqueueWarm", err); }
   }
 
-  return { city: city.slug, cityName: city.name, businessType: type, ranked, pending, unresolved };
+  return { city: city.slug, cityName: city.name, businessType: type, ranked, pending, unresolved, noSignal, rankingBasis, rankingPending: needsRank };
 }

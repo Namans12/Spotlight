@@ -59,10 +59,10 @@ import type { QlooEntityRef } from "./client.js";
 const LIMITS: Record<string, string> = {
   audience_demographics: "Global audience skew relative to average, not specific to this city; not a percentage.",
   where_popular: "Affinity is comparable only within this query and city; top cells only (the harness keeps 20).",
-  recommend_places: "Venues are what fans of this title in this city over-index on, not endorsements or a count of visitors.",
-  entity_tags: "Tags describe the venues recommended for this title in this city; affinity is relative within this query, not a share of venues.",
-  recommend_artists: "Artists are what fans of this title over-index on, not listening counts or an endorsement.",
-  recommend_brands: "Food & beverage brands that fans of this title over-index on, not endorsements or sales figures.",
+  recommend_places: "Qloo recommendations for the title signal, filtered to venues in this city; not a city-specific audience profile, endorsement or visitor count.",
+  entity_tags: "Tags describe recommended venues, not measured fan cuisine preferences; the city filters venues. Affinity is query-relative, not a share of venues.",
+  recommend_artists: "Global artist recommendations for this title signal, not city-specific preferences, listening counts or an endorsement.",
+  recommend_brands: "Global food & beverage brand recommendations for this title signal, not city-specific preferences, endorsements or sales figures.",
   trends: "A recent popularity percentile as Qloo reports it; not viewership, sales or a forecast.",
 };
 const DEFAULT_LIMITS = "Qloo affinity is relative to this query only; it is not a count or a percentage of people.";

@@ -17,15 +17,12 @@ interface CampaignViewProps {
   ideaHeading?: 'h3' | 'h4';
 }
 
-/**
- * Three tie-in ideas. Each clause is followed by what it cites: Qloo and
- * Wikipedia/Wikidata chips for grounded claims, "Agent suggestion" for the
- * model's own. The chips are the point of the view; a clause with none would
- * read as evidence-backed when it is not.
- */
+/** Generated tie-in proposals with references to their supporting context.
+ * Resolving an evidence id checks the reference, not the truth of the proposal. */
 export function CampaignView({ campaign, bundle = {}, cityName, ideaHeading: Heading = 'h3' }: CampaignViewProps) {
   return (
     <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">All ideas are agent proposals. References show supporting context, not verification of the generated wording or outcomes.</p>
       {(campaign.ideas ?? []).map((idea, i) => (
         <article key={`${idea.kind}-${i}`} className="space-y-2 rounded-xl border border-border bg-card p-3.5">
           <header className="space-y-0.5">

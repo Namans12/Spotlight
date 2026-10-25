@@ -63,7 +63,7 @@ export function failureLine(err: unknown): FailureLine {
       case 'daily_limit':
         return { text: 'Daily AI limit reached — try again tomorrow.', retry: false };
       case 'too_many_streams':
-        return { text: 'Pulse is already answering two of your questions — wait a moment and try again.', retry: false };
+        return { text: 'Pulse is already answering two of your questions — wait a moment and try again.', retry: true };
       case 'rate_limited': {
         const s = err.retryAfterSeconds;
         return { text: `You're asking quickly — try again in ${s ? `${s} ${s === 1 ? 'second' : 'seconds'}` : 'a moment'}.`, retry: false };

@@ -14,8 +14,8 @@ const ideas = (evidence: string[] = []) => ({ ideas: [idea("special", evidence),
 const json = (v: unknown) => JSON.stringify(v);
 
 const bundle: EvidenceFact[] = [
-  { id: "venue:a", label: "Qloo · places", fact: "Fans of Dune in Delhi over-index on the venue Cafe A" },
-  { id: "heat:0", label: "Qloo · heatmap", fact: "Fans of Dune in Delhi over-index around Khan Market" },
+  { id: "venue:a", label: "Qloo · places", fact: "Qloo recommends Cafe A in Delhi for the Dune signal" },
+  { id: "heat:0", label: "Qloo · heatmap", fact: "Qloo heatmap for Dune in Delhi shows affinity near Khan Market" },
 ];
 const ctx = { title: "Dune", cityName: "Delhi", businessType: "cafe" as const, releaseDate: "2026-11-06" };
 const badJson = "this is not json";
@@ -308,7 +308,7 @@ describe("draftWithoutQloo", () => {
     expect(all).toMatch(/no audience data/i);
     expect(all).not.toContain("venue:a");
     expect(String(llm.calls[0][1].content)).not.toContain('"evidence"');
-    expect(all).toContain("Fans of <title> in <City> over-index on <Y>. Never 'your customers', never 'you will', never a probability about a person.");
+    expect(all).toContain("Describe Qloo associations, never individual preferences. A city venue filter is not a city audience signal.");
   });
 
   it("falls back to the single idea when nothing parses", async () => {
@@ -319,7 +319,7 @@ describe("draftWithoutQloo", () => {
 });
 
 describe("prompt contents", () => {
-  const COPY_RULE = "Fans of <title> in <City> over-index on <Y>. Never 'your customers', never 'you will', never a probability about a person.";
+  const COPY_RULE = "Describe Qloo associations, never individual preferences. A city venue filter is not a city audience signal.";
 
   it("system message holds the SAFE_USE rules and the copy rule verbatim, and demands the three kinds and JSON only", async () => {
     const llm = fakeLlm([valid]);
@@ -347,7 +347,7 @@ describe("prompt contents", () => {
     expect(close).toBeGreaterThan(open);
     const block = user.slice(open, close);
     expect(block).toContain("venue:a");
-    expect(block).toContain("Fans of Dune in Delhi over-index on the venue Cafe A");
+    expect(block).toContain("Qloo recommends Cafe A in Delhi for the Dune signal");
     expect(block).toContain("2026-11-06");
     expect(block).toContain("cafe");
     expect(user.slice(0, open)).not.toContain("venue:a");
@@ -417,9 +417,9 @@ describe("buildBundle", () => {
 
   it("heat: the top 3 named neighbourhoods by affinity, one fact each, skipping unnamed cells", () => {
     expect(facts.filter((f) => f.id.startsWith("heat:")).map((f) => f.fact)).toEqual([
-      "Fans of Dune in Delhi over-index around Khan Market",
-      "Fans of Dune in Delhi over-index around Hauz Khas",
-      "Fans of Dune in Delhi over-index around Saket",
+      "Qloo heatmap for Dune in Delhi shows affinity near Khan Market",
+      "Qloo heatmap for Dune in Delhi shows affinity near Hauz Khas",
+      "Qloo heatmap for Dune in Delhi shows affinity near Saket",
     ]);
     expect(byId("heat:0")!.label).toBe("Qloo · heatmap");
   });
@@ -430,7 +430,7 @@ describe("buildBundle", () => {
     expect(facts.filter((f) => f.id.startsWith("artist:"))).toHaveLength(5);
     expect(facts.filter((f) => f.id.startsWith("brand:"))).toHaveLength(5);
     expect(facts.filter((f) => f.id.startsWith("hook:"))).toHaveLength(2);
-    expect(byId("venue:v1")).toEqual({ id: "venue:v1", label: "Qloo · places", fact: "Fans of Dune in Delhi over-index on the venue Venue 1" });
+    expect(byId("venue:v1")).toEqual({ id: "venue:v1", label: "Qloo · places", fact: "Qloo recommends Venue 1 in Delhi for the Dune signal" });
     expect(byId("tag:t1")!.label).toBe("Qloo · tags");
     expect(byId("artist:artist1")!.label).toBe("Qloo · artists");
     expect(byId("brand:brand1")!.label).toBe("Qloo · brands");
@@ -478,12 +478,12 @@ describe("buildBundle", () => {
 
   it("drops zero-width, bidi and BOM characters", () => {
     const f = buildBundle({ themes: ok<TagAffinity[]>([{ tagId: "t1", name: "Ta\u200bg\u202e X\u2060\ufeff", affinity: 1 }]) }, "Delhi", "Dune");
-    expect(f[0].fact).toBe("Fans of Dune in Delhi over-index on the place theme Tag X");
+    expect(f[0].fact).toBe("Theme among Qloo-recommended venues in Delhi for Dune: Tag X");
   });
 
   it("sanitises the title and city that are spliced into every fact", () => {
     const f = buildBundle({ themes: ok<TagAffinity[]>([{ tagId: "t1", name: "Tag", affinity: 1 }]) }, "De\nlhi", "Du\u0000ne <x>");
-    expect(f[0].fact).toBe("Fans of Dune x in De lhi over-index on the place theme Tag");
+    expect(f[0].fact).toBe("Theme among Qloo-recommended venues in De lhi for Dune x: Tag");
   });
 
   it("does not let an id be forged from data: ids with odd characters are made safe", () => {

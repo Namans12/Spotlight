@@ -25,7 +25,7 @@ class MapBoundary extends Component<{ children: ReactNode }, { failed: boolean }
         role="status"
         className={`${MAP_HEIGHT} flex items-center justify-center rounded-lg border border-dashed border-border px-4 text-center text-sm text-muted-foreground`}
       >
-        The map couldn’t load — the list below is the same data
+        The map couldn’t load. Reload the page to try again. Named areas, when available, are listed below.
       </div>
     );
   }
@@ -43,7 +43,7 @@ export function WhereSection({ cells, title, cityName }: { cells: HeatCell[]; ti
       {/* The text alternative to the map, and the part that is useful without it. */}
       {top.length > 0 ? (
         <div>
-          <p className="text-xs font-medium text-muted-foreground">Strongest around</p>
+          <p className="text-xs font-medium text-muted-foreground">Highest affinity among displayed areas</p>
           <ol className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-foreground">
             {top.map((h) => (
               <li key={h.name}>{h.name}</li>
@@ -51,7 +51,7 @@ export function WhereSection({ cells, title, cityName }: { cells: HeatCell[]; ti
           </ol>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">No cell here has a neighbourhood name yet; the circles are still where fans concentrate.</p>
+        <p className="text-xs text-muted-foreground">No cell here has a neighbourhood name yet; the circles show the returned heatmap locations.</p>
       )}
       <p className="text-xs text-muted-foreground">Larger circles are stronger relative to the other cells shown, not a count of people.</p>
     </div>

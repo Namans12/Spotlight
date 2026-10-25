@@ -63,6 +63,6 @@ describe.skipIf(!url)("board against Postgres", () => {
     expect(mine(board.ranked)).toEqual([RESOLVED]);
     expect(mine(board.unresolved)).toEqual([MISSED]);
     expect(mine(board.pending).sort()).toEqual([STREAM, FILMED, CAL_ONLY].sort());
-    expect(board.ranked.find((c) => c.tmdbId === RESOLVED)!.why).toMatch(/^#\d+ of \d+ for Delhi audiences/);
+    expect(board.ranked.find((c) => c.tmdbId === RESOLVED)!.why).toBe("Release order · no comparable local ranking");
   });
 });

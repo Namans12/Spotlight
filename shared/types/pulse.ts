@@ -19,10 +19,10 @@ export interface Campaign { ideas: CampaignIdea[]; groundedBy: "qloo" | "none"; 
 export type BriefSectionKey = "who" | "where" | "venues" | "themes" | "artists" | "brands" | "hook" | "trend" | "campaign";
 export interface BriefHeader { tmdbId: number; mediaType: "movie" | "tv"; title: string; posterUrl: string | null; releaseDate: string | null; city: string; cityName: string; businessType: BusinessType; qlooEntityId: string | null; }
 export type BriefEvent = { type: "header"; header: BriefHeader } | { type: "section"; key: BriefSectionKey; section: EvidenceSection<unknown> } | { type: "done" };
-export interface BoardCard { tmdbId: number; mediaType: "movie" | "tv"; title: string; posterUrl: string | null; releaseDate: string; platform: string | null; kind: string; score: number | null; why: string | null; }
-export interface BoardResponse { city: string; cityName: string; businessType: BusinessType; ranked: BoardCard[]; pending: BoardCard[]; unresolved: BoardCard[]; }
+export interface BoardCard { tmdbId: number; mediaType: "movie" | "tv"; title: string; posterUrl: string | null; releaseDate: string; platform: string | null; kind: string; score: number | null; why: string | null; localRank?: number; rankTotal?: number; }
+export interface BoardResponse { city: string; cityName: string; businessType: BusinessType; ranked: BoardCard[]; pending: BoardCard[]; unresolved: BoardCard[]; noSignal?: BoardCard[]; rankingBasis?: "qloo_shortlist" | "release_order"; rankingPending?: boolean; }
 export type AgentEvent = { type: "tool"; name: string; args: string } | { type: "tool_result"; name: string; summary: string } | { type: "message"; text: string } | { type: "error"; text: string } | { type: "done" };
 /** One row of GET /title-locations: a launch city a title was filmed or set in. */
 export interface TitleLocationEntry { city_slug: string; cityName: string; kind: "filmed" | "set"; landmark_label: string | null; source: "wikidata" | "wikipedia" | "both"; }
-/** GET /plan-night: what fans of a title over-index on in one city (no business-type filter). */
+/** GET /plan-night: city-filtered venue recommendations and global artists for a title signal. */
 export interface PlanNightResponse { title: string | null; cityName: string; places: EvidenceSection<Venue[]>; artists: EvidenceSection<NamedEntity[]>; }

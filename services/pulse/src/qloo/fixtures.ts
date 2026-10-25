@@ -127,6 +127,7 @@ export function createFixtureClient(): QlooClient {
       }];
     },
     async callTool(name, args) {
+      if (name === "qloo_rank") return { status: "ok", summary: NOTE, results: (args.options as string[]).map(entity_id => ({ entity_id })) };
       return { status: "ok", summary: "Synthetic fixture echo, not from Qloo.", results: [{ tool: name, args }], result_count: 1 };
     },
   };

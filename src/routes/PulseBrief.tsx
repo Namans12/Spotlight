@@ -231,32 +231,32 @@ function BriefStream({ city, type, mediaType, tmdbId }: TitleParams) {
         );
       case 'where':
         return (
-          <BriefSection {...common} lede={`Where fans of ${title} in ${cityName} are concentrated.`} skeletonClass="h-72 sm:h-80">
+          <BriefSection {...common} lede={`Qloo heatmap affinity for ${title} around ${cityName}.`} skeletonClass="h-72 sm:h-80">
             {(data) => <WhereSection cells={data as HeatCell[]} title={title} cityName={cityName} />}
           </BriefSection>
         );
       case 'venues':
         return (
-          <BriefSection {...common} lede={`Fans of ${title} in ${cityName} over-index on these places…`} skeletonClass="h-40">
+          <BriefSection {...common} lede={`Qloo-recommended venues in ${cityName} for ${title}.`} skeletonClass="h-40">
             {(data) => <VenueList data={data} currency={currency} />}
           </BriefSection>
         );
       case 'themes':
         return (
-          <BriefSection {...common} lede={`Fans of ${title} in ${cityName} over-index on these place themes…`} skeletonClass="h-16">
-            {(data) => <NameChips data={data} label={`Place themes fans of ${title} in ${cityName} over-index on`} />}
+          <BriefSection {...common} lede={`Food themes among recommended venues in ${cityName}.`} skeletonClass="h-16">
+            {(data) => <NameChips data={data} label={`Food themes among recommended venues in ${cityName}`} />}
           </BriefSection>
         );
       case 'artists':
         return (
-          <BriefSection {...common} lede={`Fans of ${title} over-index on these artists…`} skeletonClass="h-16">
-            {(data) => <NameChips data={data} label={`Artists fans of ${title} over-index on`} />}
+          <BriefSection {...common} lede={`Qloo-recommended artists for ${title} (global affinities).`} skeletonClass="h-16">
+            {(data) => <NameChips data={data} label={`Global artist recommendations for ${title}`} />}
           </BriefSection>
         );
       case 'brands':
         return (
-          <BriefSection {...common} lede={`Fans of ${title} over-index on these brands…`} skeletonClass="h-16">
-            {(data) => <NameChips data={data} label={`Brands fans of ${title} over-index on`} />}
+          <BriefSection {...common} lede={`Qloo-recommended food and drink brands for ${title} (global affinities).`} skeletonClass="h-16">
+            {(data) => <NameChips data={data} label={`Global food and drink brand recommendations for ${title}`} />}
           </BriefSection>
         );
       case 'hook':
@@ -286,18 +286,15 @@ function BriefStream({ city, type, mediaType, tmdbId }: TitleParams) {
             skeletonClass="h-64"
             body={
               compareOpen && !(view.kind === 'loading' && stalled) ? (
-                <CampaignCompare view={view} guess={guess.state} onRetryGuess={guess.load} bundle={bundle} cityName={cityName} />
+                <CampaignCompare view={view} guess={guess.state} onRetryGuess={guess.load} onRetryCampaign={retry} bundle={bundle} cityName={cityName} />
               ) : undefined
             }
           >
-            {(data, section) => {
+            {(data) => {
               const c = data as Campaign;
               if (!Array.isArray(c.ideas) || c.ideas.length === 0) return <p className="text-sm text-muted-foreground">No data returned</p>;
               return (
                 <div className="space-y-3">
-                  {section.status === 'ok' && c.groundedBy === 'qloo' && (
-                    <p className="text-xs text-muted-foreground">Each clause shows what it cites; clauses marked Agent suggestion are the writer’s own.</p>
-                  )}
                   <CampaignView campaign={c} bundle={bundle} cityName={cityName} />
                 </div>
               );

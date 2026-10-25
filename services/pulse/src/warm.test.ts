@@ -7,7 +7,7 @@ import { boardSql, newBoardDb, seedEvidence, type BoardDb } from "./testing/boar
 import { fixtureDeps } from "./testing/fakes.js";
 import { createHarnessQlooClient } from "./qloo/client.js";
 import type { HarnessTransport } from "./qloo/harness.js";
-import { createBackgroundWarmer, createWarmQueue, warmCities, warmCity, warmTitle, type WarmDeps } from "./warm.js";
+import { createBackgroundWarmer, createWarmQueue, warmCities, warmCity, warmTitle, warmBoardRanks, type WarmDeps } from "./warm.js";
 
 const delhi = getCity("delhi")!;
 const mumbai = getCity("mumbai")!;
@@ -109,7 +109,8 @@ describe("warmCity", () => {
     );
     const enqueueWarm = vi.fn();
     const before = await buildBoard({ sql: s.deps.sql, enqueueWarm }, delhi, "cafe", NOW);
-    expect(before.pending).toHaveLength(2);
+    expect(before.rankingPending).toBe(true);
+    expect(before.rankingBasis).toBe("release_order");
     await warmCity(s.deps, delhi, "cafe");
     enqueueWarm.mockClear();
     const after = await buildBoard({ sql: s.deps.sql, enqueueWarm }, delhi, "cafe", NOW);
@@ -189,7 +190,7 @@ describe("warmCity", () => {
 describe("a thin-signal title (Qloo's QLOO_CONTRACT rejection) through the real client", () => {
   const contract = { status: "error", results: [], error: { code: "QLOO_CONTRACT", layer: "qloo", retryable: false, recovery: "Check the arguments." } };
 
-  it("is warmed, not failed, leaves pending, and is ranked with no local signal", async () => {
+  it("caches thin title evidence but reports a failed rank and shows release order", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       const sent: string[] = [];
@@ -209,9 +210,9 @@ describe("a thin-signal title (Qloo's QLOO_CONTRACT rejection) through the real 
       };
       const enqueueWarm = vi.fn();
       const before = await buildBoard({ sql: deps.sql, enqueueWarm }, delhi, "cafe", NOW);
-      expect(before.pending).toHaveLength(1);
+      expect(before.rankingPending).toBe(true);
 
-      expect(await warmCity(deps, delhi, "cafe")).toEqual({ warmed: 1, failed: 0 });
+      expect(await warmCity(deps, delhi, "cafe")).toEqual({ warmed: 1, failed: 1 });
       expect(db.evidence.get("q-thin|delhi|heatmap")?.status).toBe("empty");
       expect(db.evidence.get("q-thin|delhi|place_tags")?.status).toBe("empty");
 
@@ -220,12 +221,12 @@ describe("a thin-signal title (Qloo's QLOO_CONTRACT rejection) through the real 
       const after = await buildBoard({ sql: deps.sql, enqueueWarm }, delhi, "cafe", NOW);
       expect(after.pending).toHaveLength(0);
       expect(after.ranked).toHaveLength(1);
-      expect(after.ranked[0].why).toContain("no local signal yet");
+      expect(after.ranked[0].why).toContain("no comparable local ranking");
       expect(enqueueWarm).not.toHaveBeenCalled(); // not re-enqueued on every poll
       expect(sent.length).toBe(callsBefore);
       // A second warm run is all cache hits.
-      expect(await warmCity(deps, delhi, "cafe")).toEqual({ warmed: 1, failed: 0 });
-      expect(sent.length).toBe(callsBefore);
+      expect(await warmCity(deps, delhi, "cafe")).toEqual({ warmed: 1, failed: 1 });
+      expect(sent.length).toBe(callsBefore + 1); // failed rank is not cached
     } finally { warn.mockRestore(); }
   });
 });
@@ -292,5 +293,22 @@ describe("createBackgroundWarmer", () => {
     await flush();
     expect(s.resolve).not.toHaveBeenCalled();
     expect(Object.values(s.fx.qlooCalls).reduce((a, b) => a + b, 0)).toBe(0);
+  });
+});
+
+
+describe("independent media ranking failures", () => {
+  it("still ranks TV when the movie request fails", async () => {
+    const s=setup({releases:[rel(1),{...rel(2),media_type:"tv"}]});
+    s.db.entities.push(
+      {tmdb_id:1,media_type:"movie",qloo_entity_id:"film",method:"imdb",not_found:false,resolved_at:NOW},
+      {tmdb_id:2,media_type:"tv",qloo_entity_id:"show",method:"imdb",not_found:false,resolved_at:NOW},
+    );
+    s.deps.qloo.callTool=vi.fn(async (_name,args)=>args.option_type==="movie"
+      ? {status:"error",results:[],error:{code:"QLOO_CONTRACT",retryable:false}}
+      : {status:"ok",results:[{entity_id:"show"}]});
+    await expect(warmBoardRanks(s.deps,delhi)).rejects.toThrow("One or more");
+    expect(s.deps.qloo.callTool).toHaveBeenCalledTimes(2);
+    expect([...s.db.evidence.values()].some(row=>(row.payload as EvidenceSection<string[]>)?.data?.includes("show"))).toBe(true);
   });
 });

@@ -60,7 +60,7 @@ export default function HeatMap({ cells, title, cityName }: HeatMapProps) {
     <div
       role="group"
       aria-roledescription="map"
-      aria-label={`Heatmap of where fans of ${title} are concentrated in ${cityName}`}
+      aria-label={`Qloo heatmap affinity for ${title} around ${cityName}`}
       className={`isolate ${HEAT_MAP_HEIGHT} overflow-hidden rounded-lg border border-border`}
     >
       <MapContainer center={[drawn[0].lat, drawn[0].lon]} zoom={11} scrollWheelZoom={false} className="h-full w-full" attributionControl>

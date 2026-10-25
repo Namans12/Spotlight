@@ -42,6 +42,7 @@ interface CompareProps {
   view: SectionView;
   guess: GuessState;
   onRetryGuess: () => void;
+  onRetryCampaign?: () => void;
   bundle: SectionBundle;
   cityName: string;
 }
@@ -50,9 +51,9 @@ interface CompareProps {
  * The two campaigns side by side (stacked on a phone), standing in the
  * campaign section's body while "Compare without Qloo" is open, so the grounded
  * campaign is on the page once, not twice. The left heading says "Grounded in
- * Qloo taste data" only when that is true of what is shown.
+ * Qloo taste data" only when Qloo context accompanies the proposals.
  */
-export function CampaignCompare({ view, guess, onRetryGuess, bundle, cityName }: CompareProps) {
+export function CampaignCompare({ view, guess, onRetryGuess, onRetryCampaign, bundle, cityName }: CompareProps) {
   const section = view.kind === 'section' ? view.section : null;
   const grounded = isGroundedCampaign(section ?? undefined);
   const campaign = ideasOf(section?.data);
@@ -61,14 +62,17 @@ export function CampaignCompare({ view, guess, onRetryGuess, bundle, cityName }:
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-2">
-        <h3 className={COLUMN_HEADING}>{grounded ? 'Grounded in Qloo taste data' : 'Qloo-grounded draft'}</h3>
+        <h3 className={COLUMN_HEADING}>{grounded ? 'Agent proposals with Qloo context' : 'Agent proposal draft'}</h3>
+        {section?.status === 'error' && onRetryCampaign && (
+          <button type="button" onClick={onRetryCampaign} className="inline-flex min-h-11 items-center rounded px-1 text-xs font-semibold text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Retry campaign</button>
+        )}
         {note && <p className="text-sm text-muted-foreground">{note}</p>}
         {campaign ? (
           <CampaignView campaign={campaign} bundle={bundle} cityName={cityName} ideaHeading="h4" />
         ) : (
           !note && (
             <p className="text-sm text-muted-foreground">
-              {view.kind === 'loading' ? 'Still drafting…' : view.kind === 'missing' ? 'No data returned' : 'No grounded campaign to compare with.'}
+              {view.kind === 'loading' ? 'Still drafting…' : view.kind === 'missing' ? 'No data returned' : 'No agent proposals to compare with.'}
             </p>
           )
         )}

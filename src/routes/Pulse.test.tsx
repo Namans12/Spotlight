@@ -65,7 +65,7 @@ describe('Pulse board: states', () => {
     renderPulse('/pulse');
     expect(screen.getByLabelText('City')).toBeInTheDocument();
     expect(screen.getByRole('tablist', { name: 'Business type' })).toBeInTheDocument();
-    expect(screen.getByText(/Which upcoming releases will your city/)).toBeInTheDocument();
+    expect(screen.getByText(/Choose an entertainment theme/)).toBeInTheDocument();
     expect(fetchBoard).not.toHaveBeenCalled();
   });
 
@@ -122,7 +122,7 @@ describe('Pulse board: states', () => {
     );
     renderPulse();
     await screen.findByText('Ranked One');
-    const strip = screen.getByText('Not enough taste data yet (2)').closest('details') as HTMLDetailsElement;
+    const strip = screen.getByText('Not ranked or unresolved (2)').closest('details') as HTMLDetailsElement;
     expect(strip).not.toBeNull();
     expect(strip.open).toBe(false);
     expect(within(strip).getByText('Mystery Title')).toBeInTheDocument();
@@ -134,7 +134,7 @@ describe('Pulse board: states', () => {
     vi.mocked(fetchBoard).mockResolvedValue(board({ ranked: [card()] }));
     renderPulse();
     await screen.findByText('Some Film');
-    expect(screen.queryByText(/Not enough taste data yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Not ranked or unresolved/)).not.toBeInTheDocument();
   });
 
   it('says so when there is nothing at all to rank', async () => {
@@ -319,5 +319,97 @@ describe('Pulse board: Ask Pulse', () => {
   it('is not offered while choosing a profile', () => {
     renderPulse('/pulse');
     expect(screen.queryByRole('button', { name: 'Ask Pulse' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Pulse board: evidence and cooldown', () => {
+  it('groups independent Qloo ranks by media type without numeric score bars', async () => {
+    vi.mocked(fetchBoard).mockResolvedValue(board({ rankingBasis: 'qloo_shortlist', ranked: [
+      card({ title: 'A Film', localRank: 2, rankTotal: 3, score: null }),
+      card({ tmdbId: 2, title: 'A Show', mediaType: 'tv', localRank: 1, rankTotal: 2, score: null }),
+    ] }));
+    renderPulse();
+    await screen.findByText('A Film');
+    expect(within(screen.getByRole('list', { name: 'Films ranked for Delhi' })).getByText('A Film')).toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: 'TV shows ranked for Delhi' })).getByText('A Show')).toBeInTheDocument();
+    expect(screen.queryByRole('meter')).not.toBeInTheDocument();
+    expect(screen.getByText(/do not forecast demand or attendance/)).toBeInTheDocument();
+  });
+
+  it('keeps unranked titles in the collapsed disclosure without denying other evidence', async () => {
+    vi.mocked(fetchBoard).mockResolvedValue(board({ ranked: [card()], noSignal: [card({ tmdbId: 2, title: 'Thin Signal', score: null, why: null })] }));
+    renderPulse();
+    await screen.findByText('Some Film');
+    const strip = screen.getByText('Not ranked or unresolved (1)').closest('details')!;
+    expect(strip).not.toHaveAttribute('open');
+    expect(within(strip).getByText('Not returned in Qloo’s local shortlist ranking')).toBeInTheDocument();
+    expect(within(strip).getByText('Thin Signal')).toBeInTheDocument();
+  });
+
+  it('shows all-no-signal releases in release order without a rank numeral', async () => {
+    vi.mocked(fetchBoard).mockResolvedValue(board({ rankingBasis: 'release_order', ranked: [card({ title: 'Fallback', score: null, why: 'Release order · no comparable local ranking' })] }));
+    renderPulse();
+    await screen.findByText('Fallback');
+    expect(screen.getByRole('list', { name: 'Releases in release order for Delhi' })).toBeInTheDocument();
+    expect(screen.queryByRole('meter')).not.toBeInTheDocument();
+    expect(screen.queryByText('1')).not.toBeInTheDocument();
+  });
+
+  it('stops polling a cached pending board after a 429 and honours Retry-After', async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetchBoard).mockResolvedValueOnce(board({ pending: [card()] })).mockRejectedValue(new PulseApiError(429, 'rate_limited', 30));
+    renderPulse();
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_100); });
+    expect(fetchBoard).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeDisabled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+    expect(fetchBoard).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeDisabled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(fetchBoard).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: 'Try again' })).not.toBeDisabled();
+  });
+
+  it('moves focus to the picker and restores Change after cancellation', async () => {
+    vi.mocked(fetchBoard).mockResolvedValue(board());
+    const user = userEvent.setup();
+    renderPulse();
+    const change = await screen.findByRole('button', { name: 'Change' });
+    await user.click(change);
+    expect(screen.getByLabelText('City')).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('button', { name: 'Change' })).toHaveFocus();
+  });
+});
+
+describe('Pulse board: ranking warm-up polling', () => {
+  it('polls unfinished ranking even with no pending evidence cards and stops once ranks arrive', async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetchBoard)
+      .mockResolvedValueOnce(board({ rankingBasis: 'release_order', rankingPending: true, ranked: [card({ title: 'Awaiting Rank', score: null, why: 'Release order · no comparable local ranking' })] }))
+      .mockResolvedValueOnce(board({ rankingBasis: 'qloo_shortlist', rankingPending: false, ranked: [card({ title: 'Awaiting Rank', localRank: 1, rankTotal: 1, score: null, why: '#1 of 1 films in Qloo’s Delhi shortlist' })] }));
+    renderPulse();
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.getByText('Reading the local shortlist ranking…')).toBeInTheDocument();
+    expect(fetchBoard).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_100); });
+    expect(fetchBoard).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('list', { name: 'Films ranked for Delhi' })).toBeInTheDocument();
+    expect(screen.getByText('#1 of 1 films in Qloo’s Delhi shortlist')).toBeInTheDocument();
+    expect(screen.queryByText('Reading the local shortlist ranking…')).not.toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+    expect(fetchBoard).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds ranking-only polling and offers a manual refresh after two minutes', async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetchBoard).mockResolvedValue(board({ rankingBasis: 'release_order', rankingPending: true, ranked: [card({ score: null })] }));
+    renderPulse();
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(125_000); });
+    expect(screen.getByText(/Still reading — refresh to check again/)).toBeInTheDocument();
+    const calls = vi.mocked(fetchBoard).mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+    expect(fetchBoard).toHaveBeenCalledTimes(calls);
   });
 });

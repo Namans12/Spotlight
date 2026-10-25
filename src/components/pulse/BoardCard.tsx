@@ -51,7 +51,7 @@ function RankSlot({ rank }: { rank?: number }) {
 
 interface RankedProps {
   card: BoardCardData;
-  rank: number;
+  rank?: number;
   cityName: string;
   href: string;
 }
