@@ -11,6 +11,20 @@ for results, limitations, active local DB configuration and acceptance work.
 The completed paired runs, retained pilot failures, final-code follow-up and
 remaining value gap are in [evaluation results](evaluation-results.md).
 
+## October 26 broader acceptance pass
+
+See [the acceptance report](acceptance-2026-10-26.md) for the fresh full run:
+976 service, 765 frontend and 241 Python tests passed; typecheck/build passed;
+lint retains 65 errors/four warnings. Real HTTP/provider checks, controlled
+stream cancellation/limits/heartbeats and local process restart passed. The
+browser verified a real service outage, retry recovery and Stop. Actual Linux
+container and hosted behavior remain unverified.
+
+The owner's natural-language Friends/Nothing Before Coffee journey failed:
+chat searched upcoming releases, found none and did not reach the available
+catalogue evidence. An explicit Friends TMDB ID works. This discovery gap joins
+sparse current-release ranking and unproven business value as an open gate.
+
 ## October 26 final local engineering checks
 
 - Full service suite: **976 passed**, 51 files, including integration tests on
@@ -21,8 +35,8 @@ remaining value gap are in [evaluation results](evaluation-results.md).
   static routes; no claim of live title-page/API hosting follows from that.
 - Lint remains at the existing baseline: 65 errors plus four warnings. Do not
   describe the whole repository as lint-clean. git diff --check passed.
-- Python files were unchanged in this round. The earlier 241-test pass is
-  historical; no new Python run is claimed here.
+- Python files were unchanged in the implementation round. The subsequent
+  broader acceptance pass reran all 241 Python tests successfully.
 - Real /readyz succeeds on the restored persistent DB. A separate key-loaded
   service pointed at an unavailable local DB returned /healthz 200 and /readyz
   503 (4ms), without leaking connection details. Unit tests cover a stalled
@@ -102,12 +116,15 @@ performance result. Trends were empty. See
 
 - Resolve or clearly retain the sparse ranking limitation; no rich multi-title
   comparison has been demonstrated by the current live rank responses.
-- Actual Docker image build/run and restart behavior.
+- Actual Docker image build/run and container restart behavior. Local process
+  interruption/recovery was verified in the broader acceptance pass.
 - Create the recommended Render Free / Neon Free / Vercel Hobby resources.
   Owner selected Groq free tier; existing caps retained. No resources created yet.
 - Public frontend/service URLs and current release data freshness.
 - Proxy trust/CORS/streaming behavior under the selected host.
-- Fresh-browser guest flow, brief, comparison, chat, empty/error/retry states.
+- Remaining fresh-browser authenticated, mobile and cross-browser journeys;
+  fix natural-language catalogue discovery. Local desktop guest, brief,
+  comparison, chat Stop and outage/retry were verified in the acceptance pass.
 - Final screenshots, public repository revision/license, final Devpost review.
 
 No deployment, push, payment or Devpost submission has been performed by ship prep.

@@ -9,6 +9,31 @@ Groq free tier remains selected. No push, deployment, paid plan or submission.
 - docs/submission/evaluation-results.md: completed paired runs, failures and verdict.
 - docs/submission/evaluation-plan.md: frozen cases, acceptance and reproduction.
 - docs/submission/validation.md: engineering/live verification and pending gates.
+- docs/submission/acceptance-2026-10-26.md: subsequent full acceptance pass and
+  newly observed natural-language Friends discovery failure.
+
+## Subsequent “Test it all” acceptance
+
+No application code changed. Fresh 976 service, 765 frontend and 241 Python
+tests, typecheck and build passed. Lint remains at 65 errors/four warnings.
+Real HTTP validation/CORS/guards, fresh Friends Qloo demographics/heatmap/cafés,
+an explicit-ID live Groq chat and additional consumer routes passed. Controlled
+local streaming tests passed limits, disconnect slot release, heartbeat,
+SIGTERM child cleanup and restart recovery. Browser outage/Try again and Stop
+passed; an actual campaign regenerated after service restart.
+
+New product failure: a natural-language NBC/Friends request searched only
+upcoming releases and returned zero instead of reaching the available Friends
+evidence. Explicit TMDB 1668 works. Catalogue discovery needs work; do not call
+the ordinary request successful. Current city boards remain 0/10 films and
+0/7 TV, and business improvement over baseline remains unproven. No new paired
+benchmark was needed; the saved final run passed another offline citation/hash
+audit. All raw diagnostic outputs remain ignored/private.
+
+Original public API checks passed locally (releases/calendar/TMDB and private
+watchlist 401 guards). Full sign-in/authenticated flows, OMDB enrichment, mobile,
+Linux image execution and hosted behavior remain unverified. Original local
+auth/OMDB configuration is absent. Deployment stays on hold.
 
 ## Changed
 
@@ -69,6 +94,8 @@ for integration tests. The service's ignored .env DATABASE_URL now points to
 Do not use the old 54329 recipe. No Qloo cache was restored from a dump.
 
 Postgres, Pulse on 8799 and Vite on 8080 are left running for local review.
+The original API server is also running on 3001 against the restored local DB.
+Isolated acceptance services on 18989/18990 were stopped.
 The unrelated Navikenz Vite was not touched. To restart this cluster if stopped:
 
 ```bash
