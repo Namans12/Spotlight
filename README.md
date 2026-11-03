@@ -1,4 +1,180 @@
-# Spotlight
+# Release Pulse, built on Spotlight
+
+**Choose an entertainment moment. Show the cultural evidence. Draft a campaign.**
+
+Release Pulse helps a café or D2C food brand explore upcoming releases and turn
+Qloo cultural insights into a campaign brief. It combines Spotlight’s India-first
+streaming/theatrical calendar with title resolution, geographic heatmaps,
+city-filtered venues, global artist/food-brand affinities and conditional trial plans.
+It also exposes the underlying tools to an in-app chat agent.
+
+**October 26: deployment is on hold.** The paired evaluation established source
+traceability, not a business advantage over the LLM-only arm. The model selects
+context and conservative trial templates; public chat renders tool facts rather
+than unchecked model advice. See [results](docs/submission/evaluation-results.md).
+
+> **Qloo Agentic Hackathon submission work.** Spotlight existed before the event.
+> Release Pulse was added on `feat/release-pulse` during October 2026: the separate
+> Node service (`services/pulse`), migration `0016`, shared Pulse contracts,
+> `/pulse` board and brief pages, Qloo harness integration, campaign/chat agents,
+> and Wikipedia/Wikidata location pipeline are the new work. The earlier WebMCP
+> submission and original product documentation are retained below as history.
+> **Hosting and final judge verification are pending**; the historical Spotlight
+> URL below is not a claim that Release Pulse is deployed there.
+
+## Try Pulse in 60 seconds
+
+Once the deployment URL is recorded in [validation](docs/submission/validation.md):
+
+1. Open the hackathon app at `/pulse?city=delhi&type=cafe`. Pulse needs no login,
+   browser flags or personal API key.
+2. Open an evidence-backed release. Read the source and scope labels alongside
+   the heatmap, venue suggestions and campaign clauses.
+3. Select **Compare without Qloo**. Compare the grounded brief with the explicitly
+   labeled LLM-only draft; this demonstrates a difference, not a measured A/B win.
+4. Ask chat with the title and context: “For my Delhi café, explain the evidence for [title] and distinguish campaign suggestions.”
+5. Switch city or business type. Thin/unknown titles must report missing evidence;
+   city selection does not turn global demographics or artists into local data.
+
+Cold caches, provider quotas and source coverage affect latency. The earlier local
+live run on October 21 produced one brief in roughly eight seconds; that is not a
+hosted performance guarantee. See the [deployment checklist](docs/submission/deploy.md).
+
+## What Qloo contributes
+
+| Tool / operation | Used for | Scope and limits |
+|---|---|---|
+| `qloo_rank` | Order a fixed shortlist, separately for films and TV, using the city signal | At most ten candidates of one type per query; returned order only, no cross-query comparison |
+| `qloo_where_popular` | Heatmap within a selected city | Relative cells inside one query; not counts or comparable scores across separate title queries |
+| `qloo_recommend` for places | Venue ideas filtered to the selected city | The venue location is filtered; this is not a measured local audience profile |
+| `qloo_entity_tags`, `qloo_find_tags` | Food/drink themes and venue filters | Tags describe recommended venues; they do not measure fan cuisine consumption |
+| `qloo_recommend` for artists and food/beverage brands | Cross-domain creative inspiration | Global title affinities; no endorsement, licensing, listening or sales claim |
+| `qloo_audience_demographics` | Audience age/gender skew when returned | Global relative skew, not city demographics or a percentage of people |
+| IMDb/entity and title search lookups | Match TMDB titles to Qloo entities | IMDb match preferred; search fallback is labeled as a less certain match |
+
+Insights use the official npm package’s `qloo mcp` server as a private child of a
+persistent Node service. **Two identity lookups** (`/entities` by IMDb and `/search`)
+currently use authenticated GETs because the pinned harness does not expose their
+required lookup shapes. This is not an all-MCP integration. The code centralizes
+those exceptions in `services/pulse/src/qloo/harness.ts`.
+
+The board has **no weighted score**: all `score` values are `null`. Qloo ordinal
+ranks apply only within a fixed, same-type shortlist (up to ten films or ten TV
+shows) and one city signal; films and TV are never treated as comparable queries.
+The film slate reserves up to six theatrical candidates when available. Titles
+omitted from a usable returned rank appear in a collapsed strip; if fewer than
+two results per type can be compared,
+the board explicitly falls back to release order. Changing the business type
+changes brief filters, not Qloo’s city-only shortlist order. Heatmap values from
+separate requests never determine the order.
+
+**Current coverage limitation (October 26):** live Delhi and Mumbai slates each
+returned no comparable city ranks for 17 resolved titles; three were unresolved.
+All 17 resolved titles, including six theatrical candidates, remain visible in
+explicit release order. A single returned title also cannot establish a comparison.
+Established-title city probes returned only one item per ranking call.
+Successful API status therefore does not establish a useful multi-title comparison;
+this sparse result is under investigation. See [validation](docs/submission/validation.md).
+Trends returned empty in the original live spike and are not a demonstrated feature.
+
+## Request-to-result walkthrough (no secrets or cached Qloo payload)
+
+```text
+GET /brief?tmdbId=<known-id>&mediaType=movie&city=delhi&type=cafe
+  -> validate title exists in Spotlight
+  -> TMDB external IDs -> IMDb ID -> Qloo entity (preferred exact identity path)
+  -> qloo_where_popular { entity: <qloo-id>, within: "Delhi", limit: 20 }
+  -> qloo_recommend { target_type: "place", signals: [<qloo-id>],
+                      filter_location: "Delhi", include_tags: [<food-tag-id>],
+                      limit: 20, explain: false }
+  -> recommended venue tags -> locally selected food/drink themes
+  -> optional global demographic, artist and food/beverage brand evidence
+  -> separate Wikipedia/Wikidata filmed/set-here evidence
+  -> model selects context and a bounded trial plan
+  -> source context copied verbatim; actions rendered from conditional templates
+  -> stream sections and show uncited/unresolvable claims as Agent suggestion
+```
+
+This is a schematic, not an observed payload. The exact locked tool recipes and
+parameter names are in [recipes.ts](services/pulse/src/qloo/recipes.ts); all output
+is governed by their provenance/limits text. A failed provider call is shown as a
+failure, while an empty or thin response is shown as missing evidence. A circuit
+guard prevents pervasive request-contract failures being silently treated as
+missing taste data.
+
+## Run and reproduce
+
+Prerequisites: Node 22.19+, Python 3.10+ for ingestion, PostgreSQL and service keys.
+The service runs outside Vercel serverless; the frontend stays on Vercel. Build
+context for the Dockerfile is the **repository root**, not `services/pulse`.
+
+```bash
+npm ci
+npm --prefix services/pulse ci
+cp services/pulse/.env.example services/pulse/.env
+# Edit that private file, apply migrations and load current releases as below.
+npm --prefix services/pulse run start:local
+```
+
+In another terminal:
+
+```bash
+VITE_PULSE_URL=http://localhost:8799 npm run dev:full
+```
+
+The environment example uses service port 8799 and frontend port 8080. The
+`dev:full` process also starts Spotlight’s local API, needed for title-page reads;
+its server-side settings come from the shell/root local configuration. Do not
+copy service secrets into `VITE_*` variables. Pulse’s own board/brief can be
+accessed without those original watchlist APIs.
+
+See the [full deploy/seed runbook](docs/submission/deploy.md) for fresh database
+migrations, live catalog ingestion, CORS, provider settings, quotas, one-instance
+hosting and readiness checks. `/healthz` checks process liveness; `/readyz`
+checks database/schema access with a bounded response. Neither verifies provider
+quality or data freshness. No deploy or paid resources are created by these files.
+
+```bash
+npm run typecheck
+npm test
+npm run test:pulse
+.venv/bin/python -m pytest -q
+```
+
+Service database integration tests need a **separate clean database**, with
+migrations applied, in `PULSE_TEST_DATABASE_URL`; do not point tests at a populated
+live demo. Missing integration configuration skips those cases rather than proving
+them. Lint has a pre-existing baseline; new warnings/errors must be separated from
+that baseline rather than describing the entire branch as lint-clean. Fixture mode
+is development-only and invented data is not evidence of live
+Qloo coverage. See [validation status](docs/submission/validation.md) for checks
+actually performed on the final change.
+
+## Data, limitations and responsible use
+
+- Send Qloo only cultural entity/tag IDs and the explicitly selected city. Do not
+  send personal details, watch histories, chat transcripts or location histories.
+- Qloo evidence is cached privately with timestamps; no raw Qloo datasets or cache
+  dumps belong in source control. Do not publish local spike output or secrets.
+- Affinities describe aggregate cultural relationships. They do not identify what
+  an individual likes, how many fans live nearby or how much revenue is available.
+- Filmed/set-here records come from Wikipedia/Wikidata, **not Qloo**. Coverage and
+  title matching are incomplete; a missing record does not disprove a location.
+- Configured cities are Delhi, Mumbai, Bengaluru, Hyderabad, Chennai, Pune,
+  Kolkata, Goa, New York and London. Configuration is not a coverage guarantee.
+- India release dates remain India release dates when viewing overseas cities.
+- New/obscure titles often lack Qloo demographic or cross-domain data. The app
+  cannot manufacture evidence for them. Venue coordinates may be absent.
+- LLM copy is a draft for review. Brand/artist affinity grants no endorsement or
+  rights to use logos, music, characters or film assets in a commercial campaign.
+- The public demo has route limits and daily model budgets. Another provider or
+  a paid tier may raise quotas, but does not eliminate rate limits or costs.
+
+Draft submission: [Devpost copy](docs/submission/devpost.md). License: [MIT](LICENSE).
+
+---
+
+# Spotlight: original product and WebMCP history
 
 *Find what's worth watching.*
 
@@ -22,7 +198,7 @@ It runs **every Wednesday and Friday at 2:00 PM IST** (plus a nightly refresh) u
 
 The Wed/Fri run also sends a **Telegram alert scoped to your own watchlist** — nothing broadcast, nobody else's data — whenever a title on it releases (see [Watchlist-drop alerts](#watchlist-drop-alerts)). The pipeline can still send the full Out Now/Coming Up digest as a broadcast (Telegram and/or email; see `SEND_BROADCAST_DIGEST` and `EMAIL_ENABLED` in [Configuration](#configuration-env-vars)) if you want that instead of, or alongside, the watchlist alert — it's just off by default in this deployment.
 
-## Testing this in 60 seconds (for judges)
+## Historical WebMCP demonstration
 
 **Demo video:** https://youtu.be/bbvMvbdw4s8
 
@@ -155,7 +331,7 @@ Using your own Gmail (or any account) as the sender needs an **app password**, n
 
 1. Create a free project at https://neon.tech (pick a region close to your Vercel deployment region).
 2. Copy the pooled connection string.
-3. Run the migrations once, in order: `0001_init.sql`, `0002_title_ratings.sql`, `0003_title_relations.sql`, `0004_title_relations_reverse_index.sql`, `0005_title_relation_lookups.sql`, `0006_calendar_entries_poster.sql`, `0007_multi_user_accounts.sql`, `0008_release_items_month_index.sql`, `0009_calendar_language_iso.sql`, `0010_calendar_origin_release.sql`, `0011_title_seasons.sql`, `0012_reset_tmdb_relations.sql`, `0013_per_user_watchlist_alerts.sql` — e.g. `psql "$DATABASE_URL" -f migrations/0001_init.sql` for each (or via a Python one-liner with `psycopg` if you don't have `psql` installed).
+3. Run the migrations once, in order: `0001_init.sql`, `0002_title_ratings.sql`, `0003_title_relations.sql`, `0004_title_relations_reverse_index.sql`, `0005_title_relation_lookups.sql`, `0006_calendar_entries_poster.sql`, `0007_multi_user_accounts.sql`, `0008_release_items_month_index.sql`, `0009_calendar_language_iso.sql`, `0010_calendar_origin_release.sql`, `0011_title_seasons.sql`, `0012_reset_tmdb_relations.sql`, `0013_per_user_watchlist_alerts.sql`, `0014_title_progress.sql`, `0015_title_opinions.sql`, `0016_release_pulse.sql` — e.g. `psql "$DATABASE_URL" -f migrations/0001_init.sql` for each (or via a Python one-liner with `psycopg` if you don't have `psql` installed).
 4. Link the seeded calendar rows to TMDB so they get posters and become clickable: `python scripts/backfill_calendar_tmdb.py` (safe to re-run; it only touches rows still missing a `tmdb_id`).
 5. Keep the calendar populated past the seeded window: `python scripts/sync_calendar_tmdb.py --months 6`. Pulls region-aware theatrical dates (`/discover/movie` with `region` + `with_release_type=2|3` + `release_date.gte/lte` — not `primary_release_date.*`, which ignores `region` entirely and returns global junk) and TV premieres, and only ever *enriches* existing rows — a curated editorial row keeps its own platform and details and merely gains a poster and a `tmdb_id`. Queries one calendar month at a time rather than the whole window at once — TMDB caps each `/discover` call at a fixed page limit regardless of true match count, so a single big-range query lets a handful of popular titles anywhere in it crowd out an entire other month's releases before the cap even applies (confirmed directly: a 6-month single-query window had 178 real matches behind a 60-result cap, silently dropping 118). TV premieres are additionally scoped by `--tv-countries` (default `IN,US,GB`) — TMDB is crowdsourced and global TV volume runs into the hundreds a month, almost all obscure local productions; this trades missing an occasional big non-English hit for not drowning the calendar in noise. Runs nightly (see below).
 4. Optionally seed the editorial calendar: `python scripts/seed_calendar_csv.py`.

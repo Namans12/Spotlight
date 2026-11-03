@@ -15,7 +15,7 @@ function hasEnteredThisSession(): boolean {
  * app (which mounts immediately underneath so data starts loading while
  * the intro plays). */
 export function IntroGate({ children }: { children: React.ReactNode }) {
-  const [showIntro, setShowIntro] = useState(() => !hasEnteredThisSession());
+  const [showIntro, setShowIntro] = useState(() => !/^\/pulse(?:\/|$)/.test(window.location.pathname) && !hasEnteredThisSession());
 
   // The app underneath mounts and loads data while the intro plays, which can
   // make the page taller than the viewport — lock body scroll so that doesn't

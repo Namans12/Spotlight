@@ -1,0 +1,23 @@
+{
+  // The Pulse service is plain Node run through tsx, like api/ and lib/, so it
+  // takes tsconfig.server.json's NodeNext settings. It also pulls in `lib` and
+  // `shared` because it imports them by relative path, and they must be
+  // checked under the same resolution it uses to run them.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
+  },
+  "include": ["services/pulse/src", "lib", "shared"],
+  // Tests are resolved by Vite inside the service's own vitest run.
+  "exclude": ["**/*.test.ts"]
+}

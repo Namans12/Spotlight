@@ -1,0 +1,24 @@
+# Default-deny context: credentials, backups, Qloo caches, fixtures output,
+# Python environment, docs and the SPA are not sent to the container builder.
+**
+!package.json
+!package-lock.json
+!lib/
+!lib/**
+!shared/
+!shared/**
+!data/
+!data/pulse_cities.json
+!data/collection-shapes.json
+!services/
+!services/pulse/
+!services/pulse/package.json
+!services/pulse/package-lock.json
+!services/pulse/Dockerfile
+!services/pulse/src/
+!services/pulse/src/**
+**/*.test.ts
+**/*.test.tsx
+**/node_modules
+**/.env*
+**/*.log

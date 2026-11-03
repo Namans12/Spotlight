@@ -54,3 +54,28 @@ jobs:
           RELEASE_TIMEZONE: Asia/Kolkata
           DASHBOARD_URL: ${{ vars.DASHBOARD_URL }}
         run: python releasebot.py
+
+      # Asks Release Pulse to refill its board cache now that the release data
+      # is fresh. Optional and best effort: a sleeping container or a missing
+      # secret must never fail the release run, and until Pulse is deployed and
+      # configured this step does nothing at all.
+      - name: Warm Release Pulse board
+        continue-on-error: true
+        timeout-minutes: 25
+        env:
+          PULSE_WARM_SECRET: ${{ secrets.PULSE_WARM_SECRET }}
+          PULSE_URL: ${{ vars.PULSE_URL }}
+        run: |
+          if [ -z "$PULSE_WARM_SECRET" ] || [ -z "$PULSE_URL" ]; then
+            echo "Pulse warm skipped (not configured)"
+            exit 0
+          fi
+          # Free hosts can sleep; keep the warm request open until it completes.
+          # Only launch cities, never a keep-alive ping to defeat host sleep.
+          for city in delhi mumbai; do
+            report=$(curl -fsS --max-time 600 -X POST \
+              -H "Authorization: Bearer $PULSE_WARM_SECRET" \
+              "${PULSE_URL%/}/warm?wait=1&city=$city")
+            printf '%s\n' "$report"
+            jq -e '.failed == 0' <<< "$report" >/dev/null
+          done

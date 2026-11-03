@@ -1,0 +1,212 @@
+[
+  {
+    "slug": "delhi",
+    "name": "Delhi",
+    "country": "IN",
+    "lat": 28.6139,
+    "lon": 77.209,
+    "qids": [
+      "Q1353",
+      "Q987"
+    ],
+    "qlooLocationQuery": "Delhi",
+    "wikipedia": {
+      "filmed": [
+        "Films_shot_in_Delhi"
+      ],
+      "set": [
+        "Films_set_in_Delhi",
+        "Television_shows_set_in_Delhi"
+      ]
+    },
+    "prewarm": true
+  },
+  {
+    "slug": "mumbai",
+    "name": "Mumbai",
+    "country": "IN",
+    "lat": 19.076,
+    "lon": 72.8777,
+    "qids": [
+      "Q1156"
+    ],
+    "qlooLocationQuery": "Mumbai",
+    "wikipedia": {
+      "filmed": [
+        "Films_shot_in_Mumbai"
+      ],
+      "set": [
+        "Films_set_in_Mumbai",
+        "Television_shows_set_in_Mumbai"
+      ]
+    },
+    "prewarm": true
+  },
+  {
+    "slug": "bengaluru",
+    "name": "Bengaluru",
+    "country": "IN",
+    "lat": 12.9716,
+    "lon": 77.5946,
+    "qids": [
+      "Q1355"
+    ],
+    "qlooLocationQuery": "Bengaluru",
+    "wikipedia": {
+      "filmed": [
+        "Films_shot_in_Bengaluru"
+      ],
+      "set": [
+        "Films_set_in_Bengaluru"
+      ]
+    },
+    "prewarm": true
+  },
+  {
+    "slug": "hyderabad",
+    "name": "Hyderabad",
+    "country": "IN",
+    "lat": 17.385,
+    "lon": 78.4867,
+    "qids": [
+      "Q1361"
+    ],
+    "qlooLocationQuery": "Hyderabad",
+    "wikipedia": {
+      "filmed": [
+        "Films_shot_in_Hyderabad,_India"
+      ],
+      "set": [
+        "Films_set_in_Hyderabad,_India",
+        "Television_shows_set_in_Hyderabad,_India"
+      ]
+    },
+    "prewarm": false
+  },
+  {
+    "slug": "chennai",
+    "name": "Chennai",
+    "country": "IN",
+    "lat": 13.0827,
+    "lon": 80.2707,
+    "qids": [
+      "Q1352"
+    ],
+    "qlooLocationQuery": "Chennai",
+    "wikipedia": {
+      "filmed": [
+        "Films_shot_in_Chennai"
+      ],
+      "set": [
+        "Films_set_in_Chennai"
+      ]
+    },
+    "prewarm": false
+  },
+  {
+    "slug": "pune",
+    "name": "Pune",
+    "country": "IN",
+    "lat": 18.5204,
+    "lon": 73.8567,
+    "qids": [
+      "Q1538"
+    ],
+    "qlooLocationQuery": "Pune",
+    "wikipedia": {
+      "filmed": [
+        "Films_shot_in_Pune"
+      ],
+      "set": [
+        "Films_set_in_Pune",
+        "Television_shows_set_in_Pune"
+      ]
+    },
+    "prewarm": false
+  },
+  {
+    "slug": "kolkata",
+    "name": "Kolkata",
+    "country": "IN",
+    "lat": 22.5726,
+    "lon": 88.3639,
+    "qids": [
+      "Q1348"
+    ],
+    "qlooLocationQuery": "Kolkata",
+    "wikipedia": {
+      "filmed": [
+        "Films_shot_in_Kolkata"
+      ],
+      "set": [
+        "Films_set_in_Kolkata",
+        "Television_shows_set_in_Kolkata"
+      ]
+    },
+    "prewarm": false
+  },
+  {
+    "slug": "goa",
+    "name": "Goa",
+    "country": "IN",
+    "lat": 15.4909,
+    "lon": 73.8278,
+    "qids": [
+      "Q1171"
+    ],
+    "qlooLocationQuery": "Goa",
+    "wikipedia": {
+      "filmed": [
+        "Films_shot_in_Goa"
+      ],
+      "set": [
+        "Films_set_in_Goa"
+      ]
+    },
+    "prewarm": false
+  },
+  {
+    "slug": "new-york",
+    "name": "New York City",
+    "country": "US",
+    "lat": 40.7128,
+    "lon": -74.006,
+    "qids": [
+      "Q60"
+    ],
+    "qlooLocationQuery": "New York City",
+    "wikipedia": {
+      "filmed": [
+        "Films_shot_in_New_York_City",
+        "Television_shows_shot_in_New_York_City"
+      ],
+      "set": [
+        "Films_set_in_New_York_City",
+        "Television_shows_set_in_New_York_City"
+      ]
+    },
+    "prewarm": true
+  },
+  {
+    "slug": "london",
+    "name": "London",
+    "country": "GB",
+    "lat": 51.5074,
+    "lon": -0.1278,
+    "qids": [
+      "Q84"
+    ],
+    "qlooLocationQuery": "London",
+    "wikipedia": {
+      "filmed": [
+        "Films_shot_in_London",
+        "Television_shows_shot_in_London"
+      ],
+      "set": [
+        "Films_set_in_London",
+        "Television_shows_set_in_London"
+      ]
+    },
+    "prewarm": true
+  }
+]
