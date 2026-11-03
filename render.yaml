@@ -1,0 +1,39 @@
+# Free-first hackathon deployment. Source changes remain local until explicitly
+# published; creating this file does not create a Render service or spend money.
+services:
+  - type: web
+    name: release-pulse
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./services/pulse/Dockerfile
+    dockerContext: .
+    healthCheckPath: /readyz
+    numInstances: 1
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: TMDB_API_KEY
+        sync: false
+      - key: QLOO_API_KEY
+        sync: false
+      - key: QLOO_BASE_URL
+        value: https://hackathon.api.qloo.com
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: PULSE_ALLOWED_ORIGINS
+        sync: false
+      - key: PULSE_WARM_SECRET
+        generateValue: true
+      - key: PULSE_GLOBAL_DAILY_LLM
+        value: "300"
+      - key: PULSE_SESSION_DAILY_CHAT
+        value: "12"
+      - key: PULSE_SESSION_DAILY_CAMPAIGN
+        value: "20"
