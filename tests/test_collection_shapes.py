@@ -109,7 +109,7 @@ def must_pairs(plan) -> list[str]:
 
 def test_harry_potter_stays_a_single_chain():
     plan = plan_collection(1241, HARRY_POTTER, PAST)
-    assert plan.classification == "chain"
+    assert plan.classification == "arcs"
     assert must_pairs(plan) == [
         "672<-671",
         "673<-672",
@@ -180,10 +180,10 @@ def test_size_fallback_only_bites_far_above_any_real_chain():
     under = parts([(9_100_000 + i, f"Entry {i}", f"20{10 + i:02d}-01-01") for i in range(EPISODIC_PART_THRESHOLD)])
 
     over_plan = plan_collection(424242, over, PAST)
-    assert over_plan.classification == "episodic"
-    assert any("EPISODIC_PART_THRESHOLD" in w for w in over_plan.warnings)
-
-    assert plan_collection(424243, under, PAST).classification == "chain"
+    assert over_plan.classification == "unverified"
+    assert any("not curated" in w for w in over_plan.warnings)
+    assert not over_plan.must
+    assert plan_collection(424243, under, PAST).classification == "unverified"
 
 
 def test_part_order_does_not_matter():
@@ -193,10 +193,18 @@ def test_part_order_does_not_matter():
 
 
 def test_unknown_and_null_collection_ids_are_plain_chains():
-    assert plan_collection(123456789, HARRY_POTTER, PAST).classification == "chain"
-    assert plan_collection(None, HARRY_POTTER, PAST).classification == "chain"
+    assert plan_collection(123456789, HARRY_POTTER, PAST).classification == "unverified"
+    assert not plan_collection(123456789, HARRY_POTTER, PAST).must
+    assert plan_collection(None, HARRY_POTTER, PAST).classification == "unverified"
 
 
 def test_undated_parts_sort_last():
     plan = plan_collection(645, BOND, PAST)
     assert plan.loose[-1]["id"] == 1184696
+
+
+def test_unclaimed_curated_member_is_not_claimed_to_be_optional():
+    from lib_collection_shapes import UNVERIFIED_SERIES_REASON
+    extra = STAR_WARS + parts([(999001, 'New entry', '2029-01-01')])
+    plan = plan_collection(10, extra, PAST)
+    assert all(reason == UNVERIFIED_SERIES_REASON for a, b, reason in plan.can if 999001 in (a['id'], b['id']))

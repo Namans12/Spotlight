@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "http";
 import { getDb } from "../lib/db.js";
-import type { DigestResponse, DigestWindow, ReleaseItemDTO, SectionKey, WindowKind } from "../shared/types/release.js";
+import type { DigestResponse, DigestWindow, ReleaseEvidenceDTO, ReleaseItemDTO, SectionKey, WindowKind } from "../shared/types/release.js";
 
 const SECTION_ORDER: SectionKey[] = ["hindi", "english", "popular"];
 const WINDOW_KINDS: WindowKind[] = ["out_now", "coming_up"];
@@ -36,11 +36,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
           window_start: string;
           window_end: string;
           generated_at: string;
+          evidence: ReleaseEvidenceDTO | null;
         }>
       >`
         SELECT tmdb_id, media_type, title, language, release_date::text AS release_date, rating, popularity,
                overview, tmdb_url, poster_url, providers, section,
-               window_start::text AS window_start, window_end::text AS window_end, generated_at
+               window_start::text AS window_start, window_end::text AS window_end, generated_at, evidence
         FROM release_items
         WHERE region = ${region} AND window_kind = ${windowKind}
         ORDER BY release_date ASC NULLS LAST, popularity DESC, title ASC
@@ -54,7 +55,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
       for (const section of SECTION_ORDER) {
         windows[windowKind].sections[section] = rows
-          .filter((row) => row.section === section)
+          .filter((row) => row.section === section && row.release_date !== null &&
+            row.release_date >= row.window_start && row.release_date <= row.window_end &&
+            row.evidence?.region === region && row.evidence?.date_source === "tmdb_regional_digital")
           .map(
             (row): ReleaseItemDTO => ({
               tmdb_id: Number(row.tmdb_id),
@@ -67,7 +70,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
               overview: row.overview,
               tmdb_url: row.tmdb_url,
               poster_url: row.poster_url,
-              providers: row.providers,
+              providers: row.evidence?.provider_source === "tmdb_regional_availability" ? row.providers : [],
+              evidence: row.evidence,
             }),
           );
       }

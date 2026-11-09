@@ -6,6 +6,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 type TmdbRow = any;
 import {
   resolveProviders,
+  resolveProviderOffers,
   tmdbWatchProvidersBatch,
   providerCacheKey,
   tmdbCollectionParts,
@@ -53,6 +54,10 @@ describe('resolveProviders', () => {
     expect(resolveProviders(details, 'IN')).toEqual(['Buy/Rent']);
   });
 
+  it('does not infer local availability from foreign listings or networks', () => {
+    expect(resolveProviders({ ...watchProvidersPayload('US', { flatrate: [{ provider_name: 'Hulu' }] }), networks: [{ name: 'Netflix' }] }, 'IN')).toEqual([]);
+  });
+
   it('returns nothing when no tier has an answer', () => {
     expect(resolveProviders({}, 'IN')).toEqual([]);
   });
@@ -89,6 +94,7 @@ describe('tmdbWatchProvidersBatch', () => {
     // TMDB error reads as a permanent fact about the title.
     expect(result.providers).toEqual({});
     expect(Object.keys(result.providers)).not.toContain(providerCacheKey({ mediaType: 'movie', id: 1 }));
+    expect(result.availability['movie:1']).toBeUndefined();
     expect(result.hadFailures).toBe(true);
   });
 
@@ -546,4 +552,16 @@ describe('tmdbDetail trailer', () => {
     const detail = await tmdbDetail('movie', 1, 'IN');
     expect(detail.trailer).toBeNull();
   });
+});
+
+it('retains each regional subscription, free, ads, rent and purchase offer independently', () => {
+  const details = { 'watch/providers': { results: {
+    IN: { flatrate: [{ provider_name: 'Netflix' }], rent: [{ provider_name: 'Netflix' }],
+      buy: [{ provider_name: 'Netflix' }], free: [{ provider_name: 'ZEE5' }], ads: [{ provider_name: 'ZEE5' }] },
+    US: { flatrate: [{ provider_name: 'Hulu' }] },
+  } } };
+  expect(resolveProviderOffers(details, 'IN')).toEqual([
+    { provider: 'Netflix', type: 'subscription' }, { provider: 'ZEE5', type: 'free' },
+    { provider: 'ZEE5', type: 'ads' }, { provider: 'Netflix', type: 'rent' }, { provider: 'Netflix', type: 'buy' },
+  ]);
 });

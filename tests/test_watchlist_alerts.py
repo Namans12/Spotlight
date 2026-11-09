@@ -50,11 +50,12 @@ def item(title, tmdb_id, media_type="movie", providers=("Netflix",)):
         tmdb_url="https://example.invalid",
         poster_url="/p.jpg",
         providers=providers,
+        evidence=rb.ReleaseEvidence("IN", "tmdb_regional_digital", "tmdb_regional_availability", "2026-09-02T08:00:00+00:00"),
     )
 
 
 def digest_with(*items):
-    return {"out_now": {"sections": {"english": list(items)}}}
+    return {"region": "IN", "generated_at": "2026-09-02T14:00:00+05:30", "out_now": {"start": "2026-09-02", "end": "2026-09-03", "sections": {"english": list(items)}}}
 
 
 def test_matches_owner_row_from_fake_query_result():
@@ -220,3 +221,80 @@ def test_send_watchlist_alerts_message_names_the_title_and_providers():
     )
 
     assert sent_texts == ["🎯 From your watchlist: Gandhari is now on Netflix, JioHotstar"]
+
+
+def test_alerts_require_arrived_date_and_local_evidence():
+    from dataclasses import replace
+
+    eligible = item("Eligible", 1)
+    evidence = eligible.evidence
+    candidates = [
+        eligible,
+        replace(eligible, tmdb_id=2, release_date="2026-09-03"),  # future, even inside window
+        replace(eligible, tmdb_id=3, release_date="2026-09-01"),  # before window
+        replace(eligible, tmdb_id=4, evidence=None),
+        replace(eligible, tmdb_id=5, evidence=replace(evidence, region="US")),
+        replace(eligible, tmdb_id=6, evidence=replace(evidence, date_source=None)),
+        replace(eligible, tmdb_id=7, evidence=replace(evidence, provider_source=None)),
+        replace(eligible, tmdb_id=8, providers=()),
+    ]
+    assert [x.tmdb_id for x in rb.eligible_watchlist_items(digest_with(*candidates))] == [1]
+    assert rb.eligible_watchlist_items({"out_now": {"sections": {"english": candidates}}}) == []
+
+
+def test_both_matchers_reject_unknown_evidence_before_querying_watchlists():
+    from dataclasses import replace
+
+    unknown = replace(item("Unverified", 42), evidence=None)
+    conn = FakeConn(rows=[(42, "movie")])
+    assert rb.find_watchlist_matches(digest_with(unknown), conn, ["owner@example.com"]) == []
+    assert conn.cursor().last_query is None
+    assert rb.find_watchlist_matches_by_user(digest_with(unknown), conn) == []
+    assert conn.cursor().last_query is None
+
+
+def test_release_evidence_is_written_and_unknown_stays_null():
+    import json
+    from dataclasses import replace
+
+    class Cursor:
+        def __init__(self): self.calls = []
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def execute(self, sql, params): self.calls.append((sql, params))
+    class Conn:
+        def __init__(self): self.c = Cursor(); self.committed = False
+        def cursor(self): return self.c
+        def commit(self): self.committed = True
+
+    known = item("Known", 1)
+    unknown = replace(item("Unknown", 2), evidence=None)
+    digest = {"region": "IN", "generated_at": "2026-09-02T14:00:00+05:30", "out_now": {"start": "2026-09-02", "end": "2026-09-03", "sections": {"english": [known, unknown]}}, "coming_up": {"start": "2026-09-04", "end": "2026-09-10", "sections": {}}}
+    conn = Conn()
+    assert rb.write_release_items_to_db(digest, conn) == 2
+    inserts = [(sql, values) for sql, values in conn.c.calls if 'INSERT INTO release_items' in sql]
+    assert 'evidence = EXCLUDED.evidence' in inserts[0][0]
+    assert json.loads(inserts[0][1][-2])["region"] == "IN"
+    assert inserts[1][1][-2] is None
+    assert conn.committed
+
+
+def test_alerts_reject_stale_missing_and_future_evidence():
+    from dataclasses import replace
+    current = item('Film', 42)
+    stale = replace(current.evidence, observed_at='2026-08-30T08:00:00+00:00')
+    future = replace(current.evidence, observed_at='2026-09-03T08:00:00+00:00')
+    assert rb.eligible_watchlist_items(digest_with(replace(current, evidence=stale))) == []
+    assert rb.eligible_watchlist_items(digest_with(replace(current, evidence=future))) == []
+    assert rb.eligible_watchlist_items(digest_with(replace(current, evidence=replace(current.evidence, observed_at=None)))) == []
+
+
+def test_alert_sender_deduplicates_identical_title_events_per_user():
+    from dataclasses import replace
+    current = item('Film', 42)
+    conn = FakeConn(rows=[(42, 'movie')])
+    matches = rb.find_watchlist_matches(digest_with(current, replace(current, season_number=2)), conn, ['owner@example.com'])
+    delivery = FakeAlertConn()
+    sent = []
+    assert rb.send_watchlist_alerts(matches, delivery, telegram_sender=sent.append) == 1
+    assert len(sent) == 1

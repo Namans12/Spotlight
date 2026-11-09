@@ -1,9 +1,4 @@
-"""One title, one place — across both digest windows.
-
-`merge_sections` only de-duplicates within a single window. A title that the
-discover pass and the news pass dated differently therefore survived in both, and
-the calendar rendered the same film in two different months.
-"""
+"""Distinct event dates and seasons survive digest deduplication."""
 
 from __future__ import annotations
 
@@ -35,7 +30,7 @@ def total(*section_dicts):
     return sum(len(v) for d in section_dicts for v in d.values())
 
 
-def test_theatrical_dated_copy_loses_to_the_in_window_ott_copy():
+def test_different_dates_remain_distinct_events():
     """The exact live bug: Jana Nayagan in July (cinema) and August (OTT)."""
     cinema = item("Jana Nayagan", 1235877, "2026-07-23")
     ott = item("Jana Nayagan", 1235877, "2026-08-21", providers=("ZEE5",))
@@ -44,7 +39,7 @@ def test_theatrical_dated_copy_loses_to_the_in_window_ott_copy():
 
     rb.drop_cross_window_duplicates(out, up, OUT, UP)
 
-    assert out["popular"] == []
+    assert out["popular"] == [cinema]
     assert up["popular"] == [ott]
 
 
@@ -68,12 +63,12 @@ def test_value_identical_copies_collapse_to_one():
     assert total(out, up) == 1
 
 
-def test_when_neither_copy_is_in_window_the_richer_one_wins():
+def test_distinct_dates_are_not_discarded_even_outside_windows():
     bare = item("Y", 3, "2026-07-01")
     rich = item("Y", 3, "2026-07-02", providers=("Netflix",))
     out, up = {"popular": [bare]}, {"popular": [rich]}
     rb.drop_cross_window_duplicates(out, up, OUT, UP)
-    assert out["popular"] == [] and up["popular"] == [rich]
+    assert out["popular"] == [bare] and up["popular"] == [rich]
 
 
 def test_same_tmdb_id_with_different_media_type_is_not_a_duplicate():
@@ -84,23 +79,23 @@ def test_same_tmdb_id_with_different_media_type_is_not_a_duplicate():
     assert out["popular"] == [movie] and up["popular"] == [show]
 
 
-def test_unparseable_date_does_not_raise_and_loses_to_a_real_date():
+def test_unparseable_date_remains_separate_from_a_real_date():
     tba = item("Z", 4, "TBA")
     dated = item("Z", 4, "2026-08-21", providers=("Netflix",))
     out, up = {"popular": [tba]}, {"popular": [dated]}
     rb.drop_cross_window_duplicates(out, up, OUT, UP)
-    assert out["popular"] == [] and up["popular"] == [dated]
+    assert out["popular"] == [tba] and up["popular"] == [dated]
 
 
-def test_three_placements_of_one_title_collapse_to_one():
+def test_three_distinct_dates_of_one_title_remain_separate():
     a = item("Y", 8, "2026-07-01")
     b = item("Y", 8, "2026-08-19", providers=("Netflix",))
     c = item("Y", 8, "2026-08-25")
     out = {"popular": [a], "english": [b]}
     up = {"popular": [c]}
     rb.drop_cross_window_duplicates(out, up, OUT, UP)
-    assert total(out, up) == 1
-    assert out["english"] == [b], "the in-window copy survives"
+    assert total(out, up) == 3
+    assert out["english"] == [b]
 
 
 def test_a_single_placement_is_left_alone():
@@ -108,3 +103,22 @@ def test_a_single_placement_is_left_alone():
     out, up = {"popular": [only]}, {"popular": []}
     rb.drop_cross_window_duplicates(out, up, OUT, UP)
     assert out["popular"] == [only]
+
+
+def test_distinct_same_name_titles_and_dates_are_not_collapsed():
+    items = [item('Same', 1, '2026-08-19'), item('Same', 2, '2026-08-19'),
+             item('Same', 1, '2026-08-20')]
+    assert len(rb.dedupe(items)) == 3
+    merged = rb.merge_sections({'english': items[:1]}, {'english': items[1:]})
+    assert len(merged['english']) == 3
+
+
+def test_seasons_remain_distinct_and_same_event_combines_verified_providers():
+    from dataclasses import replace
+    evidence = rb.ReleaseEvidence('IN', 'tmdb_regional_digital', 'tmdb_regional_availability', event_kind='digital')
+    first = replace(item('Show', 9, '2026-08-19', providers=('Netflix',), media_type='tv'), season_number=1, evidence=evidence)
+    second = replace(first, season_number=2)
+    another_observation = replace(first, providers=('ZEE5',))
+    merged = rb.merge_sections({'english': [first, second]}, {'english': [another_observation]})['english']
+    assert len(merged) == 2
+    assert set(next(i for i in merged if i.season_number == 1).providers) == {'Netflix', 'ZEE5'}

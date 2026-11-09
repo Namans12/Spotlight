@@ -45,6 +45,7 @@ import psycopg  # noqa: E402
 import requests  # noqa: E402
 from bs4 import BeautifulSoup  # noqa: E402
 
+from lib_py.event_identity import source_record_key
 from lib_relations import load_local_env  # noqa: E402
 
 REQUEST_TIMEOUT_SECONDS = 25
@@ -86,11 +87,11 @@ UPSERT_SQL = """
 INSERT INTO calendar_entries
     (release_date, title, language, entry_type, is_theatrical,
      platform_or_distributor, details, source, source_url, origin,
-     media_type, poster_url)
+     media_type, poster_url, source_key)
 VALUES (%(release_date)s, %(title)s, %(language)s, 'Movie', true,
         NULL, NULL, 'wikipedia', %(source_url)s, 'wikipedia',
-        'movie', NULL)
-ON CONFLICT (release_date, title, entry_type) DO UPDATE SET
+        'movie', NULL, %(source_key)s)
+ON CONFLICT (origin, source_key) DO UPDATE SET
     -- Enrich only, same convention as sync_theatrical_district.py: never
     -- clobber a value another source already supplied.
     language   = COALESCE(calendar_entries.language, EXCLUDED.language),
@@ -169,7 +170,9 @@ def parse_table(table: Any, source_url: str) -> list[dict[str, Any]]:
         except ValueError:
             continue
 
-        rows.append({"title": title, "release_date": release_date, "source_url": source_url})
+        rows.append({"title": title, "release_date": release_date, "source_url": source_url,
+                     "source_fingerprint": source_record_key(source_url, release_date, [c.get_text(" ", strip=True) for c in cells],
+                                                             [a.get("href") for a in cells[0].find_all("a")])})
     return rows
 
 
@@ -180,7 +183,8 @@ def _table_year(table: Any) -> int:
 
 
 def collect(session: requests.Session, languages: list[str], years: list[int]) -> list[dict[str, Any]]:
-    by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    by_key: dict[str, dict[str, Any]] = {}
+    counts: dict[str, int] = {}
     for lang in languages:
         name = LANGUAGE_PAGE_NAMES.get(lang)
         if not name:
@@ -198,9 +202,10 @@ def collect(session: requests.Session, languages: list[str], years: list[int]) -
             for table in release_tables(soup):
                 table._sync_wikipedia_year = year  # type: ignore[attr-defined]
                 for row in parse_table(table, source_url):
-                    key = (row["title"].lower(), row["release_date"])
-                    if key in by_key:
-                        continue
+                    fingerprint = row.pop("source_fingerprint")
+                    counts[fingerprint] = counts.get(fingerprint, 0) + 1
+                    key = source_record_key(fingerprint, counts[fingerprint])
+                    row["source_key"] = key
                     row["language"] = lang
                     by_key[key] = row
                     new_for_lang += 1

@@ -153,14 +153,10 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/verify_calendar_tmdb_links.py
 
-      # calendar_entries is unique on (release_date, title, entry_type), not
-      # tmdb_id — two rows (a CSV-seeded one and a TMDB-discovered one, say)
-      # can independently resolve to the same tmdb_id once the line above
-      # links them, and nothing before this step would notice. Safe to run
-      # every night: a clean database just reports zero groups.
-      - name: Reconcile duplicate calendar releases
+      # Report possible overlaps. Shared title IDs and dates alone cannot prove
+      # event identity, so this diagnostic never deletes or unlinks rows.
+      - name: Report possible calendar overlaps
         env:
-          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/reconcile_calendar_duplicates.py
 

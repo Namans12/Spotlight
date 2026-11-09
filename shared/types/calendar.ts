@@ -12,6 +12,15 @@ export interface CalendarEntryDTO {
   /** Retained as a convenience alias for `kind === "theatrical"`. */
   isTheatrical: boolean;
   platform: string | null;
+  /** All named providers or distributors; platform is the first for older clients. */
+  platforms: string[];
+  /** Event region, or null when its source does not establish one. */
+  region: string | null;
+  source?: string | null;
+  sourceUrl?: string | null;
+  observedAt?: string | null;
+  availabilityTypes?: Record<string, string[]> | null;
+  evidenceStatus?: "regional" | "unverified";
   tmdbId: number | null;
   posterUrl: string | null;
   rating: number | null;

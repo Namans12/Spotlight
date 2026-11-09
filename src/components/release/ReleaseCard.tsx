@@ -1,7 +1,9 @@
+import type { ProviderOffer } from '../../../shared/types/availability';
 import { Link } from "react-router-dom";
 import type { ReleaseItem } from "@/types/digest";
 import { Eye, Clock, Plus, Star, ImageOff, X } from "lucide-react";
 import { ActionButton } from "@/components/watchlist/ActionButton";
+import { ReleaseEvidence } from "./ReleaseEvidence";
 import { tmdbPoster } from "@/lib/tmdbImage";
 
 interface ReleaseCardProps {
@@ -27,12 +29,14 @@ interface ReleaseCardProps {
   /** Live-fetched platform names, when the item itself doesn't already carry
    * them. Falls back to `item.providers` when omitted. */
   providers?: string[];
+  /** Null indicates that availability is unknown; undefined hides the summary. */
+  offers?: ProviderOffer[] | null;
 }
 
 export function ReleaseCard({
   item, onAddToWatchlist, onAddToWatchLater, onMarkWatched,
   onRemove, onAddToList, compact, showActions = true, dragHandle, index, linkTo, seasons, providers,
-  extraActions,
+  extraActions, offers,
 }: ReleaseCardProps) {
   const year = item.releaseDate?.slice(0, 4);
   const providerLabel = (providers ?? item.providers ?? []).slice(0, 3).join(", ");
@@ -91,6 +95,10 @@ export function ReleaseCard({
           )}
         </div>
         {providerLabel && <p className="text-[11px] text-accent font-medium">{providerLabel}</p>}
+        {offers !== undefined && <p className="text-[11px] text-muted-foreground">{offers?.length
+          ? offers.map(offer => `${offer.provider} (${offer.type === 'ads' ? 'with ads' : offer.type})`).join(' · ')
+          : 'Availability unknown'}</p>}
+        {item.evidence && <ReleaseEvidence evidence={item.evidence} providers={item.providers ?? []} />}
         {!compact && item.overview && (
           <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">{item.overview}</p>
         )}

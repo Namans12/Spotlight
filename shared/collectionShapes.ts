@@ -65,7 +65,9 @@ export const MAX_CAN_NEIGHBOURS = 3;
 export const SAME_SERIES_REASON = "Same series - not required to follow this one.";
 export const SIDE_STORY_REASON = "A side story in the same series - not required to follow the main films.";
 
-export type Classification = "chain" | "arcs" | "episodic";
+export const UNVERIFIED_SERIES_REASON = "Same series; watch order is unverified.";
+
+export type Classification = "chain" | "arcs" | "episodic" | "unverified";
 
 export interface PlannedMustEdge {
   /** The prerequisite. */
@@ -130,6 +132,7 @@ export function planCollection(
   today: string = new Date().toISOString().slice(0, 10),
 ): CollectionPlan {
   const warnings: string[] = [];
+  const unverifiedIds = new Set<number>();
   const ordered = sortByRelease(parts.filter((p) => Number.isFinite(p.id)));
   const shape = getCollectionShape(collectionId);
 
@@ -142,7 +145,12 @@ export function planCollection(
 
   const byId = new Map(chainable.map((p) => [p.id, p]));
 
-  if (shape?.episodic || chainable.length > EPISODIC_PART_THRESHOLD) {
+  if (!shape) {
+    warnings.push(`collection ${collectionId}: watch order is not curated`);
+    classification = "unverified";
+    arcs = [];
+    loose = ordered;
+  } else if (shape.episodic || chainable.length > EPISODIC_PART_THRESHOLD) {
     if (!shape?.episodic) {
       warnings.push(
         `collection ${collectionId}: ${chainable.length} parts exceeds EPISODIC_PART_THRESHOLD ` +
@@ -175,6 +183,7 @@ export function planCollection(
     }
 
     const unclaimed = chainable.filter((p) => !claimed.has(p.id));
+    unclaimed.forEach((part) => unverifiedIds.add(part.id));
     if (unclaimed.length > 0) {
       warnings.push(
         `collection ${collectionId}: ${unclaimed.length} part(s) not named in any arc ` +
@@ -218,7 +227,8 @@ export function planCollection(
     for (const sibling of nearestSiblings(ordered, index, MAX_CAN_NEIGHBOURS)) {
       // An excluded spin-off is described as one from both ends; two loose
       // entries of an episodic collection are just siblings.
-      const reason = excluded.has(part.id) || excluded.has(sibling.id) ? SIDE_STORY_REASON : SAME_SERIES_REASON;
+      const reason = classification === "unverified" || unverifiedIds.has(part.id) || unverifiedIds.has(sibling.id) ? UNVERIFIED_SERIES_REASON :
+        excluded.has(part.id) || excluded.has(sibling.id) ? SIDE_STORY_REASON : SAME_SERIES_REASON;
       for (const [from, to] of [
         [part, sibling],
         [sibling, part],

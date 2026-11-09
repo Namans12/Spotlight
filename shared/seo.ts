@@ -231,6 +231,10 @@ export const STATIC_ROUTE_META: Record<string, { title: string; description: str
     description:
       "What you saved, what you watched, and how long it took - your year on Spotlight, counted from your own watchlist.",
   },
+  "/tonight": {
+    title: "What to watch tonight | Spotlight",
+    description: "Find a film or show by mood, time, language and streaming services, with an optional quick choice.",
+  },
   "/duel": {
     title: "Can't decide what to watch? Pick one | Spotlight",
     description:

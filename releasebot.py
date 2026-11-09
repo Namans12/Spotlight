@@ -24,8 +24,8 @@ import sys
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass
-from datetime import date, datetime, timedelta
+from dataclasses import asdict, dataclass, replace
+from datetime import date, datetime, timedelta, timezone
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Any
@@ -62,6 +62,20 @@ SECTION_EMOJI = {
 
 
 @dataclass(frozen=True)
+class ReleaseEvidence:
+    """Evidence observed in this run; absent fields are unknown, never inferred."""
+
+    region: str
+    date_source: str | None = None
+    provider_source: str | None = None
+    observed_at: str | None = None
+    date_precision: str | None = None
+    event_kind: str | None = None
+    source_url: str | None = None
+    provider_types: dict[str, list[str]] | None = None
+
+
+@dataclass(frozen=True)
 class ReleaseItem:
     tmdb_id: int
     title: str
@@ -74,6 +88,8 @@ class ReleaseItem:
     tmdb_url: str
     poster_url: str | None
     providers: tuple[str, ...] = ()
+    evidence: ReleaseEvidence | None = None
+    season_number: int | None = None
 
 
 def env_required(name: str) -> str:
@@ -313,63 +329,63 @@ def rent_buy_providers(details: dict[str, Any], region: str) -> tuple[str, ...]:
 def resolve_providers(
     details: dict[str, Any], region: str, fallback: str | None = None
 ) -> tuple[str, ...]:
-    """Best available answer to "where can I watch this?", widest-relevance first.
+    """Return only provider listings explicitly observed in the requested region.
 
-    The order encodes a preference, not a guess: a subscription in the reader's
-    own region is the most useful answer, and a store in some other territory is
-    the least — but all of them beat "Platform TBA". The cross-region steps exist
-    because TMDB's India provider data is thin while its US/UK data is rich:
-    Toy Story 5 carries rent/buy entries in 36 territories and none in India, so
-    a region-only lookup reported nothing for a film that was plainly available.
+    Network names and editorial hints are not availability evidence. The
+    fallback parameter remains for callers but is intentionally not promoted.
     """
-    if subs := flatrate_providers(details, region):
-        return subs[:MAX_PROVIDERS]
-    if purchase := rent_buy_providers(details, region):
-        return purchase
-    if subs_anywhere := normalize_platforms(_names_any_region(details, AVAILABILITY_BUCKETS)):
-        return subs_anywhere[:MAX_PROVIDERS]
-    if purchase_anywhere := _tag_buy_rent(_names_any_region(details, PURCHASE_BUCKETS)):
-        return purchase_anywhere
-    # No availability recorded anywhere. The network that made it is the last
-    # real signal — a brand-new title often has one before it has providers.
-    networks = normalize_platforms(n.get("name", "") for n in details.get("networks", []))
-    if from_network := tuple(n for n in networks if n in STREAMING_NETWORKS):
-        return from_network[:MAX_PROVIDERS]
-    if fallback:
-        # News-scraped hint from news_sources — normalized so its curated
-        # spelling matches the TMDB-derived names.
-        hint = normalize_platform(fallback)
-        return (hint,) if hint else ()
-    return ()
+    return flatrate_providers(details, region)[:MAX_PROVIDERS] or rent_buy_providers(details, region)
+
+
+def digital_release_dates(details: dict[str, Any], region: str) -> list[str]:
+    """TMDB digital dates explicitly recorded for this region."""
+    countries = details.get("release_dates", {}).get("results", []) or []
+    return sorted({rd["release_date"][:10] for country in countries
+                   if country.get("iso_3166_1") == region
+                   for rd in country.get("release_dates", []) or []
+                   if rd.get("type") == 4 and rd.get("release_date")})
 
 
 def digital_release_date(details: dict[str, Any], region: str) -> str | None:
-    """Best-available 'digital' (OTT) release date for a movie.
+    dates = digital_release_dates(details, region)
+    return dates[0] if dates else None
 
-    Prefers the region-specific digital (type 4) date, falls back to the
-    earliest digital date recorded for any country. Returns 'YYYY-MM-DD' or
-    None. Region-specific digital dates are sparse on TMDB, hence the
-    fallback.
-    """
-    countries = details.get("release_dates", {}).get("results", [])
 
-    region_dates = [
-        rd["release_date"][:10]
-        for country in countries
-        if country.get("iso_3166_1") == region
-        for rd in country.get("release_dates", [])
-        if rd.get("type") == 4 and rd.get("release_date")
-    ]
-    if region_dates:
-        return min(region_dates)
+def regional_provider_types(details: dict[str, Any], region: str) -> dict[str, list[str]]:
+    """Preserve TMDB monetization buckets for the providers actually displayed."""
+    selected = set(resolve_providers(details, region))
+    buckets = details.get("watch/providers", {}).get("results", {}).get(region, {}) or {}
+    result: dict[str, list[str]] = {}
+    for bucket, label in (("flatrate", "subscription"), ("ads", "ad-supported"),
+                          ("free", "free"), ("rent", "rent"), ("buy", "buy")):
+        for entry in buckets.get(bucket, []) or []:
+            name = normalize_platform(entry.get("provider_name") or "")
+            display = name if bucket in AVAILABILITY_BUCKETS else (f"{name}{BUY_RENT_SUFFIX}" if name else GENERIC_BUY_RENT)
+            if display in selected:
+                types = result.setdefault(display, [])
+                if label not in types:
+                    types.append(label)
+    return result
 
-    any_dates = [
-        rd["release_date"][:10]
-        for country in countries
-        for rd in country.get("release_dates", [])
-        if rd.get("type") == 4 and rd.get("release_date")
-    ]
-    return min(any_dates) if any_dates else None
+
+def regional_movie_evidence(details: dict[str, Any], region: str, release_date: str) -> ReleaseEvidence:
+    """Only explicitly regional TMDB observations qualify; fallback data stays unknown."""
+    countries = details.get("release_dates", {}).get("results", []) or []
+    dates = [rd.get("release_date", "")[:10] for country in countries
+             if country.get("iso_3166_1") == region
+             for rd in country.get("release_dates", []) or []
+             if rd.get("type") == 4 and rd.get("release_date")]
+    local_providers = flatrate_providers(details, region) or rent_buy_providers(details, region)
+    return ReleaseEvidence(
+        region=region,
+        date_source="tmdb_regional_digital" if release_date in dates else None,
+        provider_source="tmdb_regional_availability" if local_providers else None,
+        observed_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        date_precision="day" if release_date in dates else None,
+        event_kind="digital" if release_date in dates else None,
+        source_url=tmdb_item_url("movie", details["id"]) if details.get("id") else None,
+        provider_types=regional_provider_types(details, region),
+    )
 
 
 def tmdb_item_url(media_type: str, item_id: int) -> str:
@@ -413,15 +429,43 @@ def normalize_tv(raw: dict[str, Any], providers: tuple[str, ...] = ()) -> Releas
     )
 
 
+def release_event_key(item: ReleaseItem) -> str:
+    """Date and season distinguish events for a title; no title-name identity."""
+    kind = item.evidence.event_kind if item.evidence and item.evidence.event_kind else "unknown"
+    season = str(item.season_number) if item.season_number is not None else "unknown"
+    return json.dumps([kind, str(item.release_date), season], separators=(",", ":"))
+
+
+def event_identity(item: ReleaseItem) -> tuple[str, int, str]:
+    return item.media_type, item.tmdb_id, release_event_key(item)
+
+
+def combine_event_observations(left: ReleaseItem, right: ReleaseItem) -> ReleaseItem:
+    """Combine provider observations only when their evidence scope agrees."""
+    winner, other = (left, right) if _item_richness(left) >= _item_richness(right) else (right, left)
+    a, b = winner.evidence, other.evidence
+    if (a and b and a.region == b.region and a.date_source == b.date_source
+            and a.provider_source == b.provider_source == "tmdb_regional_availability"):
+        provider_types = {name: list(types) for name, types in (a.provider_types or {}).items()}
+        for name, types in (b.provider_types or {}).items():
+            provider_types[name] = list(dict.fromkeys((*provider_types.get(name, []), *types)))
+        # A combined observation is no fresher than its oldest component.
+        try:
+            observed = (min(datetime.fromisoformat(a.observed_at), datetime.fromisoformat(b.observed_at)).isoformat()
+                        if a.observed_at and b.observed_at else None)
+        except (ValueError, TypeError):
+            observed = None
+        return replace(winner, providers=tuple(dict.fromkeys((*winner.providers, *other.providers))),
+                       evidence=replace(a, provider_types=provider_types, observed_at=observed))
+    return winner
+
+
 def dedupe(items: list[ReleaseItem]) -> list[ReleaseItem]:
-    seen: set[tuple[str, str, str]] = set()
-    unique: list[ReleaseItem] = []
+    unique: dict[tuple[str, int, str], ReleaseItem] = {}
     for item in sorted(items, key=lambda x: (x.release_date, -x.popularity, x.title)):
-        key = (item.media_type, item.title.lower(), item.release_date)
-        if key not in seen:
-            seen.add(key)
-            unique.append(item)
-    return unique
+        key = event_identity(item)
+        unique[key] = combine_event_observations(unique[key], item) if key in unique else item
+    return list(unique.values())
 
 
 # ---------------------------------------------------------------------------
@@ -492,7 +536,6 @@ def fetch_ott_movies(
         **{"primary_release_date.gte": recent_start, "primary_release_date.lte": end_date},
     )
 
-    confirmed_ids = {raw["id"] for raw in confirmed}
     seen: set[int] = set()
     ordered: list[dict[str, Any]] = []
     for raw in confirmed[:per_query_limit] + streaming[:per_query_limit]:
@@ -508,22 +551,13 @@ def fetch_ott_movies(
     items: list[ReleaseItem] = []
     for raw, details in zip(ordered, details_list):
         movie_id = raw["id"]
-        best_date = digital_release_date(details, tmdb.region)
         providers = resolve_providers(details, tmdb.region)
-
-        if not best_date:
-            if movie_id in confirmed_ids:
-                # Filter guarantees a region digital date exists in-window even
-                # if we could not extract the exact day.
-                best_date = raw.get("release_date") or start_date
-            elif providers and raw.get("release_date"):
-                # Straight-to-OTT originals: primary release date IS the OTT date.
-                best_date = raw["release_date"]
-
-        if best_date and start_date <= best_date <= end_date:
-            enriched = dict(raw)
-            enriched["release_date"] = best_date
-            items.append(normalize_movie(enriched, providers))
+        for event_date in digital_release_dates(details, tmdb.region):
+            if start_date <= event_date <= end_date:
+                enriched = dict(raw)
+                enriched["release_date"] = event_date
+                items.append(replace(normalize_movie(enriched, providers),
+                                     evidence=regional_movie_evidence(details, tmdb.region, event_date)))
     return items
 
 
@@ -571,7 +605,6 @@ def fetch_language_ott(
     end_date: str,
 ) -> list[ReleaseItem]:
     items = fetch_ott_movies(tmdb, start_date, end_date, language)
-    items += fetch_ott_shows(tmdb, start_date, end_date, language)
     return dedupe(items)[:20]
 
 
@@ -591,7 +624,6 @@ def fetch_popular_ott(
     candidates = [
         item
         for item in fetch_ott_movies(tmdb, start_date, end_date)
-        + fetch_ott_shows(tmdb, start_date, end_date)
         if item.language not in exclude_languages
     ]
     candidates = dedupe(candidates)
@@ -729,6 +761,7 @@ def _item_from_search(
         tmdb_url=tmdb_item_url(media_type, result["id"]),
         poster_url=poster_url(result.get("poster_path")),
         providers=providers,
+        season_number=season,
     )
 
 
@@ -748,25 +781,21 @@ def enrich_news_candidates(
     today: date,
     next_trigger: date,
     horizon_end: date,
-    recency_days: int = 45,
 ) -> dict[str, dict[str, list[ReleaseItem]]]:
     """Validate scraped titles against TMDB and bucket them into the two windows.
 
     Returns {"out_now": {section: [...]}, "coming_up": {section: [...]}}.
 
-    The date a title is filed under is its *OTT* date, resolved from the
-    release-dates endpoint — never the primary date that /search returns. Those
-    differ by months for anything that played in cinemas first: Jana Nayagan
-    opened on 23 July and streams on 21 August, and filing it under July put a
-    theatrical date on the calendar labelled as a streaming premiere, in the
-    wrong month, while a second copy sat correctly under August.
+    Date and provider fallback values remain possible leads, not proof of a
+    regional OTT premiere. Only explicit regional observations qualify for
+    watchlist alerts; see regional_movie_evidence.
 
     A movie with no digital date and no providers is dropped rather than filed
     under its theatrical date — that is how cinema-only releases (7 Dogs,
     Irumudi, Khalifa) were reaching the OTT digest.
     """
-    lo = today - timedelta(days=recency_days)
-    hi = horizon_end + timedelta(days=10)
+    lo = today
+    hi = horizon_end
 
     def lookup(
         cand: news_sources.Candidate,
@@ -799,7 +828,7 @@ def enrich_news_candidates(
 
     def resolve(
         entry: tuple[news_sources.Candidate, dict[str, Any], int | None]
-    ) -> tuple[news_sources.Candidate, dict[str, Any], str, tuple[str, ...], int | None] | None:
+    ) -> tuple[news_sources.Candidate, dict[str, Any], str, tuple[str, ...], int | None, ReleaseEvidence | None] | None:
         """Attach the OTT date and platforms, or drop the candidate.
 
         One details fetch serves both — it carries release_dates and
@@ -818,30 +847,10 @@ def enrich_news_candidates(
 
         providers = resolve_providers(details, tmdb.region, cand.platform)
 
-        if media_type == "movie":
-            ott_date = digital_release_date(details, tmdb.region)
-            if not ott_date:
-                # No digital date on record. Only a title already streaming can
-                # be dated from its primary release (straight-to-OTT original);
-                # anything else is a cinema release we have no OTT date for.
-                if not providers:
-                    return None
-                ott_date = (match.get("release_date") or "")[:10]
-        else:
-            # Shows have no separate digital date — the air date IS the drop
-            # date. Require a platform so linear-TV-only airings stay out.
-            if not providers:
-                return None
-            ott_date = ""
-            if season is not None:
-                # first_air_date is when the *series* began (Outer Banks: 2020),
-                # so a returning season must be dated from the season itself.
-                try:
-                    ott_date = (tmdb.tv_season(match["id"], season).get("air_date") or "")[:10]
-                except Exception:  # pragma: no cover - network resilience
-                    ott_date = ""
-            if not ott_date:
-                ott_date = (match.get("first_air_date") or "")[:10]
+        # TMDB first-air and season dates are global, not regional OTT dates.
+        if media_type != "movie":
+            return None
+        ott_date = digital_release_date(details, tmdb.region)
 
         if not ott_date:
             return None
@@ -851,7 +860,9 @@ def enrich_news_candidates(
             return None
         if not (lo <= parsed <= hi):
             return None
-        return cand, match, ott_date, providers, season
+        evidence = (regional_movie_evidence(details, tmdb.region, ott_date)
+                    if media_type == "movie" else None)
+        return cand, match, ott_date, providers, season, evidence
 
     with ThreadPoolExecutor(max_workers=8) as executor:
         resolved = [r for r in executor.map(resolve, by_id.values()) if r]
@@ -860,8 +871,8 @@ def enrich_news_candidates(
         "out_now": {s: [] for s in SECTION_ORDER},
         "coming_up": {s: [] for s in SECTION_ORDER},
     }
-    for cand, match, ott_date, providers, season in resolved:
-        item = _item_from_search(match, ott_date, providers, season)
+    for cand, match, ott_date, providers, season, evidence in resolved:
+        item = replace(_item_from_search(match, ott_date, providers, season), evidence=evidence)
         window = "coming_up" if date.fromisoformat(ott_date) >= next_trigger else "out_now"
         section = section_for_language(item.language, languages)
         buckets[window][section].append(item)
@@ -885,14 +896,7 @@ def drop_cross_window_duplicates(
     out_window: tuple[date, date],
     up_window: tuple[date, date],
 ) -> None:
-    """Keep one copy of each title across both windows, in place.
-
-    `merge_sections` de-duplicates within a window, so a title that the discover
-    pass dated differently from the news pass survived in both — the calendar
-    then rendered the same film in two months. When a title appears twice, the
-    copy whose date actually falls inside its own window wins; failing that, the
-    richer copy does.
-    """
+    """Collapse repeated observations of the same event, preserving other dates."""
 
     def in_window(item: ReleaseItem, window: tuple[date, date]) -> bool:
         try:
@@ -902,11 +906,11 @@ def drop_cross_window_duplicates(
 
     # (owning sections dict, section name, item, that window's bounds)
     Placement = tuple[dict[str, list[ReleaseItem]], str, ReleaseItem, tuple[date, date]]
-    placements: dict[tuple[str, int], list[Placement]] = {}
+    placements: dict[tuple[str, int, str], list[Placement]] = {}
     for sections, window in ((out_sections, out_window), (up_sections, up_window)):
         for section, items in sections.items():
             for item in items:
-                placements.setdefault((item.media_type, item.tmdb_id), []).append(
+                placements.setdefault(event_identity(item), []).append(
                     (sections, section, item, window)
                 )
 
@@ -915,6 +919,13 @@ def drop_cross_window_duplicates(
             continue
         best = max(spots, key=lambda s: (int(in_window(s[2], s[3])), _item_richness(s[2])))
         winner = best[2]
+        combined = winner
+        for _, _, candidate, _ in spots:
+            if candidate is not winner:
+                combined = combine_event_observations(combined, candidate)
+        if combined is not winner:
+            sections, section, _, _ = best
+            sections[section] = [combined if item is winner else item for item in sections[section]]
         for sections, section, item, _window in spots:
             # Identity, not equality: ReleaseItem is a frozen dataclass, so two
             # value-identical copies compare equal and both would survive.
@@ -927,16 +938,14 @@ def merge_sections(
     base: dict[str, list[ReleaseItem]],
     extra: dict[str, list[ReleaseItem]],
 ) -> dict[str, list[ReleaseItem]]:
-    """Merge news items into a window's sections, de-duplicating by title and
-    keeping the richer copy (poster/providers/popularity)."""
+    """Merge observations by event identity without suppressing same-name titles."""
     for section, items in extra.items():
         combined = base.get(section, []) + items
-        best: dict[tuple[str, str], ReleaseItem] = {}
+        best: dict[tuple[str, int, str], ReleaseItem] = {}
         for item in combined:
-            key = (item.media_type, _norm_title(item.title))
+            key = event_identity(item)
             current = best.get(key)
-            if current is None or _item_richness(item) > _item_richness(current):
-                best[key] = item
+            best[key] = combine_event_observations(current, item) if current is not None else item
         base[section] = sorted(
             best.values(), key=lambda x: (x.release_date, -x.popularity, x.title)
         )
@@ -1326,15 +1335,16 @@ def write_release_items_to_db(digest: dict[str, Any], conn: Any) -> int:
                         INSERT INTO release_items
                             (tmdb_id, media_type, title, language, release_date, rating,
                              popularity, overview, tmdb_url, poster_url, providers,
-                             region, section, window_kind, window_start, window_end, generated_at, updated_at)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, now())
-                        ON CONFLICT (tmdb_id, media_type, region, window_kind, section)
+                             region, section, window_kind, window_start, window_end, generated_at, evidence, event_key, updated_at)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s, now())
+                        ON CONFLICT (tmdb_id, media_type, region, window_kind, section, event_key)
                         DO UPDATE SET
                             title = EXCLUDED.title, release_date = EXCLUDED.release_date,
                             rating = EXCLUDED.rating, popularity = EXCLUDED.popularity,
                             overview = EXCLUDED.overview, poster_url = EXCLUDED.poster_url,
                             providers = EXCLUDED.providers, window_start = EXCLUDED.window_start,
                             window_end = EXCLUDED.window_end, generated_at = EXCLUDED.generated_at,
+                            evidence = EXCLUDED.evidence,
                             updated_at = now()
                         """,
                         (
@@ -1355,6 +1365,8 @@ def write_release_items_to_db(digest: dict[str, Any], conn: Any) -> int:
                             window["start"],
                             window["end"],
                             generated_at,
+                            json.dumps(asdict(item.evidence)) if item.evidence else None,
+                            release_event_key(item),
                         ),
                     )
                     count += 1
@@ -1367,6 +1379,53 @@ def write_release_items_to_db(digest: dict[str, Any], conn: Any) -> int:
     return count
 
 
+def date_in_window(value: str, start: date, end: date) -> bool:
+    try:
+        return start <= date.fromisoformat(str(value)) <= end
+    except (TypeError, ValueError):
+        return False
+
+
+def eligible_watchlist_items(digest: dict[str, Any]) -> list[ReleaseItem]:
+    """Require a regional date and current provider observation, never a fallback.
+
+    A future date inside Out Now is not yet a drop. Missing or malformed run
+    dates, bounds, regions, or evidence fail closed.
+    """
+    window = digest.get("out_now", {})
+    try:
+        start = date.fromisoformat(window["start"])
+        end = date.fromisoformat(window["end"])
+        run_at = datetime.fromisoformat(digest["generated_at"].replace("Z", "+00:00"))
+        if run_at.tzinfo is None:
+            return []
+        run_date = run_at.date()
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return []
+    region = digest.get("region")
+    result = []
+    for items in window.get("sections", {}).values():
+        for item in items:
+            try:
+                event_date = date.fromisoformat(str(item.release_date))
+            except (TypeError, ValueError):
+                continue
+            evidence = getattr(item, "evidence", None)
+            try:
+                observed = datetime.fromisoformat(evidence.observed_at.replace("Z", "+00:00")) if evidence and evidence.observed_at else None
+                age = run_at - observed if observed and observed.tzinfo else None
+            except (TypeError, ValueError, AttributeError):
+                age = None
+            if (age is not None and -timedelta(minutes=5) <= age <= timedelta(hours=24)
+                    and start <= event_date <= end and event_date <= run_date and region
+                    and evidence and evidence.region == region
+                    and evidence.date_source == "tmdb_regional_digital"
+                    and evidence.provider_source == "tmdb_regional_availability"
+                    and item.providers):
+                result.append(item)
+    return result
+
+
 def find_watchlist_matches(
     digest: dict[str, Any], conn: Any, owner_emails: list[str]
 ) -> list[dict[str, Any]]:
@@ -1374,7 +1433,7 @@ def find_watchlist_matches(
     watchlist/watchLater buckets (scoped by owner_emails — other users'
     watchlists must never trigger an alert to the owner). Returns matches
     worth alerting on."""
-    all_out_now_items = [item for items in digest["out_now"]["sections"].values() for item in items]
+    all_out_now_items = eligible_watchlist_items(digest)
     if not all_out_now_items:
         return []
     with conn.cursor() as cur:
@@ -1415,7 +1474,7 @@ def find_watchlist_matches_by_user(digest: dict[str, Any], conn: Any) -> list[di
     other steps are already network-bound, and a per-user round trip would
     scale badly for no reason.
     """
-    all_out_now_items = [item for items in digest["out_now"]["sections"].values() for item in items]
+    all_out_now_items = eligible_watchlist_items(digest)
     if not all_out_now_items:
         return []
 
@@ -1637,6 +1696,15 @@ def build_digest(now: datetime | None = None, diagnostics: bool = False) -> dict
                     sections["popular"] = sections["popular"][:30]
             except Exception as exc:  # pragma: no cover - never fail the digest on news
                 print(f"  news augmentation skipped: {exc}", file=sys.stderr)
+
+    # Enforce the published window for every source, including discovery and
+    # sample data, before the snapshot is stored or notifications are built.
+    for sections, start, end in ((out_sections, out_start, out_end), (up_sections, up_start, up_end)):
+        for section, items in sections.items():
+            sections[section] = [item for item in items if date_in_window(item.release_date, start, end)
+                                 and item.evidence is not None
+                                 and item.evidence.region == region
+                                 and item.evidence.date_source == "tmdb_regional_digital"]
 
     return {
         "generated_at": now.isoformat(timespec="seconds"),

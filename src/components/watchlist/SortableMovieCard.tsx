@@ -1,3 +1,4 @@
+import type { ProviderOffer } from '../../../shared/types/availability';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
@@ -15,9 +16,10 @@ interface SortableMovieCardProps {
   /** TV only, from the seasons cache; null while loading or unknown. */
   seasons?: number | null;
   providers?: string[];
+  offers?: ProviderOffer[] | null;
 }
 
-export function SortableMovieCard({ item, index, onMarkWatched, onRemove, onAddToWatchLater, onAddToList, seasons, providers }: SortableMovieCardProps) {
+export function SortableMovieCard({ item, index, onMarkWatched, onRemove, onAddToWatchLater, onAddToList, seasons, providers, offers }: SortableMovieCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.dbId });
 
   const style = {
@@ -34,6 +36,7 @@ export function SortableMovieCard({ item, index, onMarkWatched, onRemove, onAddT
         index={index}
         seasons={seasons}
         providers={providers}
+        offers={offers}
         onMarkWatched={onMarkWatched}
         onRemove={onRemove}
         onAddToWatchLater={onAddToWatchLater}

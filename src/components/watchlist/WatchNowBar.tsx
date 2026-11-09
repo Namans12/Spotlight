@@ -55,8 +55,7 @@ function Chip({
  * halves of that come from data the page already loaded — the providers batch
  * fetched for the poster cards, which now carries runtime too.
  *
- * Renders nothing when there is nothing to narrow. A filter bar over four
- * saved titles is furniture.
+ * Unknown availability remains selectable even when no provider data exists.
  */
 export function WatchNowBar({
   filters,
@@ -67,7 +66,7 @@ export function WatchNowBar({
   totalCount,
 }: WatchNowBarProps) {
   const active = hasActiveFilters(filters);
-  if (platforms.length === 0 && runtimeBands.length === 0) return null;
+
 
   const togglePlatform = (name: string) =>
     onChange({
@@ -98,6 +97,10 @@ export function WatchNowBar({
         )}
       </div>
 
+      <p className="text-xs text-muted-foreground">Offers in India: JustWatch via TMDB; availability may change.</p>
+      {(filters.platforms.length > 0 || (filters.availabilityTypes?.length ?? 0) > 0) && (
+        <p className="text-xs text-muted-foreground">Unknown availability appears only when selected without a service filter.</p>
+      )}
       <div className="flex flex-wrap gap-1.5">
         {/* Films vs series first: it is the coarsest cut and the one people
             reach for most ("I want a film tonight, not three more episodes"). */}
@@ -119,6 +122,15 @@ export function WatchNowBar({
               {band.label}
             </span>
           </Chip>
+        ))}
+
+        {([['subscription', 'Subscription'], ['free', 'Free'], ['ads', 'With ads'], ['rent', 'Rent'], ['buy', 'Buy'], ['unknown', 'Availability unknown']] as const).map(([type, label]) => (
+          <Chip key={type} active={(filters.availabilityTypes ?? []).includes(type)} onClick={() => onChange({
+            ...filters,
+            availabilityTypes: (filters.availabilityTypes ?? []).includes(type)
+              ? (filters.availabilityTypes ?? []).filter(value => value !== type)
+              : [...(filters.availabilityTypes ?? []), type],
+          })}>{label}</Chip>
         ))}
 
         {platforms.map((name) => (

@@ -21,7 +21,7 @@ export function ReleaseGrid({ items, linkBase, ratingFor }: ReleaseGridProps) {
     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-4">
       {items.map((item) => (
         <PosterCard
-          key={`${item.mediaType}-${item.id}`}
+          key={`${item.mediaType}-${item.id}-${item.releaseDate}-${item.title}`}
           item={item}
           rating={ratingFor(item.mediaType, item.id)}
           seasons={seasonsFor(item.mediaType, item.id)}

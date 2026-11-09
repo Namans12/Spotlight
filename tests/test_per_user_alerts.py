@@ -30,6 +30,8 @@ class FakeItem:
         self.media_type = media_type
         self.title = title
         self.providers = providers
+        self.release_date = "2026-09-02"
+        self.evidence = releasebot.ReleaseEvidence("IN", "tmdb_regional_digital", "tmdb_regional_availability", "2026-09-02T08:00:00+00:00")
 
 
 class FakeCursor:
@@ -82,7 +84,7 @@ class FakeConn:
 
 
 def digest_with(*items: FakeItem) -> dict:
-    return {"out_now": {"sections": {"hindi": list(items)}}}
+    return {"region": "IN", "generated_at": "2026-09-02T14:00:00+05:30", "out_now": {"start": "2026-09-02", "end": "2026-09-03", "sections": {"hindi": list(items)}}}
 
 
 DUNE = FakeItem(693134, "movie", "Dune: Part Two", ["Netflix"])

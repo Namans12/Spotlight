@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Movie, WatchlistItem } from '@/types/movie';
 import { getRecommendations, getCredits, discover, type MediaType } from '@/lib/tmdb';
 import { useWatchlistContext } from '@/contexts/WatchlistContext';
-import { likedSeeds } from '@/lib/taste';
+import { likedSeeds, opinionKey } from '@/lib/taste';
 
 export interface SuggestionRow {
   key: string;
@@ -46,19 +46,18 @@ export function useSuggestions() {
   const saved = [...wl.watchlist, ...wl.watchLater].sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0));
   const seeds: WatchlistItem[] = [...liked, ...saved].slice(0, SEED_COUNT);
 
-  const seedKey = seeds.map((s) => `${s.mediaType}:${s.id}`).join(',');
+  const seedKey = seeds.map((s) => opinionKey(s.mediaType, s.id)).join(',');
+  const likedKeys = new Set(liked.map((s) => opinionKey(s.mediaType, s.id)));
+  const owned = new Set([...wl.watchlist, ...wl.watchLater, ...wl.watched,
+    ...Object.values(wl.customListItems).flat()].map((item) => opinionKey(item.mediaType, item.id)));
+  const ownedKey = [...owned].sort().join(',');
+  const likedKey = [...likedKeys].sort().join(',');
 
   return useQuery({
-    queryKey: ['suggestions', seedKey],
+    queryKey: ['suggestions', seedKey, likedKey, ownedKey],
     enabled: seeds.length > 0,
     staleTime: 30 * 60_000,
     queryFn: async (): Promise<SuggestionRow[]> => {
-      // Anything already saved should never be suggested back.
-      const owned = new Set<number>(
-        [...wl.watchlist, ...wl.watchLater, ...wl.watched].map((i) => i.id),
-      );
-
-      const likedIds = new Set(liked.map((s) => s.id));
       const rows: SuggestionRow[] = [];
 
       const becauseRows = await Promise.all(
@@ -66,8 +65,8 @@ export function useSuggestions() {
           const items = await getRecommendations(seed.mediaType as MediaType, seed.id).catch(() => [] as Movie[]);
           return {
             key: `because-${seed.mediaType}-${seed.id}`,
-            title: likedIds.has(seed.id) ? `Because you liked ${seed.title}` : `Because you added ${seed.title}`,
-            items: items.filter((m) => !owned.has(m.id)).slice(0, 20),
+            title: likedKeys.has(opinionKey(seed.mediaType, seed.id)) ? `Because you liked ${seed.title}` : `Because you added ${seed.title}`,
+            items: items.filter((m) => !owned.has(opinionKey(m.mediaType, m.id))).slice(0, 20),
           };
         }),
       );
@@ -92,7 +91,7 @@ export function useSuggestions() {
           rows.push({
             key: `genre-${ids.join('-')}`,
             title: `More ${names.join(' & ')}`,
-            items: items.filter((m) => !owned.has(m.id) && m.id !== top.id).slice(0, 20),
+            items: items.filter((m) => !owned.has(opinionKey(m.mediaType, m.id)) && opinionKey(m.mediaType, m.id) !== opinionKey(top.mediaType, top.id)).slice(0, 20),
           });
         }
 
@@ -103,7 +102,7 @@ export function useSuggestions() {
             key: `director-${director.id}`,
             title: `From ${director.name}`,
             subtitle: 'Director',
-            items: items.filter((m) => !owned.has(m.id) && m.id !== top.id).slice(0, 20),
+            items: items.filter((m) => !owned.has(opinionKey(m.mediaType, m.id)) && opinionKey(m.mediaType, m.id) !== opinionKey(top.mediaType, top.id)).slice(0, 20),
           });
         }
 
@@ -113,7 +112,7 @@ export function useSuggestions() {
           rows.push({
             key: `actor-${actor.id}`,
             title: `Starring ${actor.name}`,
-            items: items.filter((m) => !owned.has(m.id) && m.id !== top.id).slice(0, 20),
+            items: items.filter((m) => !owned.has(opinionKey(m.mediaType, m.id)) && opinionKey(m.mediaType, m.id) !== opinionKey(top.mediaType, top.id)).slice(0, 20),
           });
         }
       }

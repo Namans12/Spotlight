@@ -1,3 +1,4 @@
+import type { ProviderOffer } from '../../shared/types/availability';
 import { useQuery } from '@tanstack/react-query';
 import { fetchProvidersBatch, providerKey, type ProviderSubject } from '@/lib/providers';
 
@@ -10,9 +11,8 @@ export type ProvidersLookup = (mediaType: string, tmdbId: number) => string[] | 
  * render, not once per grid, so TanStack Query dedupes by the sorted id list
  * instead of firing a separate request per grid.
  *
- * Returns `undefined` (not `[]`) while unresolved, so a caller can tell "still
- * loading" from "checked, and there's nowhere to watch it" — the latter is a
- * real, renderable answer (nothing to show), the former isn't.
+ * Returns `undefined` while unresolved. An empty answer means the source has
+ * no listings; it does not establish that the title is unavailable.
  */
 export function useProviders(items: ProviderSubject[]): ProvidersLookup {
   const keys = items.map((i) => ({ mediaType: i.mediaType, id: i.id }));
@@ -74,4 +74,13 @@ export function useGenres(items: ProviderSubject[]): GenresLookup {
 
   const map = query.data?.genres;
   return (mediaType: string, tmdbId: number): string[] | undefined => map?.[providerKey(mediaType, tmdbId)];
+}
+
+/** Structured regional offers; absent or empty data is not proof of unavailability. */
+export function useAvailability(items: ProviderSubject[]): (mediaType: string, tmdbId: number) => ProviderOffer[] | undefined {
+  const keys = items.map((item) => ({ mediaType: item.mediaType, id: item.id }));
+  const cacheKey = keys.map((key) => providerKey(key.mediaType, key.id)).sort().join(',');
+  const query = useQuery({ queryKey: ['providers', cacheKey], queryFn: () => fetchProvidersBatch(keys),
+    enabled: keys.length > 0, staleTime: 6 * 60 * 60_000 });
+  return (mediaType, tmdbId) => query.data?.availability?.[providerKey(mediaType, tmdbId)];
 }

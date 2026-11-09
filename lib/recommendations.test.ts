@@ -23,7 +23,7 @@ function movie(id: number, over: Partial<TmdbMovieResult> = {}): TmdbMovieResult
   };
 }
 
-const opts = { originId: 1 };
+const opts = { originId: 1, originMediaType: 'movie' as const };
 
 describe('scoreCandidates', () => {
   it('never recommends the title being viewed', () => {
@@ -78,7 +78,7 @@ describe('scoreCandidates', () => {
     const hindi = movie(20, { originalLanguage: 'hi' });
     const english = movie(21, { originalLanguage: 'en' });
     const buckets: CandidateBucket[] = [{ kind: 'keyword', label: 'Also coming of age', results: [hindi, english] }];
-    const ranked = scoreCandidates(buckets, { originId: 1, originLanguage: 'hi' });
+    const ranked = scoreCandidates(buckets, { originId: 1, originMediaType: 'movie', originLanguage: 'hi' });
     expect(ranked[0].id).toBe(20);
   });
 
@@ -96,7 +96,7 @@ describe('scoreCandidates', () => {
         { kind: 'keyword', label: 'Similar themes', results: [foreign] },
         { kind: 'keyword', label: 'Similar themes', results: [local] },
       ],
-      { originId: 1, originLanguage: 'hi' },
+      { originId: 1, originMediaType: 'movie', originLanguage: 'hi' },
     );
     expect(ranked.map((r) => r.id)).toEqual([71, 70]);
     // Discounted, never filtered.
@@ -113,7 +113,7 @@ describe('scoreCandidates', () => {
         { kind: 'director', label: 'Also directed by X', results: [foreignButStrong] },
         { kind: 'similar', results: [localButWeak] },
       ],
-      { originId: 1, originLanguage: 'hi' },
+      { originId: 1, originMediaType: 'movie', originLanguage: 'hi' },
     );
     expect(ranked[0].id).toBe(80);
   });
@@ -122,8 +122,8 @@ describe('scoreCandidates', () => {
     // An English catalogue for an English title: the factor applies uniformly
     // and must not reshuffle anything.
     const results = [movie(90), movie(91), movie(92)];
-    const withLang = scoreCandidates([{ kind: 'recommendation', results }], { originId: 1, originLanguage: 'en' });
-    const withoutLang = scoreCandidates([{ kind: 'recommendation', results }], { originId: 1 });
+    const withLang = scoreCandidates([{ kind: 'recommendation', results }], { originId: 1, originMediaType: 'movie', originLanguage: 'en' });
+    const withoutLang = scoreCandidates([{ kind: 'recommendation', results }], { originId: 1, originMediaType: 'movie' });
     expect(withLang.map((r) => r.id)).toEqual(withoutLang.map((r) => r.id));
   });
 
@@ -137,7 +137,7 @@ describe('scoreCandidates', () => {
       { kind: 'director', label: 'Also directed by Ayan Mukerji', results: [noGenreOverlap] },
       { kind: 'keyword', label: 'Also romance', results: [genreTwin] },
     ];
-    const ranked = scoreCandidates(buckets, { originId: 1, originGenreIds: [35, 10749] });
+    const ranked = scoreCandidates(buckets, { originId: 1, originMediaType: 'movie', originGenreIds: [35, 10749] });
     expect(ranked[0].id).toBe(30);
   });
 
@@ -176,6 +176,12 @@ describe('scoreCandidates', () => {
 
   it('honours the limit', () => {
     const results = Array.from({ length: 30 }, (_, i) => movie(200 + i));
-    expect(scoreCandidates([{ kind: 'person', label: 'x', results }], { originId: 1, limit: 5 })).toHaveLength(5);
+    expect(scoreCandidates([{ kind: 'person', label: 'x', results }], { originId: 1, originMediaType: 'movie', limit: 5 })).toHaveLength(5);
   });
+});
+
+it('keeps movie and TV titles with the same numeric ID distinct', () => {
+  const rows = [movie(1), movie(1, { mediaType: 'tv' }), movie(2), movie(2, { mediaType: 'tv' })];
+  const ranked = scoreCandidates([{ kind: 'recommendation', results: rows }], { originId: 1, originMediaType: 'movie', chainIds: [2] });
+  expect(ranked.map(item => `${item.mediaType}:${item.id}`).sort()).toEqual(['movie:2', 'tv:1', 'tv:2']);
 });

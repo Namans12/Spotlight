@@ -5,6 +5,7 @@ import { RatingBadges } from '@/components/release/RatingBadges';
 import { hasAnyScore, type TitleRating } from '@/lib/ratings';
 import { WatchedToggle, WatchedBadge } from '@/components/watchlist/WatchedToggle';
 import { ImageOff, Star, Plus, Clock, ThumbsDown } from 'lucide-react';
+import { ReleaseEvidence } from './ReleaseEvidence';
 import { tmdbPosterFluid } from '@/lib/tmdbImage';
 
 interface PosterCardProps {
@@ -143,6 +144,8 @@ export function PosterCard({
           only when the combined text happened to overflow, so one card in a
           row would grow a second line while its neighbours didn't. */}
       {provider && <p className="mt-0.5 text-[10px] text-accent font-medium truncate">{provider}</p>}
+
+      {item.evidence && <ReleaseEvidence evidence={item.evidence} providers={item.providers ?? []} />}
 
       {reason && <p className="mt-1 text-[10px] text-muted-foreground leading-snug line-clamp-2">{reason}</p>}
 

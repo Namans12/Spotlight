@@ -10,6 +10,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   const url = new URL(req.url ?? "/", "http://localhost");
   const month = url.searchParams.get("month");
+  const region = (url.searchParams.get("region") ?? process.env.REGION ?? "IN").toUpperCase();
 
   if (!month || !MONTH_PATTERN.test(month)) {
     res.statusCode = 400;
@@ -17,11 +18,17 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return;
   }
 
+  if (!/^[A-Z]{2}$/.test(region)) {
+    res.statusCode = 400;
+    res.end(JSON.stringify({ error: "region must be a two-letter country code" }));
+    return;
+  }
+
   try {
-    const entries = await getCalendarMonth(getDb(), month);
+    const entries = await getCalendarMonth(getDb(), month, region);
     res.statusCode = 200;
     res.setHeader("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400");
-    res.end(JSON.stringify({ month, entries }));
+    res.end(JSON.stringify({ month, region, entries }));
   } catch (err) {
     console.error("[calendar] lookup failed", err);
     res.statusCode = 500;

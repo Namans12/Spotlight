@@ -1,108 +1,88 @@
 import type postgres from "postgres";
 import type { CalendarEntryDTO } from "../shared/types/calendar.js";
-import {
-  calendarTitleKey,
-  classifyPlatform,
-  mediaTypeFromEntryType,
-  normalizePlatforms,
-  splitPlatformField,
-} from "../shared/platforms.js";
+import { classifyPlatform, isKnownStreamer, mediaTypeFromEntryType, normalizePlatforms, splitPlatformField } from "../shared/platforms.js";
 
-function dedupeKey(title: string, releaseDate: string): string {
-  return `${calendarTitleKey(title)}::${releaseDate}`;
+/** Only merge observations when all event dimensions are known and agree.
+ * An unknown season is not interchangeable with a known season. */
+function eventKey(entry: CalendarEntryDTO): string | null {
+  if (!entry.region || !entry.mediaType || !entry.tmdbId) return null;
+  const part = entry.title.match(/\b(?:season|series|s|part|chapter)\s*(\d+)\s*$/i);
+  return JSON.stringify([entry.region, entry.mediaType, entry.tmdbId, entry.releaseDate, entry.kind,
+    part ? `${part[0].replace(/\s+/g, " ").toLowerCase()}` : null]);
 }
 
-/** Entries for a given month, merging the CSV-seeded editorial calendar with
- * any TMDB-confirmed release_items rows for that month. When both cover the
- * same (title, release_date), the TMDB row wins — it has a poster, rating,
- * overview, and provider data the CSV row doesn't.
- *
- * `mediaType` and `kind` are derived here rather than read from the columns:
- * the seeder never populated `calendar_entries.media_type` (so every row used
- * to render as a film, un-clickable), and the stored `is_theatrical` came from
- * a substring heuristic that mislabelled 154 of 267 shows. Deriving at read
- * time corrects the existing rows without a reseed. */
-export async function getCalendarMonth(sql: postgres.Sql<any>, month: string): Promise<CalendarEntryDTO[]> {
+export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, region = process.env.REGION ?? "IN"): Promise<CalendarEntryDTO[]> {
   const monthStart = `${month}-01`;
-
   const releaseRows = await sql`
-    SELECT DISTINCT ON (tmdb_id, media_type)
-      tmdb_id, media_type, title, language, release_date::text AS release_date, rating, poster_url, overview, providers
+    SELECT tmdb_id, media_type, title, language, release_date::text AS release_date, rating, poster_url, overview,
+      CASE WHEN evidence->>'provider_source' = 'tmdb_regional_availability' THEN providers ELSE ARRAY[]::text[] END AS providers, evidence
     FROM release_items
-    WHERE date_trunc('month', release_date::timestamp) = date_trunc('month', ${monthStart}::date)
-    ORDER BY tmdb_id, media_type, release_date
+    WHERE region = ${region} AND evidence->>'region' = region
+      AND evidence->>'date_source' = 'tmdb_regional_digital'
+      AND date_trunc('month', release_date::timestamp) = date_trunc('month', ${monthStart}::date)
+    ORDER BY release_date, tmdb_id, media_type
   `;
-
-  const csvRows = await sql`
-    SELECT release_date::text AS release_date, title, language, entry_type, is_theatrical, platform_or_distributor,
-           tmdb_id, media_type, details, poster_url,
-           origin_region, origin_release_date::text AS origin_release_date
+  const calendarRows = await sql`
+    SELECT id, release_date::text AS release_date, title, language, entry_type, platform_or_distributor,
+      tmdb_id, media_type, details, poster_url, origin_region, origin_release_date::text AS origin_release_date,
+      evidence->>'region' AS event_region, evidence, source, source_url
     FROM calendar_entries
     WHERE date_trunc('month', release_date::timestamp) = date_trunc('month', ${monthStart}::date)
-    ORDER BY release_date
+      AND (evidence->>'region' IS NULL OR evidence->>'region' = ${region})
+      AND (origin <> 'tmdb_upcoming' OR
+           (evidence->>'region' = ${region} AND evidence->>'date_source' = 'tmdb_regional_theatrical'))
+    ORDER BY release_date, id
   `;
 
-  const seen = new Set<string>();
   const entries: CalendarEntryDTO[] = [];
+  const byEvent = new Map<string, CalendarEntryDTO>();
+  const add = (entry: CalendarEntryDTO) => {
+    const key = eventKey(entry);
+    const existing = key ? byEvent.get(key) : undefined;
+    if (!existing) {
+      entries.push(entry);
+      if (key) byEvent.set(key, entry);
+      return;
+    }
+    // The same event may occur in multiple digest sections. Preserve all
+    // observed providers, while keeping each event and region distinct.
+    existing.platforms = [...new Set([...existing.platforms, ...entry.platforms])];
+    existing.platform = existing.platforms[0] ?? null;
+    existing.posterUrl ??= entry.posterUrl;
+    existing.overview ??= entry.overview;
+    existing.rating ??= entry.rating;
+    const times = [existing.observedAt, entry.observedAt].map(value => value ? Date.parse(value) : NaN);
+    existing.observedAt = times.every(Number.isFinite) ? new Date(Math.min(...times)).toISOString() : null;
+    const types = existing.availabilityTypes ?? {};
+    for (const [name, values] of Object.entries(entry.availabilityTypes ?? {}))
+      types[name] = [...new Set([...(types[name] ?? []), ...values])];
+    existing.availabilityTypes = types;
+  };
 
   for (const row of releaseRows) {
-    const releaseDate = String(row.release_date);
-    const providers = normalizePlatforms(row.providers);
-    entries.push({
-      releaseDate,
-      title: row.title,
-      language: row.language,
-      mediaType: row.media_type,
-      kind: "streaming",
-      isTheatrical: false,
-      platform: providers[0] ?? null,
-      tmdbId: Number(row.tmdb_id),
-      posterUrl: row.poster_url,
-      rating: row.rating !== null ? Number(row.rating) : null,
-      overview: row.overview,
-      origin: "tmdb",
-      // release_items is OTT-only; a streaming date is whatever date the
-      // platform itself dropped the title on, not a theatrical window with a
-      // separate home-market date to contrast against.
-      originRegion: null,
-      originReleaseDate: null,
-    });
-    seen.add(dedupeKey(row.title, releaseDate));
+    const platforms = normalizePlatforms(row.providers);
+    add({ releaseDate: String(row.release_date), title: row.title, language: row.language,
+      mediaType: row.media_type, kind: "streaming", isTheatrical: false,
+      platform: platforms[0] ?? null, platforms, region, tmdbId: Number(row.tmdb_id),
+      posterUrl: row.poster_url, rating: row.rating !== null ? Number(row.rating) : null,
+      overview: row.overview, origin: "tmdb", originRegion: null, originReleaseDate: null,
+      source: platforms.length ? "TMDB / JustWatch" : "TMDB", sourceUrl: row.evidence?.source_url ?? null, observedAt: row.evidence?.observed_at ?? null,
+      availabilityTypes: row.evidence?.provider_types ?? null, evidenceStatus: "regional" });
   }
-
-  for (const row of csvRows) {
-    const releaseDate = String(row.release_date);
-    const key = dedupeKey(row.title, releaseDate);
-    if (seen.has(key)) continue;
-    seen.add(key);
-
+  for (const row of calendarRows) {
     const kind = classifyPlatform(row.entry_type, row.platform_or_distributor);
-    // The CSV lists every distributor on a film ("Warner Bros. Pictures /
-    // Warner Bros. Pictures Animation"); the first is the one worth showing.
-    const platformParts = splitPlatformField(row.platform_or_distributor);
-    const platform =
-      kind === "streaming" ? normalizePlatforms(platformParts)[0] ?? null : platformParts[0] ?? null;
-
-    entries.push({
-      releaseDate,
-      title: row.title,
-      language: row.language,
-      mediaType: row.media_type ?? mediaTypeFromEntryType(row.entry_type),
-      kind,
-      isTheatrical: kind === "theatrical",
-      platform,
-      tmdbId: row.tmdb_id !== null ? Number(row.tmdb_id) : null,
-      // Filled by scripts/backfill_calendar_tmdb.py; still null for rows it
-      // could not confidently match, which render as a text line as before.
-      posterUrl: row.poster_url ?? null,
-      rating: null,
-      overview: row.details,
-      origin: "csv_seed",
-      originRegion: row.origin_region ?? null,
-      originReleaseDate: row.origin_release_date ?? null,
-    });
+    const parts = splitPlatformField(row.platform_or_distributor);
+    const platforms = kind === "streaming" ? normalizePlatforms(parts.filter(isKnownStreamer)) : parts;
+    add({ releaseDate: String(row.release_date), title: row.title, language: row.language,
+      mediaType: row.media_type ?? mediaTypeFromEntryType(row.entry_type), kind,
+      isTheatrical: kind === "theatrical", platform: platforms[0] ?? null, platforms,
+      region: row.event_region ?? null, tmdbId: row.tmdb_id !== null ? Number(row.tmdb_id) : null,
+      posterUrl: row.poster_url ?? null, rating: null, overview: row.details,
+      origin: "csv_seed", originRegion: row.origin_region ?? null, originReleaseDate: row.origin_release_date ?? null,
+      source: row.source ?? null, sourceUrl: row.source_url ?? null,
+      observedAt: row.evidence?.observed_at ?? null, availabilityTypes: null,
+      evidenceStatus: row.event_region && row.evidence?.date_source ? "regional" : "unverified" });
   }
-
   entries.sort((a, b) => a.releaseDate.localeCompare(b.releaseDate) || a.title.localeCompare(b.title));
   return entries;
 }

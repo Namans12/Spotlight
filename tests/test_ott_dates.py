@@ -126,9 +126,9 @@ def test_digital_date_prefers_region_over_other_countries():
     assert rb.digital_release_date(payload, "IN") == "2026-08-21"
 
 
-def test_digital_date_falls_back_to_earliest_any_country():
+def test_digital_date_does_not_fall_back_to_foreign_country():
     payload = movie_payload(digital_any="2026-06-01")
-    assert rb.digital_release_date(payload, "IN") == "2026-06-01"
+    assert rb.digital_release_date(payload, "IN") is None
 
 
 def test_digital_date_absent_when_no_type_4_entry():
@@ -149,7 +149,7 @@ def test_movie_is_filed_under_its_digital_date_not_its_theatrical_date():
     window, item = placed[0]
     assert item.release_date == "2026-08-21", "must use the digital date"
     assert window == "coming_up", "21 Aug is on/after the next run, so Coming Up"
-    assert item.providers == ("ZEE5",), "news hint fills in where TMDB has no IN provider"
+    assert item.providers == (), "news hint is not regional availability evidence"
 
 
 def test_cinema_only_movie_is_dropped_not_dated_from_its_theatrical_release():
@@ -159,12 +159,12 @@ def test_cinema_only_movie_is_dropped_not_dated_from_its_theatrical_release():
     assert flat(enrich(tmdb, [Candidate("Irumudi")])) == []
 
 
-def test_straight_to_ott_movie_may_use_its_primary_date():
+def test_primary_date_does_not_establish_ott_date():
     """No digital date on record, but already streaming -> primary date is the drop."""
     det = movie_payload(movie_id=7, title="An Original", primary="2026-08-19", providers_in=("Netflix",))
     tmdb = FakeTmdb(search={"An Original": [dict(det, media_type="movie")]}, movies={7: det})
     placed = flat(enrich(tmdb, [Candidate("An Original")]))
-    assert [(w, i.release_date, i.providers) for w, i in placed] == [("out_now", "2026-08-19", ("Netflix",))]
+    assert placed == []  # primary date is not a regional digital date
 
 
 def test_title_outside_the_recency_horizon_is_dropped():
@@ -202,7 +202,7 @@ def test_split_season(raw, expected):
     assert rb._split_season(raw) == expected
 
 
-def test_returning_season_is_dated_from_the_season_not_the_series():
+def test_global_season_date_does_not_establish_regional_ott_date():
     """first_air_date is 2020 for Outer Banks; season 5 aired 2026-08-20."""
     show = tv_payload(tv_id=71446, name="Outer Banks", first_air="2020-04-15", providers_in=("Netflix",))
     tmdb = FakeTmdb(
@@ -212,11 +212,7 @@ def test_returning_season_is_dated_from_the_season_not_the_series():
         seasons={(71446, 5): {"air_date": "2026-08-20"}},
     )
     placed = flat(enrich(tmdb, [Candidate("Outer Banks Season 5", "Netflix")]))
-    assert len(placed) == 1
-    _, item = placed[0]
-    assert item.release_date == "2026-08-20", "the season's air_date, not the series' 2020 start"
-    assert item.title == "Outer Banks Season 5", "the digest must name the season"
-    assert tmdb.season_calls == [(71446, 5)]
+    assert placed == []  # global season air date cannot establish regional streaming
 
 
 def test_series_start_date_alone_does_not_qualify_a_returning_show():
@@ -246,14 +242,14 @@ def test_streaming_networks_is_global_not_india_only():
         assert name in rb.STREAMING_NETWORKS, name
 
 
-def test_network_fallback_accepts_a_non_india_network():
+def test_foreign_network_is_not_regional_availability():
     """Was previously refused. A reader outside India is better served by
     "Hulu" than by nothing at all."""
-    assert rb.resolve_providers(tv_payload(networks=("Hulu",)), "IN") == ("Hulu",)
+    assert rb.resolve_providers(tv_payload(networks=("Hulu",)), "IN") == ()
 
 
-def test_network_fallback_accepts_an_india_network():
-    assert rb.resolve_providers(tv_payload(networks=("ZEE5",)), "IN") == ("ZEE5",)
+def test_network_is_not_regional_availability():
+    assert rb.resolve_providers(tv_payload(networks=("ZEE5",)), "IN") == ()
 
 
 def test_real_region_availability_beats_the_network_fallback():
@@ -261,8 +257,8 @@ def test_real_region_availability_beats_the_network_fallback():
     assert rb.resolve_providers(details, "IN") == ("JioHotstar",)
 
 
-def test_news_hint_is_normalized_and_used_only_as_a_last_resort():
-    assert rb.resolve_providers(tv_payload(), "IN", "Disney+") == ("JioHotstar",)
+def test_news_hint_is_not_regional_availability():
+    assert rb.resolve_providers(tv_payload(), "IN", "Disney+") == ()
     # A real provider wins over the hint.
     assert rb.resolve_providers(tv_payload(providers_in=("Netflix",)), "IN", "ZEE5") == ("Netflix",)
 
@@ -271,3 +267,51 @@ def test_a_broadcast_only_network_is_still_not_a_streaming_platform():
     """PBS/TLC air a show but you cannot stream it there — the network fallback
     only accepts services that are themselves streaming platforms."""
     assert rb.resolve_providers(tv_payload(networks=("PBS",)), "IN") == ()
+
+@pytest.mark.parametrize("day,expected", [
+    ("2026-08-18", []),
+    ("2026-08-19", ["out_now"]),
+    ("2026-08-20", ["out_now"]),
+    ("2026-08-21", ["coming_up"]),
+    ("2026-08-27", ["coming_up"]),
+    ("2026-08-28", []),
+])
+def test_news_candidates_stay_in_declared_windows(day, expected):
+    det = movie_payload(movie_id=42, title="A Film", digital_in=day, providers_in=("Netflix",))
+    tmdb = FakeTmdb(search={"A Film": [dict(det, media_type="movie")]}, movies={42: det})
+    assert [window for window, _ in flat(enrich(tmdb, [Candidate("A Film")]))] == expected
+
+
+def test_alert_evidence_requires_local_date_and_local_provider():
+    local = movie_payload(digital_in="2026-08-19", providers_in=("Netflix",))
+    evidence = rb.regional_movie_evidence(local, "IN", "2026-08-19")
+    assert evidence.date_source == "tmdb_regional_digital"
+    assert evidence.provider_source == "tmdb_regional_availability"
+    assert rb.regional_movie_evidence(movie_payload(digital_any="2026-08-19", providers_in=("Netflix",)), "IN", "2026-08-19").date_source is None
+    assert rb.regional_movie_evidence(movie_payload(digital_in="2026-08-19"), "IN", "2026-08-19").provider_source is None
+
+
+def test_distinct_region_digital_dates_are_preserved():
+    details = movie_payload(digital_in='2026-08-19')
+    details['release_dates']['results'][0]['release_dates'].append({'type': 4, 'release_date': '2026-08-21T00:00:00Z'})
+    assert rb.digital_release_dates(details, 'IN') == ['2026-08-19', '2026-08-21']
+    assert rb.regional_movie_evidence(details, 'IN', '2026-08-21').date_source == 'tmdb_regional_digital'
+
+
+def test_movie_discovery_emits_each_regional_date_in_window():
+    details = movie_payload(movie_id=42, title='A Film', digital_in='2026-08-19', providers_in=('Netflix',))
+    details['release_dates']['results'][0]['release_dates'].append({'type': 4, 'release_date': '2026-08-20T00:00:00Z'})
+    class DiscoverTmdb:
+        region = 'IN'
+        def discover(self, *_args, **_kwargs): return [details]
+        def details_or_empty(self, *_args): return details
+    items = rb.fetch_ott_movies(DiscoverTmdb(), '2026-08-19', '2026-08-20')
+    assert [x.release_date for x in items] == ['2026-08-19', '2026-08-20']
+
+
+def test_provider_types_preserve_region_and_monetization():
+    details = movie_payload(digital_in='2026-08-19', providers_in=('Netflix',))
+    details['watch/providers']['results']['IN']['ads'] = [{'provider_name': 'Netflix'}]
+    details['watch/providers']['results']['US'] = {'flatrate': [{'provider_name': 'Hulu'}]}
+    evidence = rb.regional_movie_evidence(details, 'IN', '2026-08-19')
+    assert evidence.provider_types == {'Netflix': ['subscription', 'ad-supported']}

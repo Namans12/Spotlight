@@ -85,6 +85,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         const { buckets, profile } = await tmdbRecommendationBuckets(type, id);
         body = scoreCandidates(buckets, {
           originId: id,
+          originMediaType: type,
           originLanguage: profile?.language,
           originGenreIds: profile?.genreIds,
           limit: 20,
@@ -115,7 +116,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         if (keys.length === 0) {
           body = {};
         } else {
-          const { providers, runtimes, genres, hadFailures } = await tmdbWatchProvidersBatch(keys);
+          const { providers, availability, runtimes, genres, hadFailures } = await tmdbWatchProvidersBatch(keys);
           // Wrapped rather than the bare providers map this used to return.
           // `runtimes` rides along for free — the batch already fetches each
           // title's full detail to read providers and discarded the rest, and
@@ -123,7 +124,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
           // TMDB already sent. src/lib/providers.ts still accepts the old flat
           // shape, because a CDN entry cached before this deploy keeps being
           // served for up to an hour after it.
-          body = { providers, runtimes, genres };
+          body = { providers, availability, runtimes, genres };
           // A batch where any leg failed (TMDB 429/5xx, a timeout) must not get
           // the long cache lifetime the happy path does -- that would bake a
           // transient rate-limit hit in as "confirmed: nothing to watch this

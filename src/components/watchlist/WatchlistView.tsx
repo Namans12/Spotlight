@@ -4,7 +4,7 @@ import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { WatchlistItem } from '@/types/movie';
 import { SortableMovieCard } from './SortableMovieCard';
 import { useSeasons } from '@/hooks/useSeasons';
-import { useProviders, useRuntimes } from '@/hooks/useProviders';
+import { useAvailability, useProviders, useRuntimes } from '@/hooks/useProviders';
 import { WatchNowBar } from './WatchNowBar';
 import {
   EMPTY_FILTERS,
@@ -33,13 +33,14 @@ interface WatchlistViewProps {
 export function WatchlistView({ items, onReorder, onMarkWatched, onRemove, onAddToWatchLater, onAddToList, emptyMessage = 'Nothing here yet', showWatchNow = false }: WatchlistViewProps) {
   const seasonsFor = useSeasons(items);
   const providersFor = useProviders(items);
+  const availabilityFor = useAvailability(items);
   // Same batch request as useProviders — TanStack dedupes on the shared query
   // key, so runtime costs nothing extra here or at TMDB.
   const runtimeFor = useRuntimes(items);
   const [filters, setFilters] = useState<WatchNowFilters>(EMPTY_FILTERS);
 
   const filtering = showWatchNow && hasActiveFilters(filters);
-  const visible = showWatchNow ? filterWatchNow(items, filters, { providersFor, runtimeFor }) : items;
+  const visible = showWatchNow ? filterWatchNow(items, filters, { providersFor, availabilityFor, runtimeFor }) : items;
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
@@ -72,7 +73,8 @@ export function WatchlistView({ items, onReorder, onMarkWatched, onRemove, onAdd
         item={item}
         index={idx}
         seasons={seasonsFor(item.mediaType, item.id)}
-        providers={providersFor(item.mediaType, item.id)}
+        providers={showWatchNow ? [] : providersFor(item.mediaType, item.id)}
+        offers={showWatchNow ? availabilityFor(item.mediaType, item.id) ?? null : undefined}
         onMarkWatched={() => onMarkWatched(item.dbId)}
         onRemove={() => onRemove(item.dbId)}
         onAddToWatchLater={onAddToWatchLater ? () => onAddToWatchLater(item.dbId) : undefined}
@@ -84,7 +86,7 @@ export function WatchlistView({ items, onReorder, onMarkWatched, onRemove, onAdd
     <WatchNowBar
       filters={filters}
       onChange={setFilters}
-      platforms={availablePlatforms(items, providersFor)}
+      platforms={availablePlatforms(items, availabilityFor)}
       runtimeBands={availableRuntimeBands(items, runtimeFor)}
       shownCount={visible.length}
       totalCount={items.length}

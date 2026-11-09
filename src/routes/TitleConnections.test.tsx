@@ -283,7 +283,7 @@ describe('a title with no chain', () => {
   it('says a film stands on its own', async () => {
     vi.mocked(fetchRelations).mockResolvedValue(titleRelations({}));
     renderApp();
-    expect(await screen.findByText(/it stands on its own/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no verified watch order is recorded/i)).toBeInTheDocument();
   });
 
   // TMDB has no collection concept for TV, so a show outside the curated seed
@@ -310,6 +310,6 @@ describe('a title with no chain', () => {
     });
     renderApp('/title/tv/1/connections');
 
-    expect(await screen.findByText(/start at Season 1 and watch all 8 seasons in order/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No cross-series order is recorded. This series has 8 seasons/i)).toBeInTheDocument();
   });
 });

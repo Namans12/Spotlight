@@ -56,6 +56,11 @@ export function splitPlatformField(raw: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
+/** Whether a name maps to a known streaming service, rather than a distributor. */
+export function isKnownStreamer(name: string): boolean {
+  return KNOWN_STREAMERS.has(normalizePlatform(name).toLowerCase());
+}
+
 /**
  * Classifies a calendar row as a cinema release, a linear-TV premiere, or an
  * OTT drop.

@@ -90,10 +90,7 @@ def test_still_falls_through_to_platform_tba_when_truly_unknown():
 
 
 # --------------------------------------------------------------------------
-# Cross-region fallback — the step that actually resolves Toy Story 5.
-# TMDB's India provider data is thin while its US/UK data is rich: Toy Story 5
-# carries rent/buy entries in 36 territories and none in India, so a
-# region-only lookup reported nothing for a film that was plainly available.
+# A listing in another territory cannot establish availability in India.
 # --------------------------------------------------------------------------
 
 def multi_region(regions: dict):
@@ -109,18 +106,14 @@ def multi_region(regions: dict):
     }
 
 
-def test_toy_story_5_shape_resolves_from_other_territories():
+def test_foreign_purchase_does_not_establish_india_availability():
     """No India data at all; rent/buy in US, GB, AU."""
     details = multi_region({
         "US": {"rent": ["Amazon Video", "Apple TV Store", "Google Play Movies"]},
         "GB": {"rent": ["Apple TV Store", "Rakuten TV"]},
         "AU": {"rent": ["Apple TV Store"]},
     })
-    got = rb.resolve_providers(details, "IN")
-    assert got, "must not come back empty when 3 territories list it"
-    assert all(g.endswith(" (Buy/Rent)") for g in got), got
-    # Apple TV Store is in all three territories, so it ranks first.
-    assert got[0].startswith("Apple TV"), got
+    assert rb.resolve_providers(details, "IN") == ()
 
 
 def test_own_region_subscription_still_wins_over_foreign_data():
@@ -140,17 +133,17 @@ def test_own_region_buy_rent_wins_over_foreign_subscription():
     assert rb.resolve_providers(details, "IN") == ("Amazon Prime (Buy/Rent)",)
 
 
-def test_foreign_subscription_beats_foreign_purchase():
+def test_foreign_listings_are_not_reported_in_india():
     details = multi_region({
         "US": {"flatrate": ["Hulu"]},
         "GB": {"rent": ["Sky Store"]},
     })
-    assert rb.resolve_providers(details, "IN") == ("Hulu",)
+    assert rb.resolve_providers(details, "IN") == ()
 
 
 def test_provider_list_is_capped():
     details = multi_region({
-        "US": {"flatrate": ["Netflix", "Hulu", "Peacock", "Paramount+", "HBO Max"]},
+        "IN": {"flatrate": ["Netflix", "Hulu", "Peacock", "Paramount+", "HBO Max"]},
     })
     assert len(rb.resolve_providers(details, "IN")) <= rb.MAX_PROVIDERS
 

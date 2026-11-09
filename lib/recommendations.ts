@@ -144,6 +144,7 @@ const MIN_VOTE_COUNT = 20;
 export interface ScoreOptions {
   /** The title being viewed. Never recommends itself. */
   originId: number;
+  originMediaType: "movie" | "tv";
   originLanguage?: string;
   originGenreIds?: number[];
   /** Titles already known to be part of this one's watch-order chain. Not
@@ -155,7 +156,7 @@ export interface ScoreOptions {
 }
 
 export function scoreCandidates(buckets: CandidateBucket[], opts: ScoreOptions): ScoredRecommendation[] {
-  const { originId, originLanguage, originGenreIds = [], chainIds = [], limit = 20 } = opts;
+  const { originId, originMediaType, originLanguage, originGenreIds = [], chainIds = [], limit = 20 } = opts;
   const originGenres = new Set(originGenreIds);
   const chain = new Set(chainIds);
 
@@ -166,7 +167,7 @@ export function scoreCandidates(buckets: CandidateBucket[], opts: ScoreOptions):
      *  reason three times. */
     reasons: Map<string, number>;
   }
-  const byId = new Map<number, Accumulator>();
+  const byId = new Map<string, Accumulator>();
 
   for (const bucket of buckets) {
     const weight = WEIGHTS[bucket.kind];
@@ -179,16 +180,17 @@ export function scoreCandidates(buckets: CandidateBucket[], opts: ScoreOptions):
     // person and director buckets where a deep hit is still a real one.
     const considered = bucket.results.slice(0, BUCKET_DEPTH[bucket.kind]);
     considered.forEach((movie, index) => {
-      if (!movie || movie.id === originId) return;
+      if (!movie || (movie.id === originId && movie.mediaType === originMediaType)) return;
+      const identity = `${movie.mediaType}:${movie.id}`;
 
       const points = weight * rankFactor(index, considered.length);
-      const existing = byId.get(movie.id);
+      const existing = byId.get(identity);
       const acc: Accumulator = existing ?? { movie, score: 0, reasons: new Map() };
       acc.score += points;
       if (bucket.label) {
         acc.reasons.set(bucket.label, Math.max(acc.reasons.get(bucket.label) ?? 0, points));
       }
-      if (!existing) byId.set(movie.id, acc);
+      if (!existing) byId.set(identity, acc);
     });
   }
 
@@ -219,7 +221,7 @@ export function scoreCandidates(buckets: CandidateBucket[], opts: ScoreOptions):
     score += Math.min(movie.voteAverage ?? 0, 10) * 0.8;
 
     // Already surfaced, prominently, in the Watch order rail above.
-    if (chain.has(movie.id)) score *= 0.75;
+    if (movie.mediaType === originMediaType && chain.has(movie.id)) score *= 0.75;
 
     scored.push({
       ...movie,

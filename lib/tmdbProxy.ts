@@ -1,4 +1,5 @@
-import { normalizePlatforms, STREAMING_NETWORKS } from "../shared/platforms.js";
+import type { ProviderOffer, AvailabilityType } from "../shared/types/availability.js";
+import { normalizePlatform, normalizePlatforms } from "../shared/platforms.js";
 import { sortByRelease, type CollectionPart } from "../shared/collectionShapes.js";
 import type { CandidateBucket } from "./recommendations.js";
 
@@ -34,21 +35,6 @@ function namesInRegion(details: any, region: string, buckets: readonly string[])
   return names;
 }
 
-/** Provider names from every territory, most widely-carried first — a store
- * listed in 30 countries is a better one-line answer than one listed in a
- * single small market. */
-function namesAnyRegion(details: any, buckets: readonly string[]): string[] {
-  const results = details?.["watch/providers"]?.results ?? {};
-  const counts = new Map<string, number>();
-  for (const region of Object.keys(results)) {
-    // A store listed in both rent and buy for one region still counts once.
-    for (const name of new Set(namesInRegion(details, region, buckets))) {
-      counts.set(name, (counts.get(name) ?? 0) + 1);
-    }
-  }
-  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name]) => name);
-}
-
 function flatrateProviders(details: any, region: string): string[] {
   return normalizePlatforms(namesInRegion(details, region, AVAILABILITY_BUCKETS));
 }
@@ -68,37 +54,28 @@ function rentBuyProviders(details: any, region: string): string[] {
   return tagBuyRent(namesInRegion(details, region, PURCHASE_BUCKETS));
 }
 
-/** Best available answer to "where can I watch this?", widest-relevance first.
- *
- * The order encodes a preference, not a guess: a subscription in the reader's
- * own region is the most useful answer, and a store in some other territory is
- * the least — but all of them beat showing nothing. The cross-region steps
- * exist because TMDB's India provider data is thin while its US/UK data is
- * rich: a title can carry rent/buy entries in 30+ territories and none in
- * India, so a region-only lookup would report nothing for a title that's
- * plainly available. Mirrors resolve_providers in releasebot.py, the same
- * fallback chain already proven on the release calendar. */
+/** Only listings explicitly observed in the requested region qualify. */
 export function resolveProviders(details: any, region: string): string[] {
   const subs = flatrateProviders(details, region);
-  if (subs.length > 0) return subs.slice(0, MAX_PROVIDERS);
+  return subs.length > 0 ? subs.slice(0, MAX_PROVIDERS) : rentBuyProviders(details, region);
+}
 
-  const purchase = rentBuyProviders(details, region);
-  if (purchase.length > 0) return purchase;
-
-  const subsAnywhere = normalizePlatforms(namesAnyRegion(details, AVAILABILITY_BUCKETS));
-  if (subsAnywhere.length > 0) return subsAnywhere.slice(0, MAX_PROVIDERS);
-
-  const purchaseAnywhere = tagBuyRent(namesAnyRegion(details, PURCHASE_BUCKETS));
-  if (purchaseAnywhere.length > 0) return purchaseAnywhere;
-
-  // No availability recorded anywhere. The network that made it is the last
-  // real signal — a brand-new title often has one before it has providers.
-  // Movies carry no `networks` field at all, so this tier is TV-only in practice.
-  const networks = normalizePlatforms((details?.networks ?? []).map((n: any) => n?.name ?? ""));
-  const fromNetwork = networks.filter((n) => STREAMING_NETWORKS.has(n));
-  if (fromNetwork.length > 0) return fromNetwork.slice(0, MAX_PROVIDERS);
-
-  return [];
+/** Preserve each local offer and monetization type independently. */
+export function resolveProviderOffers(details: any, region: string): ProviderOffer[] {
+  const payload = details?.["watch/providers"]?.results?.[region] ?? {};
+  const buckets: [string, AvailabilityType][] = [
+    ["flatrate", "subscription"], ["free", "free"], ["ads", "ads"], ["rent", "rent"], ["buy", "buy"],
+  ];
+  const offers: ProviderOffer[] = [];
+  const seen = new Set<string>();
+  for (const [bucket, type] of buckets) {
+    for (const entry of payload[bucket] ?? []) {
+      const provider = normalizePlatform(entry?.provider_name ?? "");
+      const key = `${provider}:${type}`;
+      if (provider && !seen.has(key)) { seen.add(key); offers.push({ provider, type }); }
+    }
+  }
+  return offers;
 }
 
 export interface TmdbMovieResult {
@@ -777,6 +754,7 @@ export type GenreMap = Record<string, string[]>;
 
 export interface ProviderBatchResult {
   providers: Record<string, string[]>;
+  availability: Record<string, ProviderOffer[]>;
   /** Free: this batch already fetches each title's full detail payload to read
    *  its providers and discards the rest, and the runtime is in there. A
    *  separate lookup would double the request count to learn a number TMDB
@@ -802,7 +780,7 @@ export interface ProviderBatchResult {
  *
  * A failed key (a bad id, a transient TMDB error, a 429) is omitted from
  * `providers` entirely rather than mapped to `[]`. `[]` is a real, cacheable
- * answer -- "checked, nothing to watch it on" -- and a failure is not that; the
+ * answer -- no listings returned by this source -- and a failure is not that; the
  * client's `useProviders` already treats a missing key as "still unknown" the
  * same way it treats one that hasn't resolved yet, so nothing downstream reads
  * this any differently than before. What changes is the cache: see
@@ -837,11 +815,12 @@ export async function tmdbWatchProvidersBatch(
       const genres = (detail?.genres ?? [])
         .map((g: TmdbRow) => g?.name)
         .filter((name: unknown): name is string => typeof name === "string" && name.length > 0);
-      return { providers: resolveProviders(detail, region), runtime, genres };
+      return { providers: resolveProviders(detail, region), availability: resolveProviderOffers(detail, region), runtime, genres };
     }),
   );
 
   const providers: Record<string, string[]> = {};
+  const availability: Record<string, ProviderOffer[]> = {};
   const runtimes: RuntimeMap = {};
   const genres: GenreMap = {};
   let hadFailures = false;
@@ -849,6 +828,7 @@ export async function tmdbWatchProvidersBatch(
     const result = results[i];
     if (result.status === "fulfilled") {
       providers[providerCacheKey(k)] = result.value.providers;
+      availability[providerCacheKey(k)] = result.value.availability;
       if (result.value.runtime !== null) runtimes[providerCacheKey(k)] = result.value.runtime;
       if (result.value.genres.length > 0) genres[providerCacheKey(k)] = result.value.genres;
     } else {
@@ -863,7 +843,7 @@ export async function tmdbWatchProvidersBatch(
       `[tmdb] providers-batch truncated ${keys.length - trimmed.length} of ${keys.length} requested keys`,
     );
   }
-  return { providers, runtimes, genres, hadFailures };
+  return { providers, availability, runtimes, genres, hadFailures };
 }
 
 // ---------------------------------------------------------------------------

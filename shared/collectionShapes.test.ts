@@ -89,7 +89,7 @@ const PAST = '2030-01-01'; // everything in these fixtures has released
 describe('planCollection — chain (the default, and it must stay the default)', () => {
   it('chains Harry Potter end to end: 8 parts, one story, 7 prerequisites', () => {
     const plan = planCollection(1241, HARRY_POTTER, PAST);
-    expect(plan.classification).toBe('chain');
+    expect(plan.classification).toBe('arcs');
     expect(plan.must).toHaveLength(7);
     expect(plan.can).toHaveLength(0);
     expect(mustPairs(plan)).toEqual([
@@ -108,7 +108,7 @@ describe('planCollection — chain (the default, and it must stay the default)',
     // the primary signal, which would have turned Harry Potter into a
     // "same series, not required" list.
     expect(HARRY_POTTER.length).toBeGreaterThan(6);
-    expect(planCollection(1241, HARRY_POTTER, PAST).classification).toBe('chain');
+    expect(planCollection(1241, HARRY_POTTER, PAST).classification).toBe('arcs');
   });
 
   it('emits nothing for a single-part collection', () => {
@@ -196,9 +196,9 @@ describe('planCollection — episodic', () => {
       ] as [number, string, string]),
     );
     const plan = planCollection(424242, many, PAST);
-    expect(plan.classification).toBe('episodic');
+    expect(plan.classification).toBe('unverified');
     expect(plan.must).toHaveLength(0);
-    expect(plan.warnings.join(' ')).toMatch(/exceeds EPISODIC_PART_THRESHOLD/);
+    expect(plan.warnings.join(' ')).toMatch(/not curated/);
   });
 
   it('leaves a collection just under the threshold as a chain', () => {
@@ -209,7 +209,7 @@ describe('planCollection — episodic', () => {
         `20${String(10 + i).padStart(2, '0')}-01-01`,
       ] as [number, string, string]),
     );
-    expect(planCollection(424243, many, PAST).classification).toBe('chain');
+    expect(planCollection(424243, many, PAST).classification).toBe('unverified');
   });
 });
 
@@ -277,11 +277,12 @@ describe('planCollection — input robustness', () => {
   });
 
   it('treats an unknown collection id as a plain chain', () => {
-    expect(planCollection(123456789, HARRY_POTTER, PAST).classification).toBe('chain');
+    expect(planCollection(123456789, HARRY_POTTER, PAST).classification).toBe('unverified');
+    expect(planCollection(123456789, HARRY_POTTER, PAST).must).toHaveLength(0);
   });
 
   it('tolerates a null collection id', () => {
-    expect(planCollection(null, HARRY_POTTER, PAST).classification).toBe('chain');
+    expect(planCollection(null, HARRY_POTTER, PAST).classification).toBe('unverified');
   });
 });
 
@@ -310,4 +311,12 @@ describe('story order', () => {
     expect(hasStoryOrder(STAR_WARS.map((p) => p.id))).toBe(true);
     expect(hasStoryOrder(HARRY_POTTER.map((p) => p.id))).toBe(false);
   });
+});
+
+it('does not describe an unreviewed new member as optional', () => {
+  const extra = [...STAR_WARS, ...parts([[999001, 'Something New', '2031-05-01']])];
+  const plan = planCollection(10, extra, PAST);
+  const edges = plan.can.filter(e => e.from.id === 999001 || e.to.id === 999001);
+  expect(edges.length).toBeGreaterThan(0);
+  expect(edges.every(e => e.reason.includes('unverified'))).toBe(true);
 });

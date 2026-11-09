@@ -27,6 +27,8 @@ function entry(overrides: Partial<CalendarEntryDTO>): CalendarEntryDTO {
     kind: 'theatrical',
     isTheatrical: true,
     platform: null,
+    platforms: [],
+    region: "IN",
     tmdbId: 1,
     posterUrl: null,
     rating: null,
@@ -223,5 +225,17 @@ describe('Calendar release-kind tabs', () => {
     await user.click(screen.getByRole('tab', { name: /in cinemas/i }));
     await waitFor(() => expect(screen.queryByText('A Streaming Release')).not.toBeInTheDocument());
     expect(screen.getByText('A Cinema Release')).toBeInTheDocument();
+  });
+});
+
+describe('Calendar event details', () => {
+  it('shows all providers and labels an unknown region', async () => {
+    vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({
+      title: 'Shared event', kind: 'streaming', isTheatrical: false,
+      platforms: ['Netflix', 'ZEE5'], platform: 'Netflix', region: null,
+    })] });
+    renderCalendar();
+    expect(await screen.findByText('Netflix, ZEE5')).toBeInTheDocument();
+    expect(screen.getByText('Region unknown')).toBeInTheDocument();
   });
 });

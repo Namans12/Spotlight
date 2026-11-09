@@ -9,10 +9,7 @@ import {
   hasActiveFilters,
 } from './watchNow';
 
-// The rule that matters most here is what happens when TMDB is missing a
-// field. A saved title vanishing from someone's own list because a third
-// party has no runtime for it reads as data loss, so every filter treats
-// unknown as "don't rule it out".
+// Availability filters only match explicit regional offers. Runtime may be unknown.
 
 function item(id: number, over: Partial<WatchlistItem> = {}): WatchlistItem {
   return {
@@ -37,6 +34,9 @@ function lookups(
 ) {
   return {
     providersFor: (_m: string, id: number) => providers[id],
+    availabilityFor: (_m: string, id: number) => providers[id]?.map(name => ({
+      provider: basePlatform(name), type: (name.includes('(Buy/Rent)') ? 'rent' : 'subscription') as 'rent' | 'subscription',
+    })),
     runtimeFor: (_m: string, id: number) => runtimes[id],
   };
 }
@@ -69,13 +69,13 @@ describe('filterWatchNow', () => {
     expect(got.map((i) => i.id)).toEqual([1]);
   });
 
-  it('keeps a title whose providers have not loaded yet', () => {
+  it('does not treat a title whose providers have not loaded as a platform match', () => {
     const got = filterWatchNow([item(1)], { ...EMPTY_FILTERS, platforms: ['Netflix'] }, lookups({ 1: undefined }));
-    expect(got.map((i) => i.id)).toEqual([1]);
+    expect(got).toEqual([]);
   });
 
-  it('hides a title TMDB says is on nothing, once that is known', () => {
-    // [] is a real answer — "checked, nowhere to watch it" — unlike undefined.
+  it('does not treat an empty provider response as a platform match', () => {
+    // An empty response does not establish that the title is unavailable.
     const got = filterWatchNow([item(1)], { ...EMPTY_FILTERS, platforms: ['Netflix'] }, lookups({ 1: [] }));
     expect(got).toEqual([]);
   });
@@ -130,18 +130,18 @@ describe('availablePlatforms', () => {
   it('offers only platforms this list actually has something on, commonest first', () => {
     const got = availablePlatforms(
       [item(1), item(2), item(3)],
-      lookups({ 1: ['Netflix'], 2: ['Netflix', 'JioHotstar'], 3: ['JioHotstar'] }).providersFor,
+      lookups({ 1: ['Netflix'], 2: ['Netflix', 'JioHotstar'], 3: ['JioHotstar'] }).availabilityFor,
     );
     expect(got).toEqual(['JioHotstar', 'Netflix']); // 2 each, alphabetical tiebreak
   });
 
   it('counts a service once even when a title is on both its tiers', () => {
-    const got = availablePlatforms([item(1)], lookups({ 1: ['Apple TV+', 'Apple TV+ (Buy/Rent)'] }).providersFor);
+    const got = availablePlatforms([item(1)], lookups({ 1: ['Apple TV+', 'Apple TV+ (Buy/Rent)'] }).availabilityFor);
     expect(got).toEqual(['Apple TV+']);
   });
 
   it('ignores titles whose providers are unknown', () => {
-    expect(availablePlatforms([item(1)], lookups({ 1: undefined }).providersFor)).toEqual([]);
+    expect(availablePlatforms([item(1)], lookups({ 1: undefined }).availabilityFor)).toEqual([]);
   });
 });
 
@@ -161,5 +161,33 @@ describe('basePlatform', () => {
     expect(basePlatform('Apple TV+ (Buy/Rent)')).toBe('Apple TV+');
     expect(basePlatform('Netflix')).toBe('Netflix');
     expect(basePlatform('Buy/Rent')).toBe('Buy/Rent');
+  });
+});
+
+describe('availability categories', () => {
+  const base = lookups({});
+  const availabilityFor = (_type: string, id: number) => ({
+    1: [{ provider: 'Netflix', type: 'rent' as const }, { provider: 'Hulu', type: 'subscription' as const }],
+    2: [{ provider: 'Netflix', type: 'subscription' as const }],
+    3: [{ provider: 'Netflix', type: 'buy' as const }],
+    4: [],
+  } as Record<number, import('../../shared/types/availability').ProviderOffer[]>)[id];
+  const opts = { ...base, availabilityFor };
+  const items = [item(1), item(2), item(3), item(4), item(5)];
+  it('requires provider and category to match the same offer', () => {
+    const filters = { ...EMPTY_FILTERS, platforms: ['Netflix'], availabilityTypes: ['subscription' as const] };
+    expect(filterWatchNow(items, filters, opts).map(x => x.id)).toEqual([2]);
+  });
+  it('distinguishes rent and buy', () => {
+    expect(filterWatchNow(items, { ...EMPTY_FILTERS, availabilityTypes: ['rent'] }, opts).map(x => x.id)).toEqual([1]);
+    expect(filterWatchNow(items, { ...EMPTY_FILTERS, availabilityTypes: ['buy'] }, opts).map(x => x.id)).toEqual([3]);
+  });
+  it('shows missing and empty offers only under the unknown option, without assuming a platform', () => {
+    expect(filterWatchNow(items, { ...EMPTY_FILTERS, availabilityTypes: ['unknown'] }, opts).map(x => x.id)).toEqual([4, 5]);
+    expect(filterWatchNow(items, { ...EMPTY_FILTERS, platforms: ['Netflix'], availabilityTypes: ['unknown'] }, opts)).toEqual([]);
+  });
+  it('does not let missing availability bypass a runtime or media type constraint', () => {
+    const filters = { ...EMPTY_FILTERS, platforms: ['Netflix'], runtime: 'short' as const, mediaType: 'tv' as const };
+    expect(filterWatchNow([item(5)], filters, opts)).toEqual([]);
   });
 });

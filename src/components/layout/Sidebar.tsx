@@ -45,6 +45,7 @@ function useNavGroups(): { heading: string; items: NavItem[] }[] {
         { to: '/calendar', label: 'Calendar', icon: <CalendarDays size={18} /> },
         { to: '/browse', label: 'Browse', icon: <Compass size={18} /> },
         { to: '/search', label: 'Search', icon: <Search size={18} /> },
+        { to: '/tonight', label: 'Tonight', icon: <Sparkles size={18} /> },
         { to: '/duel', label: "Can't decide", icon: <Swords size={18} /> },
       ],
     },

@@ -314,7 +314,7 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
         const after = relations?.mustWatch.after ?? [];
 
         if (before.length === 0 && after.length === 0 && (relations?.canWatch.length ?? 0) === 0) {
-          return { ok: true, resolvedTitle: movie.title, hasChain: false, message: 'This title stands on its own - nothing else required.' };
+          return { ok: true, resolvedTitle: movie.title, hasChain: false, message: 'No verified watch order is recorded for this title.' };
         }
 
         const chain = [
@@ -367,7 +367,7 @@ export async function registerSpotlightTools(queryClient: QueryClient, signal: A
         const chain: Movie[] = await enrichChain([...before.map(relatedToMovie), movie, ...after.map(relatedToMovie)]);
 
         if (chain.length === 1) {
-          return { ok: true, title: movie.title, added: [], message: 'This title stands on its own - nothing else to plan.' };
+          return { ok: true, title: movie.title, added: [], message: 'No verified prerequisite order is recorded for this title.' };
         }
 
         const state = await watchlistApi.fetchWatchlistState();

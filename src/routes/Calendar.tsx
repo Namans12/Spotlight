@@ -8,6 +8,7 @@ import { FilterSelect } from '@/components/ui/filter-select';
 import { useMediaScope } from '@/hooks/useMediaScope';
 import { useSeasons, type SeasonsLookup } from '@/hooks/useSeasons';
 import { languageName, compareByLanguageName } from '@/lib/languages';
+import { evidenceDate, providerDetails } from '@/components/release/ReleaseEvidence';
 import { tmdbPoster } from '@/lib/tmdbImage';
 import type { CalendarEntryDTO, CalendarKind } from '../../shared/types/calendar';
 import {
@@ -107,7 +108,8 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{entry.title}</p>
         <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
-          {entry.platform && <span className="truncate">{entry.platform}</span>}
+          {(entry.platforms?.length ? entry.platforms.join(', ') : entry.platform) && <span>{entry.platforms?.length ? entry.platforms.join(', ') : entry.platform}</span>}
+          {entry.region === null && <span className="shrink-0">Region unknown</span>}
           {entry.mediaType === 'tv' && seasons != null && (
             <span className="opacity-60 shrink-0">
               {seasons} {seasons === 1 ? 'Season' : 'Seasons'}
@@ -120,6 +122,13 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
             </span>
           )}
         </div>
+        <p className="mt-1 text-[10px] text-muted-foreground leading-snug">
+          Source: {entry.source || 'unknown'} · Region: {entry.region || 'unknown'} · {evidenceDate(entry.observedAt)}
+        </p>
+        <p className="text-[10px] text-muted-foreground leading-snug">
+          {entry.kind === 'streaming' ? providerDetails(entry.platforms ?? [], entry.availabilityTypes) : entry.kind === 'theatrical' ? 'Theatrical' : 'TV network'}
+          {' · '}{entry.evidenceStatus === 'regional' ? 'Date reported by source; may change' : 'Date and release type unverified'}
+        </p>
       </div>
       {entry.rating != null && (
         <span className="inline-flex items-center gap-0.5 text-xs text-gold font-semibold shrink-0">

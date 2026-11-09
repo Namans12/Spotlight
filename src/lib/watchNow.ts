@@ -1,3 +1,4 @@
+import type { AvailabilityType, ProviderOffer } from '../../shared/types/availability';
 import type { WatchlistItem } from '@/types/movie';
 
 // "What can I watch right now" — the filter that turns a saved list into a
@@ -10,10 +11,8 @@ import type { WatchlistItem } from '@/types/movie';
 // and it now carries runtime too (lib/tmdbProxy.ts) — so this is assembly
 // rather than new data.
 //
-// Every filter is deliberately permissive about unknowns. TMDB has no runtime
-// for some titles and no provider data for others, and hiding a saved film
-// because a third party is missing a field would make the list look like it
-// lost something. Unknown means "don't rule it out", never "exclude".
+// Availability must match a regional offer; missing data is selectable as unknown.
+// Runtime can remain unknown because it is independent of availability.
 
 export type RuntimeBand = 'short' | 'medium' | 'long';
 
@@ -37,19 +36,21 @@ export const RUNTIME_BANDS: RuntimeBandSpec[] = [
 export interface WatchNowFilters {
   /** Canonical platform names. Empty means "any". */
   platforms: string[];
+  availabilityTypes?: (AvailabilityType | 'unknown')[];
   runtime: RuntimeBand | null;
   /** 'movie' | 'tv' | null for both. */
   mediaType: 'movie' | 'tv' | null;
 }
 
-export const EMPTY_FILTERS: WatchNowFilters = { platforms: [], runtime: null, mediaType: null };
+export const EMPTY_FILTERS: WatchNowFilters = { platforms: [], availabilityTypes: [], runtime: null, mediaType: null };
 
 export function hasActiveFilters(filters: WatchNowFilters): boolean {
-  return filters.platforms.length > 0 || filters.runtime !== null || filters.mediaType !== null;
+  return filters.platforms.length > 0 || (filters.availabilityTypes?.length ?? 0) > 0 || filters.runtime !== null || filters.mediaType !== null;
 }
 
 export interface WatchNowLookups {
   providersFor: (mediaType: string, tmdbId: number) => string[] | undefined;
+  availabilityFor: (mediaType: string, tmdbId: number) => ProviderOffer[] | undefined;
   runtimeFor: (mediaType: string, tmdbId: number) => number | undefined;
 }
 
@@ -62,11 +63,8 @@ function inBand(minutes: number, band: RuntimeBand): boolean {
 /**
  * Narrows a saved list to what fits the moment.
  *
- * Platform matching ignores the " (Buy/Rent)" suffix the provider resolver
- * adds: someone filtering to Netflix wants everything on Netflix, and being
- * shown nothing because their copy is a rental is a distinction they did not
- * ask to make. The suffix still matters on the card, where it stops a rental
- * reading as a subscription — it just should not drive a filter.
+ * A selected service and price type must match the same regional offer.
+ * Unknown availability is never treated as a known service or offer.
  */
 export function filterWatchNow(
   items: WatchlistItem[],
@@ -80,12 +78,16 @@ export function filterWatchNow(
   return items.filter((item) => {
     if (filters.mediaType && item.mediaType !== filters.mediaType) return false;
 
-    if (wanted.size > 0) {
-      const available = lookups.providersFor(item.mediaType, item.id);
-      // Still loading, or TMDB knows of nowhere to watch it. Neither is
-      // grounds for hiding a title the person deliberately saved.
-      if (available === undefined) return true;
-      if (!available.some((p) => wanted.has(basePlatform(p)))) return false;
+    const selectedTypes = filters.availabilityTypes ?? [];
+    if (wanted.size > 0 || selectedTypes.length > 0) {
+      const offers = lookups.availabilityFor(item.mediaType, item.id);
+      const hasKnownMatch = (offers ?? []).some((offer) =>
+        (wanted.size === 0 || wanted.has(basePlatform(offer.provider))) &&
+        (selectedTypes.length === 0 || selectedTypes.includes(offer.type)),
+      );
+      // Unknown is a separate choice and cannot establish a particular service.
+      const unknownMatch = !offers?.length && wanted.size === 0 && selectedTypes.includes('unknown');
+      if (!hasKnownMatch && !unknownMatch) return false;
     }
 
     if (filters.runtime) {
@@ -113,17 +115,12 @@ export function basePlatform(name: string): string {
  */
 export function availablePlatforms(
   items: WatchlistItem[],
-  providersFor: WatchNowLookups['providersFor'],
+  availabilityFor: WatchNowLookups['availabilityFor'],
 ): string[] {
   const counts = new Map<string, number>();
   for (const item of items) {
-    const names = providersFor(item.mediaType, item.id);
-    if (!names) continue;
-    // A title on both the subscription and rental tiers of one service counts
-    // once, or a single title would weight that service twice.
-    for (const name of new Set(names.map(basePlatform))) {
-      if (!name) continue;
-      counts.set(name, (counts.get(name) ?? 0) + 1);
+    for (const name of new Set((availabilityFor(item.mediaType, item.id) ?? []).map(offer => basePlatform(offer.provider)))) {
+      if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
     }
   }
   return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name]) => name);

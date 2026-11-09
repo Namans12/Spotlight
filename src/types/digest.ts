@@ -1,4 +1,4 @@
-import type { ReleaseItemDTO, DigestResponse, SectionKey } from "../../shared/types/release";
+import type { ReleaseItemDTO, ReleaseEvidenceDTO, DigestResponse, SectionKey } from "../../shared/types/release";
 import type { Movie } from "./movie";
 import { IMG_BASE } from "@/lib/tmdb";
 
@@ -17,6 +17,7 @@ export interface ReleaseItem {
   rating?: number;
   providers?: string[];
   tmdbUrl?: string;
+  evidence?: ReleaseEvidenceDTO | null;
 }
 
 export function tmdbUrlFor(mediaType: "movie" | "tv", id: number): string {
@@ -34,6 +35,8 @@ export function fromDigestDTO(dto: ReleaseItemDTO): ReleaseItem {
     rating: dto.rating ?? undefined,
     providers: dto.providers,
     tmdbUrl: dto.tmdb_url,
+    // Cached older API payloads have no provenance; show an explicit unknown state.
+    evidence: dto.evidence ?? {},
   };
 }
 

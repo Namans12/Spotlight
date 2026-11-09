@@ -48,7 +48,9 @@ MAX_CAN_NEIGHBOURS = 3
 SAME_SERIES_REASON = "Same series — not required to follow this one."
 SIDE_STORY_REASON = "A side story in the same series — not required to follow the main films."
 
-Classification = Literal["chain", "arcs", "episodic"]
+UNVERIFIED_SERIES_REASON = "Same series; watch order is unverified."
+
+Classification = Literal["chain", "arcs", "episodic", "unverified"]
 
 _UNDATED_SORT_KEY = "9999-99-99"
 
@@ -119,6 +121,7 @@ def plan_collection(
     """
     today = today or date.today().isoformat()
     warnings: list[str] = []
+    unverified_ids: set[int] = set()
 
     ordered = sort_by_release([p for p in parts if p.get("id")])
     shape = get_collection_shape(collection_id)
@@ -127,15 +130,21 @@ def plan_collection(
     chainable = [p for p in ordered if p["id"] not in excluded]
     by_id = {p["id"]: p for p in chainable}
 
-    if (shape and shape.get("episodic")) or len(chainable) > EPISODIC_PART_THRESHOLD:
+    if not shape:
+        warnings.append(f"collection {collection_id}: watch order is not curated")
+        classification: Classification = "unverified"
+        arcs: list[list[dict]] = []
+        loose = list(ordered)
+
+    elif shape.get("episodic") or len(chainable) > EPISODIC_PART_THRESHOLD:
         if not (shape and shape.get("episodic")):
             warnings.append(
                 f"collection {collection_id}: {len(chainable)} parts exceeds "
                 f"EPISODIC_PART_THRESHOLD ({EPISODIC_PART_THRESHOLD}) with no curated "
                 "entry — treating as episodic"
             )
-        classification: Classification = "episodic"
-        arcs: list[list[dict]] = []
+        classification = "episodic"
+        arcs = []
         loose = list(ordered)
 
     elif shape and shape.get("arcs"):
@@ -160,6 +169,7 @@ def plan_collection(
             grouped.append(sort_by_release(members))
 
         unclaimed = [p for p in chainable if p["id"] not in claimed]
+        unverified_ids.update(p["id"] for p in unclaimed)
         if unclaimed:
             warnings.append(
                 f"collection {collection_id}: {len(unclaimed)} part(s) not named in any arc "
@@ -203,6 +213,7 @@ def plan_collection(
             continue
         for sibling in _nearest_siblings(ordered, index, MAX_CAN_NEIGHBOURS):
             reason = (
+                UNVERIFIED_SERIES_REASON if classification == "unverified" or part["id"] in unverified_ids or sibling["id"] in unverified_ids else
                 SIDE_STORY_REASON
                 if part["id"] in excluded or sibling["id"] in excluded
                 else SAME_SERIES_REASON

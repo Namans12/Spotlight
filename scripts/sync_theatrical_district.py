@@ -42,6 +42,7 @@ sys.path.insert(0, str(ROOT))
 import psycopg  # noqa: E402
 import requests  # noqa: E402
 
+from lib_py.event_identity import source_record_key
 from lib_relations import load_local_env  # noqa: E402
 
 BASE_URL = "https://www.district.in/movies/upcoming-movies-in-{city}"
@@ -76,11 +77,11 @@ UPSERT_SQL = """
 INSERT INTO calendar_entries
     (release_date, title, language, entry_type, is_theatrical,
      platform_or_distributor, details, source, source_url, origin,
-     media_type, poster_url)
+     media_type, poster_url, source_key)
 VALUES (%(release_date)s, %(title)s, %(language)s, 'Movie', true,
         NULL, %(details)s, 'district.in', %(source_url)s, 'district_in',
-        'movie', %(poster_url)s)
-ON CONFLICT (release_date, title, entry_type) DO UPDATE SET
+        'movie', %(poster_url)s, %(source_key)s)
+ON CONFLICT (origin, source_key) DO UPDATE SET
     -- Enrich only, same convention as sync_calendar_tmdb.py: never clobber a
     -- value another source already supplied.
     language   = COALESCE(calendar_entries.language, EXCLUDED.language),
@@ -142,13 +143,15 @@ def extract_movies(next_data: dict[str, Any]) -> list[dict[str, Any]]:
     at props.pageProps.data.serverState.EDS....rails[3].items[7]".
     """
     found: list[dict[str, Any]] = []
-    seen_ids: set[str] = set()
+    seen_ids: set[tuple[str, str]] = set()
 
     def walk(node: Any) -> None:
         if isinstance(node, dict):
-            if "movie_id" in node and "name" in node and node["movie_id"] not in seen_ids:
-                seen_ids.add(node["movie_id"])
-                found.append(node)
+            if "movie_id" in node and "name" in node:
+                identity = (str(node["movie_id"]), str(node.get("release_date")))
+                if identity not in seen_ids:
+                    seen_ids.add(identity)
+                    found.append(node)
             for v in node.values():
                 walk(v)
         elif isinstance(node, list):
@@ -201,14 +204,8 @@ def build_row(record: dict[str, Any], url: str | None) -> dict[str, Any] | None:
 
 
 def collect(session: requests.Session, cities: list[str]) -> list[dict[str, Any]]:
-    """One row per distinct movie, first city's data wins on repeats.
-
-    A nationally-released film appears on every city's page with (in every
-    sample checked) the same date, so first-seen is a size optimisation, not a
-    correctness gamble — a genuine per-city date difference is out of scope
-    for a single `release_date` column regardless of which city wins.
-    """
-    by_id: dict[str, dict[str, Any]] = {}
+    """Retain each distinct source movie and date across cities."""
+    by_id: dict[tuple[str, str], dict[str, Any]] = {}
     for i, city in enumerate(cities):
         if i:
             time.sleep(REQUEST_GAP_SECONDS)
@@ -224,11 +221,13 @@ def collect(session: requests.Session, cities: list[str]) -> list[dict[str, Any]
         new = 0
         for record in records:
             mid = record["movie_id"]
-            if mid in by_id:
-                continue
             row = build_row(record, urls.get(mid))
             if row:
-                by_id[mid] = row
+                key = (str(mid), row["release_date"])
+                if key in by_id:
+                    continue
+                row["source_key"] = source_record_key(*key)
+                by_id[key] = row
                 new += 1
         print(f"  {city}: {len(records)} listed, {new} new")
     return list(by_id.values())

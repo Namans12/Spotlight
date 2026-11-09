@@ -80,23 +80,23 @@ def test_a_faster_foreign_rollout_is_not_mistaken_for_the_origin():
     assert got == ("2026-08-25", "US", "2026-08-21"), "France must never appear as the origin"
 
 
-def test_no_india_date_falls_back_to_the_production_countrys_date_no_bracket():
+def test_foreign_origin_is_not_an_india_date():
     """Nothing to show in parentheses when the shown date IS the origin date."""
     got = window(release_dates(production_country="US", US=["2026-07-23"], GB=["2026-07-30"]))
-    assert got == ("2026-07-23", None, None)
+    assert got == (None, None, None)
 
 
-def test_no_india_date_and_no_production_country_date_uses_any_available_date():
+def test_other_foreign_date_is_not_an_india_date():
     """The production country itself has nothing recorded, but another
     territory does — showing that beats showing nothing."""
     got = window(release_dates(production_country="US", GB=["2026-07-30"]))
-    assert got == ("2026-07-30", None, None)
+    assert got == (None, None, None)
 
 
-def test_no_release_dates_data_at_all_uses_the_discover_fallback():
+def test_missing_release_dates_do_not_use_discover_fallback():
     """A detail-call data gap must not drop a movie discover already found."""
     got = window({"release_dates": {"results": []}, "production_countries": []}, fallback="2026-08-21")
-    assert got == ("2026-08-21", None, None)
+    assert got == (None, None, None)
 
 
 def test_no_data_and_no_fallback_yields_nothing():

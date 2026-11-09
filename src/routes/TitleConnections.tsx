@@ -275,9 +275,9 @@ export default function TitleConnections() {
   const standaloneCopy =
     mediaType === 'tv'
       ? seasons && seasons > 1
-        ? `No other series is required first - start at Season 1 and watch all ${seasons} seasons in order.`
+        ? `No cross-series order is recorded. This series has ${seasons} seasons.`
         : 'No connections recorded for this series. Spotlight only tracks cross-series order for franchises it has curated.'
-      : 'Nothing else is required to follow this one - it stands on its own.';
+      : 'No verified watch order is recorded for this title.';
 
   // Counted off the *rendered* order, not off before.length. Those disagree
   // whenever the list is re-sorted — under Story order a prequel moves ahead
@@ -314,10 +314,10 @@ export default function TitleConnections() {
                   Part {currentPosition} of {mustCount}
                 </span>{' '}
                 - {standing(priorCount, laterCount)}
-                {canWatch.length > 0 && ' A few more, dashed below, are worth a look but not required.'}
+                {canWatch.length > 0 && ' Other related titles appear below; their order may need review.'}
               </>
             ) : canWatch.length > 0 ? (
-              'Nothing else is required to follow this one, but a few titles below are worth a look.'
+              'No prerequisite order is recorded. Related titles appear below; their order may need review.'
             ) : (
               standaloneCopy
             )}

@@ -172,3 +172,16 @@ def test_build_row_source_url_is_none_when_not_in_item_list():
     """A wrong guessed URL is worse than no URL at all."""
     row = d.build_row(BRAHMAKAMALA, None)
     assert row["source_url"] is None
+
+
+def test_different_district_movie_ids_get_distinct_source_keys(monkeypatch):
+    records = [dict(BRAHMAKAMALA, movie_id='1'), dict(BRAHMAKAMALA, movie_id='2')]
+    monkeypatch.setattr(d, 'fetch_page', lambda *_: make_html(records, []))
+    rows = d.collect(object(), ['hyderabad'])
+    assert len(rows) == 2
+    assert rows[0]['source_key'] != rows[1]['source_key']
+
+
+def test_same_district_movie_id_with_different_dates_stays_distinct():
+    two_dates = [BRAHMAKAMALA, dict(BRAHMAKAMALA, release_date='1787356800')]
+    assert len(d.extract_movies(make_next_data(two_dates))) == 2

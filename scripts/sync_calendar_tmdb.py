@@ -16,23 +16,8 @@ TMDB, region-aware, and re-runnable:
               small regional-language cinema, which usually has no typed
               release on TMDB at all — see scripts/sync_theatrical_district.py.
 
-  Television  /discover/tv by first_air_date, plus one detail call per title to
-              read its networks. That network is what decides whether a premiere
-              lands in the Streaming tab or the On TV tab (see classifyPlatform
-              in shared/platforms.ts), so it is worth the extra call.
-
-              Scoped to `--tv-countries` (default IN,US,GB) rather than left
-              global: TMDB is crowdsourced, and global TV volume runs into the
-              hundreds of premieres a month, almost all obscure local
-              productions from everywhere on earth. Measured directly for one
-              month: 375 unfiltered, 9 for India alone, 88 for India + the two
-              dominant English-language producers whose shows dominate Indian
-              streaming (Netflix/Prime Video/Hotstar libraries lean heavily
-              American and British). That is the trade-off this makes explicit:
-              a big Korean or Spanish-language hit can still be missed if it
-              is not one of the month's most popular entries overall, in
-              exchange for not drowning the calendar in noise. Adjust the flag
-              if that trade-off is wrong for this audience.
+  Television  TMDB first-air dates are global; the sync does not write them as
+              regional premieres without region-specific evidence.
 
 Movies arriving on OTT are deliberately NOT covered here: TMDB has no reliable
 future streaming date for a film, and inventing one would put wrong dates on the
@@ -62,6 +47,7 @@ sys.path.insert(0, str(ROOT))
 import psycopg  # noqa: E402
 import requests  # noqa: E402
 
+from lib_py.event_identity import source_record_key
 from lib_relations import TmdbUnavailable, load_local_env, rate_limit_gap, tmdb_get  # noqa: E402
 
 REQUEST_GAP_SECONDS = 0.15
@@ -80,11 +66,14 @@ UPSERT_SQL = """
 INSERT INTO calendar_entries
     (release_date, title, language, entry_type, is_theatrical,
      platform_or_distributor, details, source, source_url, origin,
-     tmdb_id, media_type, poster_url, origin_region, origin_release_date)
+     tmdb_id, media_type, poster_url, origin_region, origin_release_date, evidence, source_key)
 VALUES (%(release_date)s, %(title)s, %(language)s, %(entry_type)s, %(is_theatrical)s,
         %(platform)s, %(details)s, 'TMDB', %(source_url)s, 'tmdb_upcoming',
-        %(tmdb_id)s, %(media_type)s, %(poster_url)s, %(origin_region)s, %(origin_release_date)s)
-ON CONFLICT (release_date, title, entry_type) DO UPDATE SET
+        %(tmdb_id)s, %(media_type)s, %(poster_url)s, %(origin_region)s, %(origin_release_date)s,
+        jsonb_build_object('region', %(event_region)s::text, 'date_source', 'tmdb_regional_theatrical',
+                           'observed_at', now(), 'date_precision', 'day', 'event_kind', 'theatrical',
+                           'source_url', %(source_url)s::text), %(source_key)s)
+ON CONFLICT (origin, source_key) DO UPDATE SET
     -- Enrich only. An editorial row keeps its own curated platform and details;
     -- all it gains here is the TMDB linkage it never had.
     tmdb_id                 = COALESCE(calendar_entries.tmdb_id, EXCLUDED.tmdb_id),
@@ -95,7 +84,10 @@ ON CONFLICT (release_date, title, entry_type) DO UPDATE SET
     platform_or_distributor = COALESCE(calendar_entries.platform_or_distributor, EXCLUDED.platform_or_distributor),
     details                 = COALESCE(calendar_entries.details, EXCLUDED.details),
     origin_region           = COALESCE(calendar_entries.origin_region, EXCLUDED.origin_region),
-    origin_release_date     = COALESCE(calendar_entries.origin_release_date, EXCLUDED.origin_release_date)
+    origin_release_date     = COALESCE(calendar_entries.origin_release_date, EXCLUDED.origin_release_date),
+    evidence = CASE WHEN calendar_entries.origin = 'tmdb_upcoming'
+                    AND calendar_entries.tmdb_id = EXCLUDED.tmdb_id
+                    THEN EXCLUDED.evidence ELSE calendar_entries.evidence END
 RETURNING (xmax = 0) AS inserted
 """
 
@@ -172,11 +164,8 @@ def theatrical_window(
     worldwide release, or a production country TMDB has no date for, shows no
     bracket rather than a wrong or redundant one.
 
-    `fallback_date` is discover's own (less precise) date, used only when this
-    title's `release_dates` payload has no usable type-2/3 entry for any
-    country — data gaps happen, and a movie discover already matched on a real
-    India date should never be dropped just because the detail call came back
-    thinner than the discover call.
+    Without a date explicitly recorded for the requested region, return no
+    date; a global discover date or foreign date is not a regional release.
     """
     payload = tmdb_get(session, f"/movie/{tmdb_id}", tmdb_key, {"append_to_response": "release_dates"})
     rate_limit_gap(REQUEST_GAP_SECONDS)
@@ -202,15 +191,8 @@ def theatrical_window(
         if origin_country and origin_country != region and origin_date and origin_date != india_date:
             return india_date, origin_country, origin_date
         return india_date, None, None
-    # No India-specific date on record.
-    if origin_date:
-        # This IS the origin date already; nothing left to put in parentheses.
-        return origin_date, None, None
-    if earliest_by_country:
-        # The production country itself has no dated record, but some other
-        # territory does — better to show that one date than none at all.
-        return min(earliest_by_country.values()), None, None
-    return fallback_date, None, None
+    # A foreign or discover date is not evidence of a regional release.
+    return None, None, None
 
 
 def main() -> int:
@@ -305,54 +287,13 @@ def main() -> int:
                         "poster_url": f"{IMG_BASE}{film['poster_path']}" if film.get("poster_path") else None,
                         "origin_region": origin_region,
                         "origin_release_date": origin_release_date,
+                        "event_region": args.region,
+                        "source_key": source_record_key(args.region, "movie", film["id"], "theatrical", release_date),
                     }
                 )
 
-            if args.skip_tv:
-                continue
-
-            tv_params = {
-                "first_air_date.gte": month_start,
-                "first_air_date.lte": month_end,
-                "sort_by": "popularity.desc",
-                "include_adult": "false",
-            }
-            if tv_countries:
-                tv_params["with_origin_country"] = tv_countries
-            shows = discover(session, tmdb_key, "/discover/tv", tv_params, max_pages=MAX_PAGES_TV)
-
-            # Scoping by origin country (measured: 375 unfiltered -> 88 for
-            # IN|US|GB in a busy month) is the primary defence against TMDB's
-            # crowdsourced noise; MAX_PAGES_TV covers that comfortably. This
-            # flag is a backstop for whatever slips past both — an unusually
-            # busy month, or --tv-countries widened or cleared.
-            capped = " (capped — more exist beyond this page limit)" if len(shows) >= MAX_PAGES_TV * 20 else ""
-            print(f"  {month_start[:7]}: {len(shows)} television premieres{capped}")
-
-            for show in shows:
-                air_date = show.get("first_air_date")
-                if not air_date or show["id"] in seen_show_ids:
-                    continue
-                seen_show_ids.add(show["id"])
-                rows.append(
-                    {
-                        "release_date": air_date,
-                        "title": show.get("name") or "Untitled",
-                        "language": show.get("original_language"),
-                        "entry_type": "Show",
-                        "is_theatrical": False,
-                        "platform": tv_networks(session, tmdb_key, show["id"]),
-                        "details": show.get("overview") or None,
-                        "source_url": f"https://www.themoviedb.org/tv/{show['id']}",
-                        "tmdb_id": show["id"],
-                        "media_type": "tv",
-                        "poster_url": f"{IMG_BASE}{show['poster_path']}" if show.get("poster_path") else None,
-                        # TV premieres are a single global first_air_date, not a
-                        # per-country theatrical window — no origin to show.
-                        "origin_region": None,
-                        "origin_release_date": None,
-                    }
-                )
+            # TMDB first_air_date is global and cannot establish a regional
+            # television or streaming premiere. Do not write it as one.
     except TmdbUnavailable as err:
         print(f"\nTMDB unreachable: {err}", file=sys.stderr)
         print("Nothing was written. Re-run when the network settles.", file=sys.stderr)

@@ -92,3 +92,13 @@ def test_parse_table_skips_rows_naming_a_streaming_platform():
     table._sync_wikipedia_year = 2026
     rows = w.parse_table(table, "https://en.wikipedia.org/wiki/Fixture")
     assert all(r["title"] != "Second Film" for r in rows)
+
+
+def test_wikipedia_same_title_same_day_with_distinct_source_rows_stays_distinct():
+    html = FIXTURE_HTML.replace('Second Film', 'First Film').replace('Netflix Productions', 'Other Studio')
+    soup = BeautifulSoup(html, 'html.parser')
+    table = w.release_tables(soup)[0]
+    table._sync_wikipedia_year = 2026
+    rows = [r for r in w.parse_table(table, 'https://en.wikipedia.org/wiki/Fixture') if r['title'] == 'First Film']
+    assert len(rows) == 2
+    assert rows[0]['source_fingerprint'] != rows[1]['source_fingerprint']

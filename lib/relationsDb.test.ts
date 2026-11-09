@@ -94,7 +94,7 @@ describe('writeCollectionChain', () => {
     const { sql, edges } = fakeSql();
     const result = await writeCollectionChain(sql, 404609, JOHN_WICK);
 
-    expect(result.classification).toBe('chain');
+    expect(result.classification).toBe('arcs');
     // 3 consecutive pairs x 2 directions.
     expect(edges).toHaveLength(6);
     expect(result.written).toBe(6);

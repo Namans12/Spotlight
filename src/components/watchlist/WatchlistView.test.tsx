@@ -66,6 +66,7 @@ beforeEach(() => {
   vi.mocked(fetchProvidersBatch).mockReset();
   vi.mocked(fetchProvidersBatch).mockResolvedValue({
     providers: { 'movie:1': ['Netflix'], 'movie:2': ['JioHotstar'], 'tv:3': ['Netflix'] },
+    availability: { 'movie:1': [{ provider: 'Netflix', type: 'subscription' }], 'movie:2': [{ provider: 'JioHotstar', type: 'subscription' }], 'tv:3': [{ provider: 'Netflix', type: 'subscription' }] },
     runtimes: { 'movie:1': 22, 'movie:2': 150, 'tv:3': 30 },
     genres: {},
   });
@@ -133,12 +134,11 @@ describe('what can I watch right now', () => {
     expect(screen.getByText('Long Film')).toBeInTheDocument();
   });
 
-  it('shows no bar at all on a list with nothing to narrow', async () => {
+  it('keeps unknown availability selectable when offer data is missing', async () => {
     vi.mocked(fetchProvidersBatch).mockResolvedValue({ providers: {}, runtimes: {}, genres: {} });
     renderView();
     await waitFor(() => expect(fetchProvidersBatch).toHaveBeenCalled());
-    // A filter bar with no usable filters is furniture.
-    expect(screen.queryByText('What can I watch right now?')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Availability unknown' })).toBeInTheDocument();
     expect(screen.getByText('Short Film')).toBeInTheDocument();
   });
 
@@ -164,4 +164,33 @@ describe('what can I watch right now', () => {
     expect(container.querySelectorAll('[aria-describedby^="DndDescribedBy"]').length).toBe(0);
     expect(before).toBeGreaterThanOrEqual(0);
   });
+});
+
+it('filters selected service and offer type together and displays the offer', async () => {
+  vi.mocked(fetchProvidersBatch).mockResolvedValue({
+    providers: { 'movie:1': ['Netflix (Buy/Rent)'], 'movie:2': ['Netflix'], 'tv:3': [] },
+    availability: {
+      'movie:1': [{ provider: 'Netflix', type: 'rent' }],
+      'movie:2': [{ provider: 'Netflix', type: 'subscription' }],
+      'tv:3': [],
+    }, runtimes: {}, genres: {},
+  });
+  const user = userEvent.setup();
+  renderView();
+  await user.click(await screen.findByRole('button', { name: 'Netflix' }));
+  await user.click(screen.getByRole('button', { name: 'Rent' }));
+  expect(screen.getByText('Short Film')).toBeInTheDocument();
+  expect(screen.queryByText('Long Film')).not.toBeInTheDocument();
+  expect(screen.queryByText('A Series')).not.toBeInTheDocument();
+  expect(screen.getByText('Netflix (rent)')).toBeInTheDocument();
+});
+
+it('lets the user find titles whose availability is unknown', async () => {
+  vi.mocked(fetchProvidersBatch).mockResolvedValue({ providers: {}, availability: { 'movie:1': [] }, runtimes: {}, genres: {} });
+  const user = userEvent.setup();
+  renderView();
+  await screen.findByText('Short Film');
+  await user.click(screen.getByRole('button', { name: 'Availability unknown' }));
+  expect(screen.getByText('3 of 3')).toBeInTheDocument();
+  expect(screen.getAllByText('Availability unknown')).toHaveLength(4);
 });

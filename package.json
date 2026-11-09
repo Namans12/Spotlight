@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.deploy.json",
     "test": "vitest run",
+    "evaluate:tonight": "tsx scripts/evaluate_tonight.ts",
     "test:watch": "vitest"
   },
   "dependencies": {
