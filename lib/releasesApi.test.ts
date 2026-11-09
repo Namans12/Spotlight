@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import handler from './releases';
+import handler from '../api/releases';
 
 const db = vi.hoisted(() => ({ query: vi.fn() }));
-vi.mock('../lib/db.js', () => ({ getDb: () => db.query }));
+vi.mock('./db.js', () => ({ getDb: () => db.query }));
 
 describe('release digest window', () => {
   it('omits stale and undated records while retaining the window metadata', async () => {
