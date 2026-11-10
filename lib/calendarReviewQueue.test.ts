@@ -21,6 +21,12 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('flags the legacy NBK111 date while retaining missing identity and region', () => {
+    const item = row({ origin: 'district_in', tmdb_id: null, media_type: null, title: 'NBK111', language: 'te', release_date: '2026-12-31',
+      source_url: 'https://www.district.in/movies/nbk111-movie-tickets-in-hyderabad-MV224943' });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T12:00:00Z'));
+    expect(review.reasons).toEqual(expect.arrayContaining(['date_conflict', 'identity_missing', 'region_unknown']));
+  });
   it('flags the legacy Vrushakarma date and unverified title link', () => {
     const item = row({ origin: 'district_in', tmdb_id: 1395627, title: 'Vrushakarma', language: 'te', release_date: '2026-12-31',
       source_url: 'https://www.district.in/movies/vrushakarma-movie-tickets-in-hyderabad-MV210428' });

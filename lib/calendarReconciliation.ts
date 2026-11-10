@@ -8,6 +8,13 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'district_in' && row.tmdb_id == null && row.media_type == null && row.entry_type === 'Movie' &&
+      row.language === 'te' && row.title === 'NBK111' && row.release_date === '2026-12-31' &&
+      row.source_url === 'https://www.district.in/movies/nbk111-movie-tickets-in-hyderabad-MV224943') {
+    return { type: 'conflict' as const, checkedAt: '2026-11-10', source: 'The New Indian Express',
+      sourceUrl: 'https://www.newindianexpress.com/entertainment/entertainment-news/2026/Sep/09/telugunews2026sep07balakrishnas-nbk111-is-now-titled-dada',
+      message: 'Date needs review: reporting identifies NBK111 as Dada and cites the makers’ 24 December announcement, not this legacy 31 December date. The TMDB identity and local event remain unconfirmed.' };
+  }
   if (row.origin === 'district_in' && Number(row.tmdb_id) === 1395627 && row.media_type === 'movie' &&
       row.entry_type === 'Movie' && row.language === 'te' && row.title === 'Vrushakarma' && row.release_date === '2026-12-31' &&
       row.source_url === 'https://www.district.in/movies/vrushakarma-movie-tickets-in-hyderabad-MV210428') {

@@ -18,6 +18,14 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('flags the exact legacy NBK111 date without creating a title link', async () => {
+    const item = editorial({ origin: 'district_in', tmdb_id: null, media_type: null, title: 'NBK111', language: 'te', release_date: '2026-12-31',
+      source_url: 'https://www.district.in/movies/nbk111-movie-tickets-in-hyderabad-MV224943', event_region: null, evidence: null });
+    const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, language: 'en' }]) as unknown as postgres.Sql, '2026-12', 'IN');
+    expect(entries.filter(entry => entry.dateConflict)).toHaveLength(1);
+    expect(entries.find(entry => entry.dateConflict)?.dateConflict?.message).toContain('24 December');
+    expect(entries.find(entry => entry.dateConflict)?.tmdbId).toBeNull();
+  });
   it('flags the legacy Vrushakarma date without asserting the linked title identity', async () => {
     const item = editorial({ origin: 'district_in', tmdb_id: 1395627, title: 'Vrushakarma', language: 'te', release_date: '2026-12-31',
       source_url: 'https://www.district.in/movies/vrushakarma-movie-tickets-in-hyderabad-MV210428', event_region: null, evidence: null });
