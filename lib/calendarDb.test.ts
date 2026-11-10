@@ -27,6 +27,9 @@ describe('calendar event identity', () => {
     expect(entries[0].releaseDate).toBe('2026-12-04');
     expect(entries[0].title).toBe('Untitled film');
     expect(entries[0].region).toBeNull();
+    expect(entries[0].tmdbId).toBeNull();
+    expect(entries[0].posterUrl).toBeNull();
+    expect(entries[1].tmdbId).toBe(1774728);
     expect(entries[1].dateConflict).toBeNull();
   });
   it.each([

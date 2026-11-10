@@ -79,6 +79,7 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
     const review = reviewedCalendarEntry({ origin: row.origin, tmdb_id: row.tmdb_id, media_type: row.media_type,
       title: row.title, release_date: String(row.release_date), source_url: row.source_url,
       event_region: row.event_region, evidence: row.evidence, platform_or_distributor: row.platform_or_distributor, entry_type: row.entry_type });
+    const suppressTitleLink = review?.type === 'conflict' && 'suppressTitleLink' in review && review.suppressTitleLink;
     const matchingTmdbEvidence = row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
       row.evidence?.source_url === `https://www.themoviedb.org/${row.media_type}/${row.tmdb_id}`;
     const globalPremiere = matchingTmdbEvidence && row.evidence?.date_source === 'tmdb_global_first_air' && !row.event_region && row.media_type === 'tv';
@@ -90,8 +91,8 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
     add({ releaseDate: String(row.release_date), title: row.title, language: row.language,
       mediaType: row.media_type ?? mediaTypeFromEntryType(row.entry_type), kind,
       isTheatrical: kind === "theatrical", platform: platforms[0] ?? null, platforms,
-      region: regionalEvidence ? row.event_region : null, tmdbId: row.tmdb_id !== null ? Number(row.tmdb_id) : null,
-      posterUrl: row.poster_url ?? null, rating: null, overview: row.details,
+      region: regionalEvidence ? row.event_region : null, tmdbId: !suppressTitleLink && row.tmdb_id !== null ? Number(row.tmdb_id) : null,
+      posterUrl: suppressTitleLink ? null : row.poster_url ?? null, rating: null, overview: row.details,
       origin: "csv_seed", originRegion: row.origin_region ?? null, originReleaseDate: row.origin_release_date ?? null,
       source: (regionalEvidence || globalPremiere) && row.source && row.source.toLowerCase() !== 'tmdb' ? `${row.source} / TMDB` : row.source ?? null, sourceUrl: row.source_url ?? null,
       observedAt: regionalEvidence || globalPremiere ? row.evidence?.observed_at ?? null : null, availabilityTypes: null,
