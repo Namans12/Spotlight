@@ -48,6 +48,17 @@ describe('watch-night trivia', () => {
     await user.click(screen.getByRole('button', { name: 'Try trivia' }));
     expect(screen.getByText('Question 1 of 2')).toBeInTheDocument();
   });
+  it('offers a clearly attributed catalogue-year question only for a valid date', async () => {
+    const user = userEvent.setup();
+    const { container, rerender } = render(<WatchNightTrivia mediaType="movie" id={123} releaseDate="2020-02-30" />);
+    expect(container).toBeEmptyDOMElement();
+    rerender(<WatchNightTrivia mediaType="movie" id={123} releaseDate="2020-02-29" />);
+    await user.click(screen.getByRole('button', { name: 'Try trivia' }));
+    expect(screen.getByText('Which year does TMDB list for this title?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '2020' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Correct!');
+    expect(screen.getByRole('link', { name: 'Source: TMDB' })).toHaveAttribute('href', 'https://www.themoviedb.org/movie/123');
+  });
   it.each([
     ['movie', 2062, 'Paris'], ['tv', 2316, 'Pretzels'], ['movie', 673, 'The Three Broomsticks'],
   ] as const)('checks the sourced answer for %s:%i', async (mediaType, id, answer) => {

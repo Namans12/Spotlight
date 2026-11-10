@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { watchNightTriviaQuestions } from '@/lib/watchNightTrivia';
 
-export function WatchNightTrivia({ mediaType, id }: { mediaType: 'movie' | 'tv'; id: number }) {
-  return <TriviaSession key={`${mediaType}:${id}`} mediaType={mediaType} id={id} />;
+export function WatchNightTrivia({ mediaType, id, releaseDate }: { mediaType: 'movie' | 'tv'; id: number; releaseDate?: string | null }) {
+  return <TriviaSession key={`${mediaType}:${id}:${releaseDate ?? ''}`} mediaType={mediaType} id={id} releaseDate={releaseDate} />;
 }
 
-function TriviaSession({ mediaType, id }: { mediaType: 'movie' | 'tv'; id: number }) {
+function TriviaSession({ mediaType, id, releaseDate }: { mediaType: 'movie' | 'tv'; id: number; releaseDate?: string | null }) {
   const [open, setOpen] = useState(false);
   const [answer, setAnswer] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
-  const questions = watchNightTriviaQuestions(mediaType, id);
+  const questions = watchNightTriviaQuestions(mediaType, id, releaseDate);
   const question = questions[index];
   if (!question) return null;
   return <section className="rounded-xl border border-border bg-card p-4 space-y-3" aria-label="Quick trivia">

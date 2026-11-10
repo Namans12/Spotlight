@@ -25,7 +25,16 @@ const extraQuestions: Record<string, TriviaQuestion[]> = {
     source: 'Pixar', sourceUrl: 'https://www.pixar.com/ratatouille' }],
 };
 
-export function watchNightTriviaQuestions(mediaType: 'movie' | 'tv', id: number): readonly TriviaQuestion[] {
+export function watchNightTriviaQuestions(mediaType: 'movie' | 'tv', id: number, releaseDate?: string | null): readonly TriviaQuestion[] {
   const first = watchNightTrivia(mediaType, id);
-  return first ? [first, ...(extraQuestions[`${mediaType}:${id}`] ?? [])] : [];
+  if (first) return [first, ...(extraQuestions[`${mediaType}:${id}`] ?? [])];
+  if (!Number.isSafeInteger(id) || id <= 0 || !releaseDate || !/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) return [];
+  const date = new Date(`${releaseDate}T00:00:00Z`);
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== releaseDate) return [];
+  const year = date.getUTCFullYear();
+  if (year < 1890 || year > 2100) return [];
+  const choices = [String(year - 2), String(year), String(year + 2)];
+  const rotation = id % choices.length;
+  return [{ prompt: 'Which year does TMDB list for this title?', choices: [...choices.slice(rotation), ...choices.slice(0, rotation)],
+    answer: String(year), source: 'TMDB', sourceUrl: `https://www.themoviedb.org/${mediaType}/${id}` }];
 }

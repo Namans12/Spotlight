@@ -415,7 +415,7 @@ export default function TitleDetail() {
       <FactsPanel detail={data} />
 
       <WatchNightIdeas key={`ideas:${mediaType}:${tmdbId}`} mediaType={mediaType} id={tmdbId} />
-      <WatchNightTrivia key={`trivia:${mediaType}:${tmdbId}`} mediaType={mediaType} id={tmdbId} />
+      <WatchNightTrivia key={`trivia:${mediaType}:${tmdbId}`} mediaType={mediaType} id={tmdbId} releaseDate={data.releaseDate} />
 
       {data.trailer && <TrailerCard trailer={data.trailer} />}
 
