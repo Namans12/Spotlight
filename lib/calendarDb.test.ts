@@ -18,8 +18,8 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
-  it('uses a scoped Indian ticketing announcement only for the exact Telugu record and region', async () => {
-    const item = editorial({ origin: 'wikipedia', tmdb_id: null, title: 'Talcum Powder', language: 'te', release_date: '2026-11-13',
+  it.each(['Talcum Powder', 'Itlu Arjuna'])('uses a scoped Indian ticketing announcement for %s only for the exact Telugu record and region', async (title) => {
+    const item = editorial({ origin: 'wikipedia', tmdb_id: null, title, language: 'te', release_date: '2026-11-13',
       source: 'wikipedia', source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', event_region: null, evidence: null });
     const [entry, mismatch] = await getCalendarMonth(db([], [item, { ...item, id: 2, language: 'en' }]) as unknown as postgres.Sql, '2026-11', 'IN');
     expect(entry.region).toBe('IN');
@@ -54,7 +54,6 @@ describe('calendar event identity', () => {
   it.each([
     [1450342, 'Bhogi', '2026-11-12', 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', 'conflict'],
     [1434462, 'Melcow Pondicherry', '2026-11-12', 'https://en.wikipedia.org/wiki/List_of_Malayalam_films_of_2026', 'conflict'],
-    [null, 'Itlu Arjuna', '2026-11-13', 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', 'corroboration'],
   ])('attaches scoped regional reporting for the specific Wikipedia row', async (tmdb_id, title, release_date, source_url, kind) => {
     const item = editorial({ origin: 'wikipedia', tmdb_id, title, release_date, source_url, event_region: null, evidence: null });
     const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, source_url: 'https://example.com' }]) as unknown as postgres.Sql, '2026-11', 'IN');

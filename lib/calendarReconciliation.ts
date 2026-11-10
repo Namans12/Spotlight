@@ -10,6 +10,11 @@ export function reviewedCalendarEntry(row: {
   if (row.event_region != null || row.evidence != null) return null;
   if (row.origin === 'wikipedia' && row.media_type === 'movie' && row.entry_type === 'Movie') {
     if (row.tmdb_id == null && row.language === 'te' && row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') {
+      if (row.title === 'Itlu Arjuna' && row.release_date === '2026-11-13') {
+        return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-10', source: 'BookMyShow',
+          sourceUrl: 'https://in.bookmyshow.com/movies/angara/itllu-arjuna/ET00514068',
+          message: 'BookMyShow lists the Telugu film as Itllu Arjuna for 13 November in India; bookings were not yet open when checked. The TMDB identity remains unverified.' };
+      }
       if (row.title === 'Talcum Powder' && row.release_date === '2026-11-13') {
         return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-10', source: 'BookMyShow',
           sourceUrl: 'https://in.bookmyshow.com/movies/balurghat/talcum-powder/ET00521922',
@@ -42,12 +47,6 @@ export function reviewedCalendarEntry(row: {
       return { type: 'conflict' as const, checkedAt: '2026-11-10', source: 'Simply Mollywood',
         sourceUrl: 'https://simplymollywood.com/movies/malayalam-releases-this-week-bouma-melcow-gondhal-itllu-november-12-13',
         message: 'Date needs review: regional reporting citing maker and exhibitor announcements lists 13 November. This entry’s release event and region remain unconfirmed.' };
-    }
-    if (row.tmdb_id == null && row.title === 'Itlu Arjuna' && row.release_date === '2026-11-13' &&
-        row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') {
-      return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Telangana Today',
-        sourceUrl: 'https://telanganatoday.com/itlu-arjuna-release-date-announced-anish-anaswara-rajans-film-to-arrive-on-november-13',
-        message: 'Regional reporting cites the producers’ 13 November theatrical announcement. The linked title identity and local release event remain unconfirmed.' };
     }
     return null;
   }

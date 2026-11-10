@@ -21,8 +21,8 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
-  it('recognizes a reviewed regional observation without inventing a TMDB identity', () => {
-    const item = row({ origin: 'wikipedia', tmdb_id: null, title: 'Talcum Powder', language: 'te', release_date: '2026-11-13',
+  it.each(['Talcum Powder', 'Itlu Arjuna'])('recognizes the reviewed regional observation for %s without inventing a TMDB identity', (title) => {
+    const item = row({ origin: 'wikipedia', tmdb_id: null, title, language: 'te', release_date: '2026-11-13',
       source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026' });
     const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T12:00:00Z'));
     expect(review.region).toBe('IN');
