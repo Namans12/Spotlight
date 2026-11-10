@@ -17,6 +17,8 @@ vi.mock('@/lib/seasons', () => ({
   seasonsKey: (tmdbId: number) => `tv:${tmdbId}`,
 }));
 import { fetchSeasonsBatch } from '@/lib/seasons';
+vi.mock('@/lib/providers', async (importOriginal) => ({ ...await importOriginal<typeof import('@/lib/providers')>(), fetchProvidersBatch: vi.fn() }));
+import { fetchProvidersBatch } from '@/lib/providers';
 
 function entry(overrides: Partial<CalendarEntryDTO>): CalendarEntryDTO {
   return {
@@ -237,5 +239,27 @@ describe('Calendar event details', () => {
     renderCalendar();
     expect(await screen.findByText('Netflix, ZEE5')).toBeInTheDocument();
     expect(screen.getByText('Region unknown')).toBeInTheDocument();
+  });
+
+  it('checks current India offers without claiming a regional premiere or season', async () => {
+    vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({
+      title: 'Global show', mediaType: 'tv', kind: 'global_premiere', isTheatrical: false, region: null, tmdbId: 123,
+    })] });
+    vi.mocked(fetchProvidersBatch).mockResolvedValue({ providers: {}, runtimes: {}, genres: {},
+      availability: { 'tv:123': [{ provider: 'Netflix', type: 'subscription' }, { provider: 'Apple TV Store', type: 'rent' }] } });
+    const user = userEvent.setup(); renderCalendar();
+    await user.click(await screen.findByRole('button', { name: 'Check current India availability' }));
+    expect(await screen.findByText(/Currently reported in India: Netflix \(subscription\).*Apple TV Store \(rent\)/)).toBeInTheDocument();
+    expect(screen.getByText(/do not confirm this date or a specific season/)).toBeInTheDocument();
+  });
+
+  it('does not turn a missing provider response into unavailability', async () => {
+    vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({
+      title: 'Unknown show', mediaType: 'tv', kind: 'global_premiere', isTheatrical: false, region: null, tmdbId: 123,
+    })] });
+    vi.mocked(fetchProvidersBatch).mockResolvedValue({ providers: {}, runtimes: {}, genres: {}, availability: {} });
+    const user = userEvent.setup(); renderCalendar();
+    await user.click(await screen.findByRole('button', { name: 'Check current India availability' }));
+    expect(await screen.findByText(/Could not check listings; availability is unknown/)).toBeInTheDocument();
   });
 });

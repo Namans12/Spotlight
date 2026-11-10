@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, Link } from 'react-router-dom';
 import { fetchCalendarMonth } from '@/lib/api';
@@ -10,6 +10,7 @@ import { useSeasons, type SeasonsLookup } from '@/hooks/useSeasons';
 import { languageName, compareByLanguageName } from '@/lib/languages';
 import { evidenceDate, providerDetails } from '@/components/release/ReleaseEvidence';
 import { tmdbPoster } from '@/lib/tmdbImage';
+import { fetchProvidersBatch, providerKey } from '@/lib/providers';
 import type { CalendarEntryDTO, CalendarKind } from '../../shared/types/calendar';
 import {
   ChevronLeft,
@@ -82,6 +83,13 @@ const TABS: { id: KindFilter; label: string }[] = [
 ];
 
 function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number | null }) {
+  const [checkAvailability, setCheckAvailability] = useState(false);
+  const query = useQuery({
+    queryKey: ['calendar-current-availability', entry.mediaType, entry.tmdbId],
+    queryFn: () => fetchProvidersBatch([{ mediaType: entry.mediaType!, id: entry.tmdbId! }]),
+    enabled: checkAvailability && entry.mediaType === 'tv' && entry.tmdbId != null,
+    staleTime: 0, retry: false,
+  });
   const poster = tmdbPoster(entry.posterUrl, 36); // box is w-9 = 36px
   const body = (
     <div className="flex items-center gap-3 p-3 bg-card rounded-xl border border-border hover:border-accent/30 hover:bg-card-hover transition-all duration-200">
@@ -140,11 +148,23 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
     </div>
   );
 
-  return entry.tmdbId && entry.mediaType ? (
-    <Link to={`/title/${entry.mediaType}/${entry.tmdbId}`}>{body}</Link>
-  ) : (
-    <div>{body}</div>
-  );
+  const offers = entry.tmdbId && entry.mediaType ? query.data?.availability?.[providerKey(entry.mediaType, entry.tmdbId)] : undefined;
+  const offerNames = [...new Set((offers ?? []).map(offer => offer.provider))];
+  const offerTypes: Record<string, string[]> = {};
+  for (const offer of offers ?? []) offerTypes[offer.provider] = [...new Set([...(offerTypes[offer.provider] ?? []), offer.type])];
+  return <div>
+    {entry.tmdbId && entry.mediaType ? <Link to={`/title/${entry.mediaType}/${entry.tmdbId}`}>{body}</Link> : body}
+    {entry.mediaType === 'tv' && entry.tmdbId != null && <div className="px-3 pb-2 text-xs text-muted-foreground">
+      <button type="button" className="underline" onClick={() => { if (checkAvailability) void query.refetch(); else setCheckAvailability(true); }}>
+        {checkAvailability ? 'Check India availability again' : 'Check current India availability'}
+      </button>
+      {checkAvailability && <p role="status" className="mt-1">
+        {query.isFetching ? 'Checking current listings…' : query.isError || offers === undefined ? 'Could not check listings; availability is unknown.' :
+          offers.length ? `Currently reported in India: ${providerDetails(offerNames, offerTypes)}.` : 'No India listings reported; availability is unknown.'}
+        {' '}Source: TMDB / JustWatch; results may be cached and do not confirm this date or a specific season.
+      </p>}
+    </div>}
+  </div>;
 }
 
 function DayGroups({ entries, seasonsFor }: { entries: CalendarEntryDTO[]; seasonsFor: SeasonsLookup }) {
