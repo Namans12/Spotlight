@@ -8,6 +8,13 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'district_in' && Number(row.tmdb_id) === 1395627 && row.media_type === 'movie' &&
+      row.entry_type === 'Movie' && row.language === 'te' && row.title === 'Vrushakarma' && row.release_date === '2026-12-31' &&
+      row.source_url === 'https://www.district.in/movies/vrushakarma-movie-tickets-in-hyderabad-MV210428') {
+    return { type: 'conflict' as const, checkedAt: '2026-11-10', suppressTitleLink: true, source: 'BookMyShow',
+      sourceUrl: 'https://in.bookmyshow.com/movies/dehradun/vrushakarma/ET00472260',
+      message: 'Date needs review: BookMyShow lists the Telugu film for 4 December in India, while this legacy entry lists 31 December. The linked TMDB identity and this event remain unconfirmed.' };
+  }
   if (row.origin === 'tmdb_upcoming' && Number(row.tmdb_id) === 1450342 && row.media_type === 'movie' &&
       row.entry_type === 'Movie' && row.language === 'te' && row.title === 'Bhogi' && row.release_date === '2026-11-12' &&
       row.source_url === 'https://www.themoviedb.org/movie/1450342') {

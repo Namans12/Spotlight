@@ -21,6 +21,12 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('flags the legacy Vrushakarma date and unverified title link', () => {
+    const item = row({ origin: 'district_in', tmdb_id: 1395627, title: 'Vrushakarma', language: 'te', release_date: '2026-12-31',
+      source_url: 'https://www.district.in/movies/vrushakarma-movie-tickets-in-hyderabad-MV210428' });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T12:00:00Z'));
+    expect(review.reasons).toEqual(expect.arrayContaining(['date_conflict', 'identity_unverified', 'region_unknown']));
+  });
   it('retains the Jayannth date conflict and missing identity for review', () => {
     const item = row({ origin: 'wikipedia', tmdb_id: null, title: 'Jayannth And The Jingo Pen', language: 'te', release_date: '2026-11-12',
       source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026' });

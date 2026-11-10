@@ -18,6 +18,16 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('flags the legacy Vrushakarma date without asserting the linked title identity', async () => {
+    const item = editorial({ origin: 'district_in', tmdb_id: 1395627, title: 'Vrushakarma', language: 'te', release_date: '2026-12-31',
+      source_url: 'https://www.district.in/movies/vrushakarma-movie-tickets-in-hyderabad-MV210428', event_region: null, evidence: null });
+    const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, release_date: '2026-12-30' }]) as unknown as postgres.Sql, '2026-12', 'IN');
+    const warning = entries.find(entry => entry.dateConflict);
+    expect(warning?.dateConflict?.message).toContain('4 December');
+    expect(warning?.tmdbId).toBeNull();
+    expect(warning?.region).toBeNull();
+    expect(entries.filter(entry => entry.dateConflict)).toHaveLength(1);
+  });
   it('flags the exact TMDB Bhogi observation without transferring the warning to other records', async () => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 1450342, title: 'Bhogi', language: 'te', release_date: '2026-11-12',
       source_url: 'https://www.themoviedb.org/movie/1450342', event_region: null, evidence: null });
