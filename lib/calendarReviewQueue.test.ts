@@ -21,6 +21,15 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('keeps the region unknown for an identity-only review of a US release', () => {
+    const item = row({ origin: 'csv_seed', tmdb_id: 1170608, title: 'Dune: Part Three', language: 'en', release_date: '2026-12-18',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026', platform_or_distributor: 'Warner Bros. Pictures / Legendary Pictures',
+      event_region: 'IN', evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1170608', observed_at: '2026-11-10T19:00:00Z' } });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T20:00:00Z'));
+    expect(review.reasons).toContain('region_unknown');
+    expect(review.reasons).not.toContain('identity_unverified');
+    expect(review.region).toBeNull();
+  });
   it('queues the reported Kaaka delay as unresolved alongside its unverified identity', () => {
     const item = row({ origin: 'wikipedia', tmdb_id: 1533741, title: 'Kaaka', language: 'te', release_date: '2027-01-13',
       source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2027', event_region: 'IN',

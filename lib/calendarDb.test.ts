@@ -18,6 +18,28 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it.each([
+    [1170608, 'movie', 'Movie', 'Dune: Part Three', 'en', '2026-12-18', 'American', 'Warner Bros. Pictures / Legendary Pictures', 'Warner Bros.'],
+    [1145110, 'movie', 'Movie', 'King', 'hi', '2026-12-24', 'Hindi', 'Red Chillies Entertainment, Marflix Pictures', 'Red Chillies Entertainment'],
+    [1260649, 'movie', 'Movie', 'Jumanji: Open World', 'en', '2026-12-25', 'American', 'Columbia Pictures / Seven Bucks Productions', 'Sony Pictures'],
+  ])('restores the seed title identity without transferring its regional event: %s', async (id, media_type, entry_type, title, language, release_date, list, platform_or_distributor, source) => {
+    const item = editorial({ origin: 'csv_seed', tmdb_id: id, media_type, entry_type, title, language, release_date, platform_or_distributor,
+      source_url: `https://en.wikipedia.org/wiki/List_of_${list}_films_of_2026`, event_region: 'IN',
+      evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: `https://www.themoviedb.org/movie/${id}` } });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-12', 'IN');
+    expect(entry).toMatchObject({ tmdbId: id, region: null, evidenceStatus: 'unverified' });
+    expect(entry.dateCorroboration?.source).toBe(source);
+    const [changed] = await getCalendarMonth(db([], [{ ...item, platform_or_distributor: 'Different' }]) as unknown as postgres.Sql, '2026-12', 'IN');
+    expect(changed.tmdbId).toBeNull();
+  });
+  it('restores The Good Daughter identity without asserting local availability', async () => {
+    const item = editorial({ origin: 'csv_seed', tmdb_id: 249565, media_type: 'tv', entry_type: 'Show', title: 'The Good Daughter', language: 'en',
+      release_date: '2026-11-12', platform_or_distributor: 'Peacock', source_url: 'https://deadline.com/feature/2026-tv-premiere-dates-1236391902/',
+      event_region: null, evidence: { region: null, date_source: 'tmdb_global_first_air', source_url: 'https://www.themoviedb.org/tv/249565' } });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry).toMatchObject({ tmdbId: 249565, region: null, evidenceStatus: 'unverified' });
+    expect(entry.dateCorroboration?.source).toBe('Peacock');
+  });
   it('warns about the Kaaka report without asserting a replacement date or title identity', async () => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: 1533741, title: 'Kaaka', language: 'te', release_date: '2027-01-13',
       source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2027', event_region: 'IN',

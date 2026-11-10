@@ -12,4 +12,6 @@ Automated evidence rechecks only write evidence for records originating from the
 
 Identity reviews in `lib/calendarIdentity.ts` match the original source, title, language, event date, TMDB ID and regional evidence, and cite the independent cast or crew comparison. Their review freshness is tracked separately from the TMDB date observation: `identity_review_stale` means the identity review needs a recheck and does not refresh the original release evidence.
 
+Some reviews establish only that two sources describe the same title. For these, the title link can be restored while the editorial event's region remains unknown; a US schedule and an India TMDB date do not become one event just because they share a day.
+
 Some manually reviewed regional announcements can be scoped to a country in the calendar response without modifying the original record. For example, the Telugu *Talcum Powder* entry is matched against its exact source, date, language and unresolved identity, and is shown only for India based on its linked BookMyShow listing. The listing is an announced date, not a confirmed showtime or an identified TMDB title. The queue retains the missing-identity and duplicate-observation reasons; the review's age is displayed and must be rechecked when stale.

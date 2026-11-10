@@ -12,8 +12,22 @@ export function hasUnverifiedEditorialTmdbIdentity(origin: string, evidence: unk
 export function reviewedEditorialTmdbIdentity(row: {
   origin: string; tmdb_id: number | null; media_type: string | null; title: string;
   language?: string | null; release_date: string; source_url: string | null;
-  entry_type: string | null; evidence: unknown;
+  entry_type: string | null; evidence: unknown; platform_or_distributor?: string | null;
 }) {
+  const seedMatches = [
+    { id: 1170608, type: 'movie', entry: 'Movie', title: 'Dune: Part Three', language: 'en', date: '2026-12-18', source: 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026', distributor: 'Warner Bros. Pictures / Legendary Pictures', reference: 'https://www.youtube.com/watch?v=RXZhOVd5WWM', referenceName: 'Warner Bros.', message: 'The editorial listing and TMDB match director Denis Villeneuve and leads Timothée Chalamet and Zendaya. The editorial date is a North American schedule; the local event remains unconfirmed.' },
+    { id: 1145110, type: 'movie', entry: 'Movie', title: 'King', language: 'hi', date: '2026-12-24', source: 'https://en.wikipedia.org/wiki/List_of_Hindi_films_of_2026', distributor: 'Red Chillies Entertainment, Marflix Pictures', reference: 'https://www.redchillies.com/news/marflix-pictures-and-red-chillies-entertainment-revealed-the-title-of-their-film-king-in-grand-style-on-shah-rukh-khans-birthday-with-an-action-packed-glimpse-unveiled-b', referenceName: 'Red Chillies Entertainment', message: 'The editorial listing and TMDB match director Siddharth Anand and lead Shah Rukh Khan. This identity review does not establish the local event.' },
+    { id: 1260649, type: 'movie', entry: 'Movie', title: 'Jumanji: Open World', language: 'en', date: '2026-12-25', source: 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026', distributor: 'Columbia Pictures / Seven Bucks Productions', reference: 'https://jumanji.movie/', referenceName: 'Sony Pictures', message: 'The editorial listing and TMDB match director Jake Kasdan and leads Dwayne Johnson, Kevin Hart, Jack Black and Karen Gillan. The editorial date is a US schedule; the local event remains unconfirmed.' },
+    { id: 249565, type: 'tv', entry: 'Show', title: 'The Good Daughter', language: 'en', date: '2026-11-12', source: 'https://deadline.com/feature/2026-tv-premiere-dates-1236391902/', distributor: 'Peacock', reference: 'https://www.peacocktv.com/stream-tv/the-good-daughter', referenceName: 'Peacock', message: 'The Peacock series and TMDB match stars Rose Byrne, Meghann Fahy and Brendan Gleeson. The local premiere and availability remain unconfirmed.' },
+  ];
+  if (row.origin === 'csv_seed' && row.evidence && typeof row.evidence === 'object' && !Array.isArray(row.evidence)) {
+    const evidence = row.evidence as Record<string, unknown>;
+    const match = seedMatches.find(item => Number(row.tmdb_id) === item.id && row.media_type === item.type && row.entry_type === item.entry &&
+      row.title === item.title && row.language === item.language && row.release_date === item.date && row.source_url === item.source &&
+      row.platform_or_distributor === item.distributor && evidence.source_url === `https://www.themoviedb.org/${item.type}/${item.id}` &&
+      (item.type === 'movie' ? evidence.date_source === 'tmdb_regional_theatrical' && evidence.region === 'IN' : evidence.date_source === 'tmdb_global_first_air' && evidence.region == null));
+    if (match) return { source: match.referenceName, sourceUrl: match.reference, checkedAt: '2026-11-10T19:19:12Z', message: match.message, identityOnly: true };
+  }
   if (row.origin !== 'wikipedia' || row.media_type !== 'movie' || row.entry_type !== 'Movie' ||
       !row.evidence || typeof row.evidence !== 'object' || Array.isArray(row.evidence)) return null;
   const evidence = row.evidence as Record<string, unknown>;
