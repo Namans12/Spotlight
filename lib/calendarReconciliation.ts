@@ -4,7 +4,7 @@
 export function reviewedCalendarEntry(row: {
   origin: string; tmdb_id: number | null; media_type: string | null;
   title: string; release_date: string; source_url: string | null;
-  event_region: string | null; evidence: unknown;
+  event_region: string | null; evidence: unknown; platform_or_distributor: string | null;
 }) {
   if (row.origin !== 'csv_seed' || row.event_region != null || row.evidence != null) return null;
   if (Number(row.tmdb_id) === 84773 && row.media_type === 'tv' &&
@@ -23,7 +23,46 @@ export function reviewedCalendarEntry(row: {
       source: 'The Chosen', sourceUrl: 'https://www.thechosen.tv/en-us/investor-overview/press-releases/season-six-of-the-global-hit-series-the-chosen-premieres-exclusively-on-prime-video-november-15-2026' };
   }
   const americanFilms = 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026';
+  const hindiFilms = 'https://en.wikipedia.org/wiki/List_of_Hindi_films_of_2026';
+  if (row.media_type === 'movie' && row.source_url === hindiFilms) {
+    if (Number(row.tmdb_id) === 1209723 && row.title === 'Yeh Prem Mol Liya' && row.release_date === '2026-11-27') {
+      return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Yash Raj Films',
+        sourceUrl: 'https://www.yashrajfilms.com/movies/yeh-prem-mol-liya',
+        message: 'The worldwide distributor lists a 27 November release; the local event remains unconfirmed.' };
+    }
+    if (Number(row.tmdb_id) === 1389146 && row.title === 'Ranger' && row.release_date === '2026-12-04') {
+      return { type: 'conflict' as const, checkedAt: '2026-11-10', source: 'Times of India',
+        sourceUrl: 'https://timesofindia.indiatimes.com/entertainment/hindi/bollywood/news/ajay-devgn-and-sanjay-dutt-starrer-ranger-moves-out-of-december-2026-release-roster-leaves-shraddha-kapoors-eetha-to-clash-with-akshay-kumar-and-vidya-balans-film/articleshow/134352179.cms',
+        message: 'Date needs review: industry reporting says the earlier 4 December release was pushed to 2027. The new date and this event’s region are unconfirmed.' };
+    }
+    if (Number(row.tmdb_id) === 1411089 && row.title === 'Shakti Shalini' && row.release_date === '2026-12-24') {
+      return { type: 'conflict' as const, checkedAt: '2026-11-10', source: 'Mid-day',
+        sourceUrl: 'https://www.mid-day.com/amp/entertainment/bollywood-news/article/shakti-shalini-to-be-postponed-to-avoid-clash-with-king-23653896',
+        message: 'Date needs review: press reports suggest a move to 2027; an official new date has not been established here.' };
+    }
+  }
+  if (row.tmdb_id == null && row.media_type == null && row.title === 'Zero A. D.' && row.release_date === '2026-12-25' &&
+      row.source_url === americanFilms && row.platform_or_distributor === 'Angel Studios') {
+    return { type: 'conflict' as const, checkedAt: '2026-11-10', source: 'Angel Studios',
+      sourceUrl: 'https://www.angel.com/es/press/zero-ad',
+      message: 'Date needs review: Angel Studios lists 11 December for Zero A.D.; this entry has no verified title identity or region.' };
+  }
   if (row.media_type === 'movie' && row.source_url === americanFilms) {
+    if (Number(row.tmdb_id) === 1457866 && row.title === 'THE FURTHER MIS-ADVENTURES OF CLIFF BOOTH' && row.release_date === '2026-11-25') {
+      return { type: 'event' as const, kind: 'theatrical' as const, checkedAt: '2026-11-10', source: 'Netflix Tudum',
+        sourceUrl: 'https://www.netflix.com/tudum/articles/david-fincher-new-film-release-date',
+        message: 'Netflix announces an IMAX run starting 25 November and a separate Netflix premiere on 23 December. Local dates and availability are unconfirmed.' };
+    }
+    if (Number(row.tmdb_id) === 1137888 && row.title === 'The Man with the Bag' && row.release_date === '2026-12-02') {
+      return { type: 'event' as const, kind: 'streaming' as const, checkedAt: '2026-11-10', source: 'Amazon',
+        sourceUrl: 'https://www.aboutamazon.com/news/entertainment/the-man-with-the-bag-arnold-schwarzenegger-christmas-movie-prime-video',
+        message: 'Amazon announces a 2 December Prime Video premiere. Local date and availability are unconfirmed.' };
+    }
+    if (Number(row.tmdb_id) === 1131943 && row.title === 'Madden' && row.release_date === '2026-11-26') {
+      return { type: 'conflict' as const, checkedAt: '2026-11-10', source: 'Amazon',
+        sourceUrl: 'https://www.aboutamazon.com/news/entertainment/madden-movie-nicolas-cage-prime-video',
+        message: 'Date needs review: Amazon announces a Prime Video premiere on 18 November. The 26 November entry’s region and release event remain unconfirmed.' };
+    }
     const matches = [
       [1300968, 'The Hunger Games: Sunrise on the Reaping', '2026-11-20'],
       [1400336, 'Focker-in-Law', '2026-11-25'],

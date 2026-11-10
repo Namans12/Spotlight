@@ -18,6 +18,47 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it.each([
+    [1457866, 'THE FURTHER MIS-ADVENTURES OF CLIFF BOOTH', '2026-11-25', 'Netflix / Plan B Entertainment / Heyday Films', 'theatrical'],
+    [1137888, 'The Man with the Bag', '2026-12-02', 'Amazon MGM Studios', 'streaming'],
+  ])('corrects the event kind for a specifically reviewed announcement', async (tmdb_id, title, release_date, platform_or_distributor, expectedKind) => {
+    const item = editorial({ origin: 'csv_seed', tmdb_id, title, release_date, platform_or_distributor, event_region: null, evidence: null,
+      source_url: 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026' });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry.kind).toBe(expectedKind);
+    expect(entry.platforms).toEqual([]);
+    expect(entry.region).toBeNull();
+    expect(entry.dateCorroboration?.sourceUrl).toMatch(/^https:\/\//);
+    expect(entry.evidenceStatus).toBe('unverified');
+  });
+
+  it.each([
+    [1131943, 'Madden', '2026-11-26', 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026'],
+    [1389146, 'Ranger', '2026-12-04', 'https://en.wikipedia.org/wiki/List_of_Hindi_films_of_2026'],
+    [1411089, 'Shakti Shalini', '2026-12-24', 'https://en.wikipedia.org/wiki/List_of_Hindi_films_of_2026'],
+  ])('flags additional conflicting reporting without changing the stored date', async (tmdb_id, title, release_date, source_url) => {
+    const item = editorial({ origin: 'csv_seed', tmdb_id, title, release_date, source_url, event_region: null, evidence: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry.dateConflict?.message).toContain('Date needs review');
+    expect(entry.releaseDate).toBe(release_date);
+    expect(entry.region).toBeNull();
+  });
+
+  it('limits a warning for an unmatched title to the named distributor', async () => {
+    const item = editorial({ origin: 'csv_seed', tmdb_id: null, media_type: null, title: 'Zero A. D.', release_date: '2026-12-25',
+      platform_or_distributor: 'Angel Studios', event_region: null, evidence: null, source_url: 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026' });
+    const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, platform_or_distributor: 'Other' }]) as unknown as postgres.Sql, '2026-12', 'IN');
+    expect(entries[0].dateConflict?.source).toBe('Angel Studios');
+    expect(entries[1].dateConflict).toBeNull();
+  });
+
+  it('shows the distributor announcement without claiming a regional date', async () => {
+    const item = editorial({ origin: 'csv_seed', tmdb_id: 1209723, title: 'Yeh Prem Mol Liya', release_date: '2026-11-27',
+      event_region: null, evidence: null, source_url: 'https://en.wikipedia.org/wiki/List_of_Hindi_films_of_2026' });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry.dateCorroboration?.source).toBe('Yash Raj Films');
+    expect(entry.region).toBeNull();
+  });
   it('attaches a season announcement only to the reviewed Chosen event', async () => {
     const item = editorial({ origin: 'csv_seed', tmdb_id: 85077, media_type: 'tv', entry_type: 'Show', title: 'The Chosen',
       release_date: '2026-11-15', event_region: null, evidence: null,
