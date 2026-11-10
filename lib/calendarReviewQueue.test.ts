@@ -21,6 +21,16 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('records a scoped identity review without refreshing the underlying date observation', () => {
+    const item = row({ origin: 'wikipedia', tmdb_id: 1733518, title: 'Bouma', language: 'ml', release_date: '2026-11-12',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Malayalam_films_of_2026', event_region: 'IN',
+      evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1733518', observed_at: '2026-10-01T00:00:00Z' } });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T20:00:00Z'));
+    expect(review.reasons).toContain('evidence_stale');
+    expect(review.reasons).not.toContain('identity_unverified');
+    expect(review.region).toBe('IN');
+    expect(review.reviewSourceUrl).toContain('cinemaexpress.com');
+  });
   it.each(['wikipedia', 'csv_seed', 'district_in'])('queues legacy %s TMDB evidence for independent identity review', origin => {
     const item = row({ origin, event_region: 'IN', evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical',
       source_url: 'https://www.themoviedb.org/movie/123', observed_at: '2026-12-09T00:00:00Z' } });

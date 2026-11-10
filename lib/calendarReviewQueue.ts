@@ -1,6 +1,6 @@
 import { reviewedCalendarEntry } from './calendarReconciliation.js';
 import { reviewFreshness } from '../shared/calendarFreshness.js';
-import { hasUnverifiedEditorialTmdbIdentity } from './calendarIdentity.js';
+import { hasUnverifiedEditorialTmdbIdentity, reviewedEditorialTmdbIdentity } from './calendarIdentity.js';
 
 export interface ReviewQueueRow {
   id: string | number; origin: string; tmdb_id: number | null; media_type: string | null;
@@ -37,7 +37,8 @@ export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): Rev
     if (!evidence && !review) reasons.push('unreviewed');
     if (row.evidence != null && !evidence) reasons.push('invalid_evidence');
     if (row.tmdb_id == null) reasons.push('identity_missing');
-    const identityUnverified = hasUnverifiedEditorialTmdbIdentity(row.origin, evidence);
+    const identityReview = reviewedEditorialTmdbIdentity(row);
+    const identityUnverified = hasUnverifiedEditorialTmdbIdentity(row.origin, evidence) && !identityReview;
     if (identityUnverified || (review && 'suppressTitleLink' in review && review.suppressTitleLink)) reasons.push('identity_unverified');
     const globalPremiere = !identityUnverified && evidence?.date_source === 'tmdb_global_first_air' && row.media_type === 'tv' && row.tmdb_id != null &&
       evidence.source_url === `https://www.themoviedb.org/tv/${row.tmdb_id}`;
@@ -57,10 +58,11 @@ export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): Rev
       if (freshness === 'unknown') reasons.push('freshness_unknown');
       else if (freshness === 'stale') reasons.push('evidence_stale');
     }
+    if (identityReview && reviewFreshness(identityReview.checkedAt, now) !== 'fresh') reasons.push('identity_review_stale');
     if (!reasons.length) continue;
     queue.push({ id: String(row.id), title: row.title, releaseDate: row.release_date, origin: row.origin,
       region, tmdbId: row.tmdb_id == null ? null : Number(row.tmdb_id), sourceUrl: row.source_url,
-      reviewSourceUrl: review?.sourceUrl ?? null, checkedAt: checked, reasons, duplicateObservationIds });
+      reviewSourceUrl: review?.sourceUrl ?? identityReview?.sourceUrl ?? null, checkedAt: checked, reasons, duplicateObservationIds });
   }
   const rank = (x: ReviewQueueItem) => x.reasons.includes('date_conflict') || x.reasons.includes('identity_conflict') ? 0 : x.reasons.includes('unreviewed') ? 1 : 2;
   return queue.sort((a, b) => rank(a) - rank(b) || a.releaseDate.localeCompare(b.releaseDate) || a.id.localeCompare(b.id, 'en', { numeric: true }));

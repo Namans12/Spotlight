@@ -3,7 +3,7 @@ import type { CalendarEntryDTO } from "../shared/types/calendar.js";
 import { classifyPlatform, isKnownStreamer, mediaTypeFromEntryType, normalizePlatforms, splitPlatformField } from "../shared/platforms.js";
 import { reviewedCalendarEntry } from "./calendarReconciliation.js";
 import { reviewFreshness } from "../shared/calendarFreshness.js";
-import { hasUnverifiedEditorialTmdbIdentity } from "./calendarIdentity.js";
+import { hasUnverifiedEditorialTmdbIdentity, reviewedEditorialTmdbIdentity } from "./calendarIdentity.js";
 
 /** Only merge observations when all event dimensions are known and agree.
  * An unknown season is not interchangeable with a known season. */
@@ -111,7 +111,11 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
       title: row.title, release_date: String(row.release_date), source_url: row.source_url,
       event_region: row.event_region, evidence: row.evidence, platform_or_distributor: row.platform_or_distributor, entry_type: row.entry_type, language: row.language });
     if (review?.type === 'regional' && review.region !== region) continue;
-    const identityUnverified = hasUnverifiedEditorialTmdbIdentity(row.origin, row.evidence);
+    const identityReview = reviewedEditorialTmdbIdentity({ origin: row.origin, tmdb_id: row.tmdb_id, media_type: row.media_type,
+      title: row.title, language: row.language, release_date: String(row.release_date), source_url: row.source_url,
+      entry_type: row.entry_type, evidence: row.evidence });
+    const identityUnverified = hasUnverifiedEditorialTmdbIdentity(row.origin, row.evidence) && !identityReview;
+    if (identityReview && row.event_region !== region) continue;
     const suppressTitleLink = identityUnverified || (review != null && 'suppressTitleLink' in review && review.suppressTitleLink);
     const matchingTmdbEvidence = !identityUnverified && row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
       row.evidence?.source_url === `https://www.themoviedb.org/${row.media_type}/${row.tmdb_id}`;
@@ -130,9 +134,9 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
       source: review?.type === 'regional' ? [row.source, review.source].filter(Boolean).join(' / ') : (regionalEvidence || globalPremiere) && row.source && row.source.toLowerCase() !== 'tmdb' ? `${row.source} / TMDB` : row.source ?? null, sourceUrl: row.source_url ?? null,
       observedAt: review?.type === 'regional' ? review.checkedAt : regionalEvidence || globalPremiere ? row.evidence?.observed_at ?? null : null, availabilityTypes: null,
       evidenceStatus: globalPremiere ? "global" : regionalEvidence || review?.type === 'regional' ? "regional" : "unverified",
-      reviewFreshness: review ? reviewFreshness(review.checkedAt) : null,
+      reviewFreshness: review ? reviewFreshness(review.checkedAt) : identityReview ? reviewFreshness(identityReview.checkedAt) : null,
       seasonPremiere: review?.type === 'season' ? review : null,
-      dateCorroboration: review?.type === 'corroboration' || review?.type === 'event' || review?.type === 'regional' ? review : null,
+      dateCorroboration: review?.type === 'corroboration' || review?.type === 'event' || review?.type === 'regional' ? review : identityReview,
       dateConflict: review?.type === 'conflict' ? review : null });
   }
   entries.sort((a, b) => a.releaseDate.localeCompare(b.releaseDate) || a.title.localeCompare(b.title));
