@@ -16,4 +16,11 @@ describe('provider batch compatibility', () => {
     const result = await fetchProvidersBatch([{ id: 1, mediaType: 'movie' }]);
     expect(result.availability?.['movie:1']).toEqual([{ provider: 'Netflix', type: 'rent' }]);
   });
+  it('preserves partial lookup failure without discarding successful offers', async () => {
+    vi.mocked(fetchJson).mockResolvedValue({ providers: {}, availability: { 'movie:1': [{ provider: 'Netflix', type: 'subscription' }] }, runtimes: {}, genres: {}, hadFailures: true });
+    const result = await fetchProvidersBatch([{ id: 1, mediaType: 'movie' }, { id: 2, mediaType: 'movie' }]);
+    expect(result.hadFailures).toBe(true);
+    expect(result.availability?.['movie:1']).toHaveLength(1);
+    expect(result.availability?.['movie:2']).toBeUndefined();
+  });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -91,4 +91,16 @@ it('reports unknown availability on failure and recovers after a retry', async (
   expect(screen.getByText(/No matches with the information available/)).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'try again' }));
   expect(await within(screen.getByRole('region', { name: 'Your options' })).findByText('Comedy choice')).toBeInTheDocument();
+});
+
+it('warns about partial checks, keeps verified options and retries', async () => {
+  vi.mocked(fetchProvidersBatch).mockResolvedValueOnce({ providers: {}, availability: { 'movie:1': [{ provider: 'Netflix', type: 'subscription' }] },
+    runtimes: { 'movie:1': 90 }, genres: { 'movie:1': ['Comedy'] }, hadFailures: true });
+  const user = userEvent.setup(); renderPage();
+  expect(await screen.findByText(/Some availability and runtime checks failed/)).toBeInTheDocument();
+  await user.click(screen.getByLabelText('Netflix'));
+  await user.click(screen.getByRole('button', { name: 'Find something to watch' }));
+  expect(within(screen.getByRole('region', { name: 'Your options' })).getByText('Comedy choice')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Try those checks again' }));
+  await waitFor(() => expect(screen.queryByText(/Some availability and runtime checks failed/)).not.toBeInTheDocument());
 });

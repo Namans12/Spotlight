@@ -20,6 +20,8 @@ export function providerKey(mediaType: string, tmdbId: number): string {
  * tmdbWatchProvidersBatch's own comment for why that distinction matters. */
 export interface ProviderBatch {
   providers: Record<string, string[]>;
+  /** True when one or more requested title lookups failed. Missing in older cached responses. */
+  hadFailures?: boolean;
   /** Missing key means unknown or an older cached response. */
   availability?: Record<string, ProviderOffer[]>;
   watchLinks?: Record<string, string>;
@@ -48,7 +50,7 @@ export async function fetchProvidersBatch(keys: ProviderSubject[]): Promise<Prov
     // Each field defaulted independently, for the same reason: `genres` is the
     // newest of the three, so for an hour after a deploy the edge can still be
     // serving a `{ providers, runtimes }` response to a client that expects it.
-    return { providers: batch.providers ?? {}, availability: batch.availability ?? {}, watchLinks: batch.watchLinks ?? {}, runtimes: batch.runtimes ?? {}, genres: batch.genres ?? {} };
+    return { providers: batch.providers ?? {}, availability: batch.availability ?? {}, watchLinks: batch.watchLinks ?? {}, runtimes: batch.runtimes ?? {}, genres: batch.genres ?? {}, hadFailures: batch.hadFailures === true };
   }
   return { providers: (data as Record<string, string[]>) ?? {}, runtimes: {}, genres: {} };
 }

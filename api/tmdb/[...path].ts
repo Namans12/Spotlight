@@ -124,7 +124,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
           // TMDB already sent. src/lib/providers.ts still accepts the old flat
           // shape, because a CDN entry cached before this deploy keeps being
           // served for up to an hour after it.
-          body = { providers, availability, watchLinks, runtimes, genres };
+          body = { providers, availability, watchLinks, runtimes, genres, hadFailures };
           // A batch where any leg failed (TMDB 429/5xx, a timeout) must not get
           // the long cache lifetime the happy path does -- that would bake a
           // transient rate-limit hit in as "confirmed: nothing to watch this
