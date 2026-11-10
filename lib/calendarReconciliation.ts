@@ -8,6 +8,20 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'district_in' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.language === 'en') {
+    if (Number(row.tmdb_id) === 1567605 && row.title === 'Ebenezer' && row.release_date === '2026-11-20' &&
+        row.source_url === 'https://www.district.in/movies/ebenezer-movie-tickets-in-hyderabad-MV213946') {
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-10', source: 'BookMyShow',
+        sourceUrl: 'https://in.bookmyshow.com/movies/hyderabad/ebenezer-a-christmas-carol/ET00506939',
+        message: 'BookMyShow lists Ebenezer: A Christmas Carol for 20 November in Hyderabad; bookings were not yet open when checked.' };
+    }
+    if (Number(row.tmdb_id) === 1381273 && row.title === 'Paper Tiger' && row.release_date === '2026-11-20' &&
+        row.source_url === 'https://www.district.in/movies/paper-tiger-movie-tickets-in-hyderabad-MV227340') {
+      return { type: 'conflict' as const, checkedAt: '2026-11-10', suppressTitleLink: true, source: 'BookMyShow',
+        sourceUrl: 'https://in.bookmyshow.com/movies/kolkata/paper-tiger/ET00522380',
+        message: 'Date needs review: BookMyShow lists the film for 27 November in India; this legacy entry lists 20 November without verified territory. The event and linked title identity remain unconfirmed.' };
+    }
+  }
   if (row.origin === 'district_in' && row.tmdb_id == null && row.media_type == null && row.entry_type === 'Movie' &&
       row.language === 'te' && row.title === 'NBK111' && row.release_date === '2026-12-31' &&
       row.source_url === 'https://www.district.in/movies/nbk111-movie-tickets-in-hyderabad-MV224943') {

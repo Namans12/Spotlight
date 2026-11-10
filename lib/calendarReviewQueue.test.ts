@@ -21,6 +21,12 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('flags the legacy Paper Tiger disagreement and keeps the region unknown', () => {
+    const item = row({ origin: 'district_in', tmdb_id: 1381273, title: 'Paper Tiger', language: 'en', release_date: '2026-11-20',
+      source_url: 'https://www.district.in/movies/paper-tiger-movie-tickets-in-hyderabad-MV227340' });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T12:00:00Z'));
+    expect(review.reasons).toEqual(expect.arrayContaining(['date_conflict', 'identity_unverified', 'region_unknown']));
+  });
   it('flags the legacy NBK111 date while retaining missing identity and region', () => {
     const item = row({ origin: 'district_in', tmdb_id: null, media_type: null, title: 'NBK111', language: 'te', release_date: '2026-12-31',
       source_url: 'https://www.district.in/movies/nbk111-movie-tickets-in-hyderabad-MV224943' });

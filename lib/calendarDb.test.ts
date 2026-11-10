@@ -18,6 +18,22 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('scopes the reviewed Ebenezer announcement to India without asserting bookings', async () => {
+    const item = editorial({ origin: 'district_in', tmdb_id: 1567605, title: 'Ebenezer', language: 'en', release_date: '2026-11-20',
+      source_url: 'https://www.district.in/movies/ebenezer-movie-tickets-in-hyderabad-MV213946', event_region: null, evidence: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry.region).toBe('IN');
+    expect(entry.dateCorroboration?.message).toContain('bookings were not yet open');
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
+  });
+  it('flags the legacy Paper Tiger date without asserting that different regions share an event', async () => {
+    const item = editorial({ origin: 'district_in', tmdb_id: 1381273, title: 'Paper Tiger', language: 'en', release_date: '2026-11-20',
+      source_url: 'https://www.district.in/movies/paper-tiger-movie-tickets-in-hyderabad-MV227340', event_region: null, evidence: null });
+    const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, language: 'te' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entries.filter(entry => entry.dateConflict)).toHaveLength(1);
+    expect(entries.find(entry => entry.dateConflict)?.tmdbId).toBeNull();
+    expect(entries.find(entry => entry.dateConflict)?.dateConflict?.message).toContain('27 November');
+  });
   it('flags the exact legacy NBK111 date without creating a title link', async () => {
     const item = editorial({ origin: 'district_in', tmdb_id: null, media_type: null, title: 'NBK111', language: 'te', release_date: '2026-12-31',
       source_url: 'https://www.district.in/movies/nbk111-movie-tickets-in-hyderabad-MV224943', event_region: null, evidence: null });
