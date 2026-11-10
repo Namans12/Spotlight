@@ -24,6 +24,7 @@ import { CastRow } from '@/components/title/CastRow';
 import { FactsPanel } from '@/components/title/FactsPanel';
 import { SeasonProgress } from '@/components/title/SeasonProgress';
 import { TrailerCard } from '@/components/title/TrailerCard';
+import { WatchNightIdeas } from '@/components/title/WatchNightIdeas';
 import {
   ArrowLeft,
   Star,
@@ -411,6 +412,8 @@ export default function TitleDetail() {
       )}
 
       <FactsPanel detail={data} />
+
+      <WatchNightIdeas key={`${mediaType}:${tmdbId}`} mediaType={mediaType} id={tmdbId} />
 
       {data.trailer && <TrailerCard trailer={data.trailer} />}
 
