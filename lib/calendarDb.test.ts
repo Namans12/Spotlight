@@ -18,6 +18,13 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('collapses only byte-identical Wikipedia observations and preserves different evidence', async () => {
+    const item = editorial({ origin: 'wikipedia', event_region: null, evidence: null, observation_fingerprint: 'same observation' });
+    const entries = await getCalendarMonth(db([], [item, { ...item, id: 2 },
+      { ...item, id: 3, observation_fingerprint: 'different source or evidence' },
+      { ...item, id: 4, origin: 'csv_seed' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entries).toHaveLength(3);
+  });
   it.each([
     [1450342, 'Bhogi', '2026-11-12', 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', 'conflict'],
     [1434462, 'Melcow Pondicherry', '2026-11-12', 'https://en.wikipedia.org/wiki/List_of_Malayalam_films_of_2026', 'conflict'],

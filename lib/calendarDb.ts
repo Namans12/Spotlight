@@ -29,7 +29,8 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
   const calendarRows = await sql`
     SELECT id, origin, release_date::text AS release_date, title, language, entry_type, platform_or_distributor,
       tmdb_id, media_type, details, poster_url, origin_region, origin_release_date::text AS origin_release_date,
-      evidence->>'region' AS event_region, evidence, source, source_url
+      evidence->>'region' AS event_region, evidence, source, source_url,
+      (to_jsonb(calendar_entries) - 'id' - 'created_at' - 'source_key')::text AS observation_fingerprint
     FROM calendar_entries
     WHERE date_trunc('month', release_date::timestamp) = date_trunc('month', ${monthStart}::date)
       AND (evidence->>'region' IS NULL OR evidence->>'region' = ${region})
@@ -76,7 +77,14 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
       source: platforms.length ? "TMDB / JustWatch" : "TMDB", sourceUrl: row.evidence?.source_url ?? null, observedAt: row.evidence?.observed_at ?? null,
       availabilityTypes: row.evidence?.provider_types ?? null, evidenceStatus: "regional" });
   }
+  const seenEditorialObservations = new Set<string>();
   for (const row of calendarRows) {
+    // Identical copies from the same Wikipedia observation are not separate
+    // releases. Never merge based only on a title/date or unknown region.
+    if (row.origin === 'wikipedia' && typeof row.observation_fingerprint === 'string') {
+      if (seenEditorialObservations.has(row.observation_fingerprint)) continue;
+      seenEditorialObservations.add(row.observation_fingerprint);
+    }
     const review = reviewedCalendarEntry({ origin: row.origin, tmdb_id: row.tmdb_id, media_type: row.media_type,
       title: row.title, release_date: String(row.release_date), source_url: row.source_url,
       event_region: row.event_region, evidence: row.evidence, platform_or_distributor: row.platform_or_distributor, entry_type: row.entry_type });
