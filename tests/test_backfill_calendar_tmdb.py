@@ -169,3 +169,31 @@ def test_ordinary_titles_are_not_flagged():
     assert not bc.is_too_generic_to_match("Mirzapur: The Movie")
     assert not bc.is_too_generic_to_match("Khalifa Part 1")
     assert not bc.is_too_generic_to_match("A Perfect Match")  # substring, not the exact title
+
+
+def test_main_reports_candidates_without_writing(monkeypatch, capsys):
+    class Cursor:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def execute(self, query, params):
+            assert query == bc.CANDIDATE_SQL
+        def fetchall(self): return [(1, 'Unique Film', date(2026, 11, 13), 'Movie')]
+
+    class Connection:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def cursor(self): return Cursor()
+
+    def connect(dsn, *, options):
+        assert options == '-c default_transaction_read_only=on'
+        return Connection()
+
+    monkeypatch.setattr(bc, 'load_local_env', lambda *_: None)
+    monkeypatch.setattr(bc.psycopg, 'connect', connect)
+    monkeypatch.setattr(bc, 'search', lambda *_args, **_kwargs: {'id': 12})
+    monkeypatch.setattr(bc, 'rate_limit_gap', lambda *_: None)
+    monkeypatch.setattr(sys, 'argv', ['backfill_calendar_tmdb.py'])
+    monkeypatch.setenv('DATABASE_URL', 'unused')
+    monkeypatch.setenv('TMDB_API_KEY', 'unused')
+    assert bc.main() == 0
+    assert 'possible movie:12' in capsys.readouterr().out

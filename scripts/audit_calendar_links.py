@@ -41,13 +41,10 @@ of a wrong link:
      signal: the old (unfixed) search picked one title, the fixed one picks
      another.
 
-Read-only by default. Pass --apply to relink every MISMATCH row to the id the
-fixed matcher picked — read the MISMATCH list first, since this is exactly
-the kind of change worth eyeballing before it's automatic.
+Always read-only: a title/date match is a candidate for review, not proof.
 
     python scripts/audit_calendar_links.py
     python scripts/audit_calendar_links.py --threshold-days 60 --limit 100
-    python scripts/audit_calendar_links.py --apply
 """
 
 from __future__ import annotations
@@ -78,14 +75,6 @@ ORDER BY id
 LIMIT %s
 """
 
-IMG_BASE = "https://image.tmdb.org/t/p/w342"
-
-FIX_SQL = """
-UPDATE calendar_entries
-   SET tmdb_id = %s, media_type = %s, poster_url = %s
- WHERE id = %s
-"""
-
 
 def main() -> int:
     load_local_env(ROOT)
@@ -98,15 +87,6 @@ def main() -> int:
         default=DEFAULT_THRESHOLD_DAYS,
         help=f"Flag rows whose TMDB date differs by more than this many days (default {DEFAULT_THRESHOLD_DAYS}).",
     )
-    parser.add_argument(
-        "--apply",
-        action="store_true",
-        help=(
-            "Relink every MISMATCH row (both the date-diff heuristic AND the fixed matcher's second "
-            "opinion agree it's wrong) to the id the fixed matcher picks. Without this flag, the run "
-            "is entirely read-only. Corroborated and unclear rows are never touched."
-        ),
-    )
     args = parser.parse_args()
 
     dsn = os.getenv("DATABASE_URL")
@@ -118,7 +98,7 @@ def main() -> int:
         print("TMDB_API_KEY is not set", file=sys.stderr)
         return 1
 
-    with psycopg.connect(dsn) as conn:
+    with psycopg.connect(dsn, options='-c default_transaction_read_only=on') as conn:
         with conn.cursor() as cur:
             cur.execute(CANDIDATE_SQL, (args.limit,))
             rows = cur.fetchall()
@@ -187,11 +167,11 @@ def main() -> int:
             rematch_title = rematch.get("title") or rematch.get("name") or "?"
             mismatches.append((row_id, title, cal_date, tmdb_id, media_type, origin, real_title, real_date, diff, rematch["id"], rematch_title, rematch.get("release_date") or rematch.get("first_air_date")))
 
-    print(f"\n=== {len(confirmed_ok)} corroborated: matcher independently agrees, likely just a release-date lag ===")
+    print(f"\n=== {len(confirmed_ok)} candidates where matcher agrees; identity and event still require review ===")
     for row_id, title, cal_date, tmdb_id, media_type, origin, real_title, real_date, diff in confirmed_ok:
         print(f"  id={row_id:5} [{origin}]  {title!r} ({cal_date}) == {media_type}:{tmdb_id} {real_title!r} ({real_date})  diff={diff}d  [OK, no action]")
 
-    print(f"\n=== {len(mismatches)} MISMATCH: matcher would now pick a different title — likely a real wrong link ===")
+    print(f"\n=== {len(mismatches)} MISMATCH: matcher would now pick a different title; review both identities ===")
     for row_id, title, cal_date, tmdb_id, media_type, origin, real_title, real_date, diff, new_id, new_title, new_date in mismatches:
         flag = "  <-- surprising for tmdb_upcoming (no search step at creation — look closely)" if origin == "tmdb_upcoming" else ""
         print(f"  id={row_id:5}  calendar: {title!r} ({cal_date})  [{media_type}, {origin}]{flag}")
@@ -202,26 +182,7 @@ def main() -> int:
     for row_id, title, cal_date, tmdb_id, media_type, origin, real_title, real_date, diff, reason in unclear:
         print(f"  id={row_id:5} [{origin}]  {title!r} ({cal_date})  ->  {tmdb_id} {real_title!r}  diff={diff}d  ({reason})")
 
-    if mismatches and args.apply:
-        print(f"\n--apply passed — relinking all {len(mismatches)} mismatch(es)...")
-        with psycopg.connect(dsn) as conn:
-            with conn.cursor() as cur:
-                for row_id, title, cal_date, tmdb_id, media_type, origin, real_title, real_date, diff, new_id, new_title, new_date in mismatches:
-                    # Re-fetch the poster for the new id — the earlier search()
-                    # result already carries it, but recomputing here keeps this
-                    # block independent of what search() happened to return.
-                    path = "/movie" if media_type == "movie" else "/tv"
-                    detail = tmdb_get(session, f"{path}/{new_id}", tmdb_key, {})
-                    poster_url = f"{IMG_BASE}{detail['poster_path']}" if (detail or {}).get("poster_path") else None
-                    cur.execute(FIX_SQL, (new_id, media_type, poster_url, row_id))
-                    print(f"  id={row_id:5}  {title!r}: {tmdb_id} -> {new_id} ({new_title!r})")
-            conn.commit()
-        print("done.")
-    elif mismatches:
-        print(
-            "\nRun again with --apply to relink every MISMATCH row above to the id the fixed matcher picked. "
-            "Read the list first — this is exactly the kind of change worth eyeballing before it's automatic."
-        )
+    print("\nCandidates require independent review; no rows changed.")
     return 0
 
 

@@ -1,42 +1,7 @@
-"""Resolve CSV-seeded calendar rows against TMDB.
+"""Report candidate TMDB matches for calendar rows without changing identities.
 
-calendar_entries was loaded from a one-time editorial CSV with no TMDB linkage,
-so every seeded row renders as an un-clickable line with no artwork. This fills
-tmdb_id, media_type and poster_url so those rows behave like the rest of the
-app: a poster, a link to the title page, and — because relations warm
-themselves on view — a Watch order chain if the title has one.
-
-Matching is deliberately strict. A row is only written when the TMDB result's
-title matches after case/accent/punctuation folding AND the release year is
-within a year of the calendar's date. Anything less is left alone: the failure
-mode of a fuzzy match here is a release calendar confidently showing the wrong
-film's poster, which is worse than showing none. Every skip is printed.
-
-Title matching alone is not enough, though: TMDB has no uniqueness constraint
-on titles, so two unrelated films can share an exact title and both land in
-the "matches" set (found in production — see search()'s docstring). When that
-happens, the candidate closest in release date to the calendar's own date
-wins, since that is the one signal TMDB's own result ordering doesn't use.
-
-One more sharp edge, also found in production: a row labelled 'Movie' with no
-confident movie match falls back to searching 'tv' next (see `order` in
-main()), and search()'s own year-tolerant rescue for that type can then latch
-onto a hugely popular, completely unrelated show sharing the bare title —
-"Mirzapur" (a CSV row meaning the 2026 movie "Mirzapur: The Movie") linked
-straight to the original 2018 Mirzapur TV series this way, a title match with
-no year in common at all. That rescue is real and needed (see search()'s
-docstring for the bug it fixes), so it isn't removed — it's restricted to only
-fire on the type the row's own entry_type already implied, never on the
-fallback attempt at the other type. A row like Mirzapur's now goes unmatched
-instead of confidently wrong; scripts/reconcile_calendar_duplicates.py cleans
-up any such mislink still sitting in the database from before this fix.
-
-Safe to re-run, and designed to be: it only looks at rows still missing a
-tmdb_id, so a run interrupted by a flaky network picks up where it left off.
-
-    python scripts/backfill_calendar_tmdb.py --dry-run
-    python scripts/backfill_calendar_tmdb.py --limit 100
-    python scripts/backfill_calendar_tmdb.py
+Title and date heuristics are not proof of identity. Review candidates against
+independent sources before using them; --dry-run is accepted for compatibility.
 """
 
 from __future__ import annotations
@@ -64,7 +29,6 @@ from lib_relations import (  # noqa: E402
 )
 
 REQUEST_GAP_SECONDS = 0.15
-IMG_BASE = "https://image.tmdb.org/t/p/w342"
 
 # (media_type, tmdb_id) pairs confirmed BY HAND to be a different, unrelated
 # production that merely shares a title string with a calendar row — a title
@@ -110,13 +74,6 @@ SELECT id, title, release_date, entry_type
  ORDER BY release_date
  LIMIT %s
 """
-
-UPDATE_SQL = """
-UPDATE calendar_entries
-   SET tmdb_id = %s, media_type = %s, poster_url = %s
- WHERE id = %s
-"""
-
 
 def expected_media_type(entry_type: str | None) -> str:
     """The CSV's own vocabulary is just Show / Movie."""
@@ -285,7 +242,7 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(description="Link calendar_entries rows to TMDB.")
     parser.add_argument("--limit", type=int, default=1000, help="Max unresolved rows to attempt (default 1000).")
-    parser.add_argument("--dry-run", action="store_true", help="Report matches; write nothing.")
+    parser.add_argument("--dry-run", action="store_true", help="Compatibility option; reporting is always read-only.")
     args = parser.parse_args()
 
     dsn = os.getenv("DATABASE_URL")
@@ -302,7 +259,7 @@ def main() -> int:
     unmatched = 0
     unavailable = 0
 
-    with psycopg.connect(dsn) as conn:
+    with psycopg.connect(dsn, options='-c default_transaction_read_only=on') as conn:
         with conn.cursor() as cur:
             cur.execute(CANDIDATE_SQL, (args.limit,))
             rows = cur.fetchall()
@@ -341,17 +298,10 @@ def main() -> int:
                     unmatched += 1
                     continue
 
-                poster_url = f"{IMG_BASE}{result['poster_path']}" if result.get("poster_path") else None
                 matched += 1
-                print(f"  matched {title!r} -> {found_type}:{result['id']}")
-                if not args.dry_run:
-                    cur.execute(UPDATE_SQL, (result["id"], found_type, poster_url, row_id))
+                print(f"  REVIEW id={row_id} {title!r} -> possible {found_type}:{result['id']}")
 
-        if not args.dry_run:
-            conn.commit()
-
-    verb = "would link" if args.dry_run else "linked"
-    print(f"\n{verb} {matched}, {unmatched} without a confident match, {unavailable} unreachable")
+    print(f"\n{matched} possible matches for review, {unmatched} without a candidate, {unavailable} unreachable; no rows changed")
     if unavailable:
         print("Re-run to retry the unreachable ones — nothing about them was judged bad.")
     return 0

@@ -156,7 +156,7 @@ Using your own Gmail (or any account) as the sender needs an **app password**, n
 1. Create a free project at https://neon.tech (pick a region close to your Vercel deployment region).
 2. Copy the pooled connection string.
 3. Run the migrations once, in order: `0001_init.sql`, `0002_title_ratings.sql`, `0003_title_relations.sql`, `0004_title_relations_reverse_index.sql`, `0005_title_relation_lookups.sql`, `0006_calendar_entries_poster.sql`, `0007_multi_user_accounts.sql`, `0008_release_items_month_index.sql`, `0009_calendar_language_iso.sql`, `0010_calendar_origin_release.sql`, `0011_title_seasons.sql`, `0012_reset_tmdb_relations.sql`, `0013_per_user_watchlist_alerts.sql` — e.g. `psql "$DATABASE_URL" -f migrations/0001_init.sql` for each (or via a Python one-liner with `psycopg` if you don't have `psql` installed).
-4. Link the seeded calendar rows to TMDB so they get posters and become clickable: `python scripts/backfill_calendar_tmdb.py` (safe to re-run; it only touches rows still missing a `tmdb_id`).
+4. Report possible TMDB identities for unlinked calendar entries: `python scripts/backfill_calendar_tmdb.py`. Results require independent review and the command does not change rows.
 5. Keep the calendar populated past the seeded window: `python scripts/sync_calendar_tmdb.py --months 6`. Pulls region-aware theatrical dates (`/discover/movie` with `region` + `with_release_type=2|3` + `release_date.gte/lte` — not `primary_release_date.*`, which ignores `region` entirely and returns global junk) and TV premieres, and only ever *enriches* existing rows — a curated editorial row keeps its own platform and details and merely gains a poster and a `tmdb_id`. Queries one calendar month at a time rather than the whole window at once — TMDB caps each `/discover` call at a fixed page limit regardless of true match count, so a single big-range query lets a handful of popular titles anywhere in it crowd out an entire other month's releases before the cap even applies (confirmed directly: a 6-month single-query window had 178 real matches behind a 60-result cap, silently dropping 118). TV premieres are additionally scoped by `--tv-countries` (default `IN,US,GB`) — TMDB is crowdsourced and global TV volume runs into the hundreds a month, almost all obscure local productions; this trades missing an occasional big non-English hit for not drowning the calendar in noise. Runs nightly (see below).
 4. Optionally seed the editorial calendar: `python scripts/seed_calendar_csv.py`.
 
@@ -640,29 +640,7 @@ re-run; a clean database just reports zero groups.
     python scripts/reconcile_calendar_duplicates.py --dry-run
     python scripts/reconcile_calendar_duplicates.py
 
-**A link that was correct can stop being correct.** `backfill_calendar_tmdb.py`
-only ever runs once per row (it selects `WHERE tmdb_id IS NULL`), so a link it
-made is never revisited — but TMDB's own data for that id can still change.
-Mid-session, TMDB renamed a linked record from "Khalifa Part 1" to "Khalifa:
-The Ruler"; separately, ~40 linked rows had a `language` that no longer agreed
-with TMDB's `original_language`, the field every other write path here treats
-as ground truth. `scripts/verify_calendar_tmdb_links.py` re-checks every linked
-row against TMDB's *current* data: a title that no longer matches is a rename
-if the release date still agrees (title + language refreshed, link kept) or a
-wrong match if it doesn't (unlinked, same reasoning as the duplicate case
-above); a `language` disagreement on a title that still matches is corrected
-to TMDB's current value.
-
-It cannot catch a wrong match whose title string is byte-identical to the real
-one (TMDB has more than one "Perfect Match", more than one "Giant" — decoys
-found only by reading the overview by hand) — `KNOWN_WRONG_MATCHES` and
-`NEVER_AUTO_MATCH_TITLES` in `backfill_calendar_tmdb.py` are the record of
-that: without them, unlinking a decoy just makes the row a fresh candidate
-that finds a *different* wrong entry on the next run, which is exactly what
-happened once, in production, before those existed. A `LANGUAGE_OVERRIDES`
-map in `verify_calendar_tmdb_links.py` plays the same role for one TMDB record
-(Judaa) whose own `original_language` is simply wrong. Extend these by hand
-when a new one turns up; don't expect either script to find it unassisted.
+**Calendar identity checks are read-only.** `backfill_calendar_tmdb.py` reports potential matches for unlinked entries, while `verify_calendar_tmdb_links.py` reports potential mismatches on existing links. Title and date similarity cannot establish identity; verify candidates against independent sources before changing a record. Neither command updates titles, languages, posters, identities, or evidence.
 
     python scripts/verify_calendar_tmdb_links.py --dry-run
     python scripts/verify_calendar_tmdb_links.py

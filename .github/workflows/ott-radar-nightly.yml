@@ -114,12 +114,8 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/sync_theatrical_wikipedia.py
 
-      # Links any calendar row still missing a tmdb_id (only ever the
-      # editorial CSV rows, or a future manual reseed) so it gets a poster and
-      # becomes clickable. Matches on exact folded title + release year;
-      # anything less confident is left alone rather than risk a wrong poster
-      # on a release calendar. No-op when everything is already linked.
-      - name: Link calendar entries to TMDB
+      # Title/date search supplies candidates only: it cannot prove identity.
+      - name: Report possible calendar TMDB matches
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
