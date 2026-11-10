@@ -18,6 +18,32 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('uses a scoped Indian ticketing announcement only for the exact Telugu record and region', async () => {
+    const item = editorial({ origin: 'wikipedia', tmdb_id: null, title: 'Talcum Powder', language: 'te', release_date: '2026-11-13',
+      source: 'wikipedia', source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', event_region: null, evidence: null });
+    const [entry, mismatch] = await getCalendarMonth(db([], [item, { ...item, id: 2, language: 'en' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry.region).toBe('IN');
+    expect(entry.evidenceStatus).toBe('regional');
+    expect(entry.tmdbId).toBeNull();
+    expect(entry.source).toBe('wikipedia / BookMyShow');
+    expect(entry.dateCorroboration?.message).toContain('bookings were not yet open');
+    expect(mismatch.region).toBeNull();
+    expect(mismatch.evidenceStatus).toBe('unverified');
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
+  });
+
+  it.each([
+    ['Aakasamlo Oka Tara', '2026-11-20', 'Telangana Today'],
+    ['Dear Astronaut', '2026-11-20', 'Cinema Express'],
+    ['Jayannth And The Jingo Pen', '2026-11-12', 'Simply Mollywood'],
+  ])('adds reporting for the exact Telugu record without assigning a region', async (title, release_date, source) => {
+    const item = editorial({ origin: 'wikipedia', tmdb_id: null, title, language: 'te', release_date,
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', event_region: null, evidence: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry.dateCorroboration?.source).toBe(source);
+    expect(entry.region).toBeNull();
+    expect(entry.evidenceStatus).toBe('unverified');
+  });
   it('collapses only byte-identical Wikipedia observations and preserves different evidence', async () => {
     const item = editorial({ origin: 'wikipedia', event_region: null, evidence: null, observation_fingerprint: 'same observation' });
     const entries = await getCalendarMonth(db([], [item, { ...item, id: 2 },

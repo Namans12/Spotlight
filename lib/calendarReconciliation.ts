@@ -5,9 +5,32 @@ export function reviewedCalendarEntry(row: {
   origin: string; tmdb_id: number | null; media_type: string | null;
   title: string; release_date: string; source_url: string | null;
   event_region: string | null; evidence: unknown; platform_or_distributor: string | null; entry_type: string | null;
+  language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
   if (row.origin === 'wikipedia' && row.media_type === 'movie' && row.entry_type === 'Movie') {
+    if (row.tmdb_id == null && row.language === 'te' && row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') {
+      if (row.title === 'Talcum Powder' && row.release_date === '2026-11-13') {
+        return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-10', source: 'BookMyShow',
+          sourceUrl: 'https://in.bookmyshow.com/movies/balurghat/talcum-powder/ET00521922',
+          message: 'BookMyShow lists the Telugu film for 13 November in India; bookings were not yet open when checked. The TMDB identity remains unverified.' };
+      }
+      if (row.title === 'Aakasamlo Oka Tara' && row.release_date === '2026-11-20') {
+        return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Telangana Today',
+          sourceUrl: 'https://telanganatoday.com/dulquer-salmaans-aakasamlo-oka-tara-gets-november-20-release-date',
+          message: 'Reporting cites the producers’ 20 November theatrical announcement. The TMDB identity and local release event remain unconfirmed.' };
+      }
+      if (row.title === 'Dear Astronaut' && row.release_date === '2026-11-20') {
+        return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Cinema Express',
+          sourceUrl: 'https://www.cinemaexpress.com/telugu/news/2026/Oct/31/dear-astronaut-locks-release-date',
+          message: 'Reporting cites the filmmakers’ 20 November theatrical announcement. The TMDB identity and local release event remain unconfirmed.' };
+      }
+      if (row.title === 'Jayannth And The Jingo Pen' && row.release_date === '2026-11-12') {
+        return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Simply Mollywood',
+          sourceUrl: 'https://simplymollywood.com/movies/jayannth-and-the-jingo-pen-trailer-november-12-philips-and-the-monkey-pen',
+          message: 'Regional reporting lists a 12 November theatrical release. The TMDB identity and local release event remain unconfirmed.' };
+      }
+    }
     if (Number(row.tmdb_id) === 1450342 && row.title === 'Bhogi' && row.release_date === '2026-11-12' &&
         row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') {
       return { type: 'conflict' as const, checkedAt: '2026-11-10', source: '123telugu',

@@ -5,6 +5,7 @@ export interface ReviewQueueRow {
   id: string | number; origin: string; tmdb_id: number | null; media_type: string | null;
   title: string; release_date: string; source_url: string | null; entry_type: string | null;
   event_region: string | null; evidence: unknown; platform_or_distributor: string | null;
+  language?: string | null;
   observation_fingerprint?: string | null;
 }
 export interface ReviewQueueItem {
@@ -38,7 +39,8 @@ export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): Rev
     if (review?.type === 'conflict' && 'suppressTitleLink' in review && review.suppressTitleLink) reasons.push('identity_unverified');
     const globalPremiere = evidence?.date_source === 'tmdb_global_first_air' && row.media_type === 'tv' && row.tmdb_id != null &&
       evidence.source_url === `https://www.themoviedb.org/tv/${row.tmdb_id}`;
-    if (!row.event_region) reasons.push(globalPremiere ? 'global_premiere_local_unknown' : 'region_unknown');
+    const region = review?.type === 'regional' ? review.region : row.event_region;
+    if (!region) reasons.push(globalPremiere ? 'global_premiere_local_unknown' : 'region_unknown');
     if (evidence && (typeof evidence.date_source !== 'string' || !evidence.date_source ||
         typeof evidence.source_url !== 'string' || !evidence.source_url.startsWith('https://'))) reasons.push('evidence_incomplete');
     if (evidence && row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
@@ -52,7 +54,7 @@ export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): Rev
     }
     if (!reasons.length) continue;
     queue.push({ id: String(row.id), title: row.title, releaseDate: row.release_date, origin: row.origin,
-      region: row.event_region, tmdbId: row.tmdb_id == null ? null : Number(row.tmdb_id), sourceUrl: row.source_url,
+      region, tmdbId: row.tmdb_id == null ? null : Number(row.tmdb_id), sourceUrl: row.source_url,
       reviewSourceUrl: review?.sourceUrl ?? null, checkedAt: checked, reasons, duplicateObservationIds });
   }
   const rank = (x: ReviewQueueItem) => x.reasons.includes('date_conflict') || x.reasons.includes('identity_conflict') ? 0 : x.reasons.includes('unreviewed') ? 1 : 2;

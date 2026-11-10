@@ -87,7 +87,8 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
     }
     const review = reviewedCalendarEntry({ origin: row.origin, tmdb_id: row.tmdb_id, media_type: row.media_type,
       title: row.title, release_date: String(row.release_date), source_url: row.source_url,
-      event_region: row.event_region, evidence: row.evidence, platform_or_distributor: row.platform_or_distributor, entry_type: row.entry_type });
+      event_region: row.event_region, evidence: row.evidence, platform_or_distributor: row.platform_or_distributor, entry_type: row.entry_type, language: row.language });
+    if (review?.type === 'regional' && review.region !== region) continue;
     const suppressTitleLink = review?.type === 'conflict' && 'suppressTitleLink' in review && review.suppressTitleLink;
     const matchingTmdbEvidence = row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
       row.evidence?.source_url === `https://www.themoviedb.org/${row.media_type}/${row.tmdb_id}`;
@@ -100,15 +101,15 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
     add({ releaseDate: String(row.release_date), title: row.title, language: row.language,
       mediaType: row.media_type ?? mediaTypeFromEntryType(row.entry_type), kind,
       isTheatrical: kind === "theatrical", platform: platforms[0] ?? null, platforms,
-      region: regionalEvidence ? row.event_region : null, tmdbId: !suppressTitleLink && row.tmdb_id !== null ? Number(row.tmdb_id) : null,
+      region: review?.type === 'regional' ? review.region : regionalEvidence ? row.event_region : null, tmdbId: !suppressTitleLink && row.tmdb_id !== null ? Number(row.tmdb_id) : null,
       posterUrl: suppressTitleLink ? null : row.poster_url ?? null, rating: null, overview: row.details,
       origin: "csv_seed", originRegion: row.origin_region ?? null, originReleaseDate: row.origin_release_date ?? null,
-      source: (regionalEvidence || globalPremiere) && row.source && row.source.toLowerCase() !== 'tmdb' ? `${row.source} / TMDB` : row.source ?? null, sourceUrl: row.source_url ?? null,
-      observedAt: regionalEvidence || globalPremiere ? row.evidence?.observed_at ?? null : null, availabilityTypes: null,
-      evidenceStatus: globalPremiere ? "global" : regionalEvidence ? "regional" : "unverified",
+      source: review?.type === 'regional' ? [row.source, review.source].filter(Boolean).join(' / ') : (regionalEvidence || globalPremiere) && row.source && row.source.toLowerCase() !== 'tmdb' ? `${row.source} / TMDB` : row.source ?? null, sourceUrl: row.source_url ?? null,
+      observedAt: review?.type === 'regional' ? review.checkedAt : regionalEvidence || globalPremiere ? row.evidence?.observed_at ?? null : null, availabilityTypes: null,
+      evidenceStatus: globalPremiere ? "global" : regionalEvidence || review?.type === 'regional' ? "regional" : "unverified",
       reviewFreshness: review ? reviewFreshness(review.checkedAt) : null,
       seasonPremiere: review?.type === 'season' ? review : null,
-      dateCorroboration: review?.type === 'corroboration' || review?.type === 'event' ? review : null,
+      dateCorroboration: review?.type === 'corroboration' || review?.type === 'event' || review?.type === 'regional' ? review : null,
       dateConflict: review?.type === 'conflict' ? review : null });
   }
   entries.sort((a, b) => a.releaseDate.localeCompare(b.releaseDate) || a.title.localeCompare(b.title));

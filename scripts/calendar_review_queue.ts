@@ -27,7 +27,7 @@ async function main() {
   const sql = postgres(dsn, { max: 1, connect_timeout: 10 });
   try {
     const result = await sql.begin('read only', async tx => tx`
-      SELECT id, origin, tmdb_id, media_type, title, release_date::text AS release_date, source_url,
+      SELECT id, origin, tmdb_id, media_type, title, language, release_date::text AS release_date, source_url,
         entry_type, platform_or_distributor, evidence->>'region' AS event_region, evidence,
         (to_jsonb(calendar_entries) - 'id' - 'created_at' - 'source_key')::text AS observation_fingerprint
       FROM calendar_entries
@@ -35,7 +35,7 @@ async function main() {
       ORDER BY release_date, id LIMIT ${limit + 1}`);
     const truncated = result.length > limit;
     const rows: ReviewQueueRow[] = result.slice(0, limit).map(row => ({
-      id: row.id, origin: row.origin, tmdb_id: row.tmdb_id, media_type: row.media_type, title: row.title,
+      id: row.id, origin: row.origin, tmdb_id: row.tmdb_id, media_type: row.media_type, title: row.title, language: row.language,
       release_date: row.release_date, source_url: row.source_url, entry_type: row.entry_type,
       platform_or_distributor: row.platform_or_distributor, event_region: row.event_region, evidence: row.evidence,
       observation_fingerprint: row.observation_fingerprint,

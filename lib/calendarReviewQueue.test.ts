@@ -21,6 +21,15 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('recognizes a reviewed regional observation without inventing a TMDB identity', () => {
+    const item = row({ origin: 'wikipedia', tmdb_id: null, title: 'Talcum Powder', language: 'te', release_date: '2026-11-13',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026' });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T12:00:00Z'));
+    expect(review.region).toBe('IN');
+    expect(review.reasons).toContain('identity_missing');
+    expect(review.reasons).not.toContain('region_unknown');
+    expect(review.reviewSourceUrl).toContain('bookmyshow.com');
+  });
   it('links only exact Wikipedia observations and keeps both records reviewable', () => {
     const original = row({ id: 1, origin: 'wikipedia', observation_fingerprint: 'same' });
     const items = buildCalendarReviewQueue([original, { ...original, id: 2 },
