@@ -7,7 +7,7 @@ import psycopg
 import requests
 
 from lib_relations import TmdbUnavailable, load_local_env, rate_limit_gap, tmdb_get
-from recheck_calendar_evidence import SELECT_CANDIDATES, exact_title_match
+from recheck_calendar_evidence import SELECT_CANDIDATES, exact_title_match, regional_theatrical_dates
 from recheck_global_tv import SELECT as SELECT_TV
 
 
@@ -16,12 +16,10 @@ def movie_reason(payload, origin, title, stored_date, region):
         return 'title_not_found'
     if origin != 'tmdb_upcoming' and not any(exact_title_match(title, n) for n in (payload.get('title'), payload.get('original_title')) if n):
         return 'title_mismatch'
-    regions = (payload.get('release_dates') or {}).get('results') or []
-    dates = [str(d['release_date'])[:10] for r in regions if r.get('iso_3166_1') == region
-             for d in r.get('release_dates', []) if d.get('type') in (2, 3) and d.get('release_date')]
+    dates = regional_theatrical_dates(payload, region)
     if not dates:
         return 'no_regional_theatrical_date'
-    return 'exact_match' if min(dates) == str(stored_date) else 'different_regional_date'
+    return 'exact_match' if str(stored_date) in dates else 'different_regional_date'
 
 
 def tv_reason(payload, origin, title, stored_date):

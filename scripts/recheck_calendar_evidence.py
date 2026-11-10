@@ -1,7 +1,7 @@
 """Recheck legacy TMDB theatrical rows without inferring dates or deleting rows.
 
 Dry-run by default. --apply updates only still-unchanged, unverified rows after
-the exact stored date is confirmed as the earliest theatrical date in region.
+the exact stored date is confirmed as a theatrical date in the region.
 Rows already represented by a verified event are deliberately left untouched.
 """
 from __future__ import annotations
@@ -9,15 +9,14 @@ from __future__ import annotations
 import argparse
 import os
 import unicodedata
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import psycopg
 import requests
 from psycopg.types.json import Jsonb
 
-from lib_relations import TmdbUnavailable, load_local_env, tmdb_get
-from sync_calendar_tmdb import theatrical_window
+from lib_relations import TmdbUnavailable, load_local_env, tmdb_get, rate_limit_gap
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -58,22 +57,38 @@ WHERE a.id = %s AND a.tmdb_id = %s AND a.release_date = %s::date
 """
 
 
-def verified_candidates(rows, session, key, region, lookup=theatrical_window, detail=tmdb_get):
+def regional_theatrical_dates(payload, region):
+    dates = set()
+    for territory in (payload.get('release_dates') or {}).get('results') or []:
+        if territory.get('iso_3166_1') != region:
+            continue
+        for release in territory.get('release_dates') or []:
+            if release.get('type') not in (2, 3) or not isinstance(release.get('release_date'), str):
+                continue
+            raw = release['release_date'][:10]
+            try:
+                if date.fromisoformat(raw).isoformat() == raw:
+                    dates.add(raw)
+            except ValueError:
+                continue
+    return dates
+
+
+def verified_candidates(rows, session, key, region, detail=tmdb_get):
     """Fetch all observations before writing, and fail closed on upstream failure."""
     checked = {}
     verified = []
     details = {}
     for row_id, tmdb_id, stored_date, origin, title in rows:
+        if tmdb_id not in details:
+            details[tmdb_id] = detail(session, f'/movie/{tmdb_id}', key, {'append_to_response': 'release_dates'}) or {}
+            checked[tmdb_id] = (regional_theatrical_dates(details[tmdb_id], region), datetime.now(timezone.utc).isoformat())
+            rate_limit_gap(0.15)
         if origin != 'tmdb_upcoming':
-            if tmdb_id not in details:
-                details[tmdb_id] = detail(session, f'/movie/{tmdb_id}', key) or {}
             names = [details[tmdb_id].get('title'), details[tmdb_id].get('original_title')]
             if not any(exact_title_match(title, name) for name in names if name):
                 continue
-        if tmdb_id not in checked:
-            found = lookup(session, key, tmdb_id, region, None)[0]
-            checked[tmdb_id] = (found, datetime.now(timezone.utc).isoformat())
-        if checked[tmdb_id][0] == str(stored_date):
+        if str(stored_date) in checked[tmdb_id][0]:
             verified.append((row_id, tmdb_id, str(stored_date), checked[tmdb_id][1], origin, title))
     return verified
 

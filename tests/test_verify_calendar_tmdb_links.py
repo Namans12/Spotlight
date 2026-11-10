@@ -88,3 +88,29 @@ def test_language_override_wins_over_tmdbs_own_value():
 
 def test_ids_without_an_override_are_unaffected():
     assert v.LANGUAGE_OVERRIDES.get(999999999) is None
+
+
+def test_verifier_reports_conflicts_without_mutating_rows(monkeypatch, capsys):
+    statements = []
+    class Cursor:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def execute(self, sql): statements.append(sql)
+        def fetchall(self): return [(1, 'Old Title', 'hi', 10, 'movie', '2026-11-10')]
+    class Connection:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def cursor(self): return Cursor()
+        def commit(self): raise AssertionError('must not commit')
+    def connect(_dsn, **kwargs):
+        assert 'default_transaction_read_only=on' in kwargs.get('options', '')
+        return Connection()
+    monkeypatch.setenv('DATABASE_URL', 'fixture')
+    monkeypatch.setenv('TMDB_API_KEY', 'fixture')
+    monkeypatch.setattr(v, 'load_local_env', lambda *_: None)
+    monkeypatch.setattr(v.psycopg, 'connect', connect)
+    monkeypatch.setattr(v, 'tmdb_request', lambda *_: {'title': 'Another Title', 'release_date': '2026-11-10', 'original_language': 'en'})
+    monkeypatch.setattr(sys, 'argv', ['verify_calendar_tmdb_links.py'])
+    assert v.main() == 0
+    assert len(statements) == 1 and statements[0].lstrip().startswith('SELECT')
+    assert 'no rows changed' in capsys.readouterr().out

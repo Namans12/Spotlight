@@ -125,17 +125,9 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/backfill_calendar_tmdb.py
 
-      # Checks every already-linked row against TMDB's CURRENT data — a link
-      # made correctly can still go wrong later: TMDB renames a record
-      # (found happening mid-session to "Khalifa Part 1"), or its
-      # `original_language` disagrees with what every other write path in
-      # this app treats as ground truth. Also unlinks a title that no longer
-      # matches at all and whose date doesn't corroborate it either — a real,
-      # if rare, wrong match. Two known-bad TMDB records and one known-wrong
-      # TMDB language are excluded via a hardcoded override inside the
-      # script itself (documented there) so a fix made by hand doesn't get
-      # silently re-broken by this same step the next night.
-      - name: Verify calendar TMDB links are still correct
+      # Report mismatches for review; a title/global-date difference alone is
+      # insufficient to unlink, retitle or overwrite editorial observations.
+      - name: Report calendar TMDB link mismatches
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

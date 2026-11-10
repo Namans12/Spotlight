@@ -10,16 +10,18 @@ import recheck_calendar_evidence as recheck
 from lib_relations import TmdbUnavailable
 
 
-def test_only_exact_regional_dates_are_verified_and_requests_are_shared():
+def test_only_exact_regional_dates_are_verified_and_requests_are_shared(monkeypatch):
+    monkeypatch.setattr(recheck, 'rate_limit_gap', lambda *_: None)
     calls = []
-    def lookup(session, key, title_id, region, fallback):
-        calls.append((title_id, region))
-        return ('2026-11-10' if title_id == 1 else None, None, None)
+    def lookup(session, path, key, params):
+        calls.append(path)
+        dates = [{'type': 2, 'release_date': '2026-11-10'}, {'type': 3, 'release_date': '2026-11-11'}] if path.endswith('/1') else []
+        return {'release_dates': {'results': [{'iso_3166_1': 'IN', 'release_dates': dates}]}}
     rows = [(1, 1, '2026-11-10', 'tmdb_upcoming', 'A'), (2, 1, '2026-11-11', 'tmdb_upcoming', 'A'), (3, 2, '2026-11-10', 'tmdb_upcoming', 'B')]
     verified = recheck.verified_candidates(rows, None, 'key', 'IN', lookup)
-    assert len(verified) == 1 and verified[0][:3] == (1, 1, '2026-11-10')
+    assert [v[0] for v in verified] == [1, 2]
     assert verified[0][3].endswith('+00:00')
-    assert calls == [(1, 'IN'), (2, 'IN')]
+    assert calls == ['/movie/1', '/movie/2']
 
 
 def test_upstream_failure_stops_before_any_write(monkeypatch):
@@ -37,16 +39,25 @@ def test_upstream_failure_stops_before_any_write(monkeypatch):
         recheck.run(Connection(), None, 'key', apply=True)
 
 
-def test_external_movies_require_exact_title_and_regional_date():
+def test_external_movies_require_exact_title_and_regional_date(monkeypatch):
+    monkeypatch.setattr(recheck, 'rate_limit_gap', lambda *_: None)
     rows = [(1, 11, '2026-11-10', 'wikipedia', 'Right Film'),
             (2, 12, '2026-11-10', 'district_in', 'Wrong Film'),
             (3, 13, '2026-11-10', 'csv_seed', 'Right Film')]
-    def detail(_s, path, _k):
-        return {'title': 'Different Film' if path.endswith('/12') else 'Right Film'}
-    def window(_s, _k, movie_id, _r, _f):
-        return ('2026-11-11' if movie_id == 13 else '2026-11-10', None, None)
-    result = recheck.verified_candidates(rows, None, 'key', 'IN', window, detail)
+    def detail(_s, path, _k, _params):
+        return {'title': 'Different Film' if path.endswith('/12') else 'Right Film', 'release_dates': {'results': [
+            {'iso_3166_1': 'IN', 'release_dates': [{'type': 3, 'release_date': '2026-11-11' if path.endswith('/13') else '2026-11-10'}]}]}}
+    result = recheck.verified_candidates(rows, None, 'key', 'IN', detail)
     assert [r[0] for r in result] == [1]
+
+
+def test_regional_dates_ignore_invalid_foreign_and_non_theatrical():
+    payload = {'release_dates': {'results': [
+        {'iso_3166_1': 'IN', 'release_dates': [{'type': 3, 'release_date': '2026-11-10'},
+          {'type': 2, 'release_date': '2026-11-12'}, {'type': 3, 'release_date': '2026-99-99'},
+          {'type': 4, 'release_date': '2026-11-13'}]},
+        {'iso_3166_1': 'US', 'release_dates': [{'type': 3, 'release_date': '2026-11-14'}]}]}}
+    assert recheck.regional_theatrical_dates(payload, 'IN') == {'2026-11-10', '2026-11-12'}
 
 
 def test_title_match_preserves_non_latin_identity():
