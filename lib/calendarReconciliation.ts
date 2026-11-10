@@ -8,6 +8,13 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'tmdb_upcoming' && Number(row.tmdb_id) === 1450342 && row.media_type === 'movie' &&
+      row.entry_type === 'Movie' && row.language === 'te' && row.title === 'Bhogi' && row.release_date === '2026-11-12' &&
+      row.source_url === 'https://www.themoviedb.org/movie/1450342') {
+    return { type: 'conflict' as const, checkedAt: '2026-11-10', source: '123telugu',
+      sourceUrl: 'https://www.123telugu.com/mnews/sharwanands-bhogi-postponed-heres-why-hk.html',
+      message: 'Date needs review: local reporting says the announced 12 November release has been postponed; no replacement date is confirmed here.' };
+  }
   if (row.origin === 'wikipedia' && row.media_type === 'movie' && row.entry_type === 'Movie') {
     if (row.tmdb_id == null && row.language === 'te' && row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') {
       if (row.title === 'Itlu Arjuna' && row.release_date === '2026-11-13') {

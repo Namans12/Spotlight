@@ -18,6 +18,14 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('flags the exact TMDB Bhogi observation without transferring the warning to other records', async () => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 1450342, title: 'Bhogi', language: 'te', release_date: '2026-11-12',
+      source_url: 'https://www.themoviedb.org/movie/1450342', event_region: null, evidence: null });
+    const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, release_date: '2026-11-13' },
+      { ...item, id: 3, language: 'en' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entries.find(entry => entry.dateConflict)?.dateConflict?.source).toBe('123telugu');
+    expect(entries.filter(entry => entry.dateConflict)).toHaveLength(1);
+  });
   it.each(['Talcum Powder', 'Itlu Arjuna'])('uses a scoped Indian ticketing announcement for %s only for the exact Telugu record and region', async (title) => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: null, title, language: 'te', release_date: '2026-11-13',
       source: 'wikipedia', source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', event_region: null, evidence: null });

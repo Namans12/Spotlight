@@ -21,6 +21,14 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('flags the disputed TMDB Bhogi observation as a date conflict', () => {
+    const item = row({ origin: 'tmdb_upcoming', tmdb_id: 1450342, title: 'Bhogi', language: 'te', release_date: '2026-11-12',
+      source_url: 'https://www.themoviedb.org/movie/1450342' });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T12:00:00Z'));
+    expect(review.reasons).toContain('date_conflict');
+    expect(review.reasons).not.toContain('unreviewed');
+    expect(review.reasons).toContain('region_unknown');
+  });
   it.each(['Talcum Powder', 'Itlu Arjuna'])('recognizes the reviewed regional observation for %s without inventing a TMDB identity', (title) => {
     const item = row({ origin: 'wikipedia', tmdb_id: null, title, language: 'te', release_date: '2026-11-13',
       source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026' });
