@@ -755,6 +755,7 @@ export type GenreMap = Record<string, string[]>;
 export interface ProviderBatchResult {
   providers: Record<string, string[]>;
   availability: Record<string, ProviderOffer[]>;
+  watchLinks: Record<string, string>;
   /** Free: this batch already fetches each title's full detail payload to read
    *  its providers and discards the rest, and the runtime is in there. A
    *  separate lookup would double the request count to learn a number TMDB
@@ -771,6 +772,18 @@ export interface ProviderBatchResult {
    *  response where this is true — see this function's own comment on why a
    *  failed leg is omitted rather than defaulted to `[]`. */
   hadFailures: boolean;
+}
+
+/** Only forward the same title and territory's official TMDB watch link. */
+export function regionalWatchLink(details: any, region: string, key: ProviderKey): string | null {
+  const raw = details?.['watch/providers']?.results?.[region]?.link;
+  if (typeof raw !== 'string') return null;
+  try {
+    const url = new URL(raw);
+    const path = new RegExp(`^/${key.mediaType}/${key.id}(?:-[^/]*)?/watch/?$`);
+    return url.origin === 'https://www.themoviedb.org' && !url.username && !url.password &&
+      path.test(url.pathname) && url.searchParams.get('locale')?.toUpperCase() === region.toUpperCase() ? url.href : null;
+  } catch { return null; }
 }
 
 /** Providers for many titles in one call. Every key gets its own TMDB fetch —
@@ -815,12 +828,14 @@ export async function tmdbWatchProvidersBatch(
       const genres = (detail?.genres ?? [])
         .map((g: TmdbRow) => g?.name)
         .filter((name: unknown): name is string => typeof name === "string" && name.length > 0);
-      return { providers: resolveProviders(detail, region), availability: resolveProviderOffers(detail, region), runtime, genres };
+      return { providers: resolveProviders(detail, region), availability: resolveProviderOffers(detail, region),
+        watchLink: regionalWatchLink(detail, region, { mediaType, id }), runtime, genres };
     }),
   );
 
   const providers: Record<string, string[]> = {};
   const availability: Record<string, ProviderOffer[]> = {};
+  const watchLinks: Record<string, string> = {};
   const runtimes: RuntimeMap = {};
   const genres: GenreMap = {};
   let hadFailures = false;
@@ -829,6 +844,7 @@ export async function tmdbWatchProvidersBatch(
     if (result.status === "fulfilled") {
       providers[providerCacheKey(k)] = result.value.providers;
       availability[providerCacheKey(k)] = result.value.availability;
+      if (result.value.watchLink) watchLinks[providerCacheKey(k)] = result.value.watchLink;
       if (result.value.runtime !== null) runtimes[providerCacheKey(k)] = result.value.runtime;
       if (result.value.genres.length > 0) genres[providerCacheKey(k)] = result.value.genres;
     } else {
@@ -843,7 +859,7 @@ export async function tmdbWatchProvidersBatch(
       `[tmdb] providers-batch truncated ${keys.length - trimmed.length} of ${keys.length} requested keys`,
     );
   }
-  return { providers, availability, runtimes, genres, hadFailures };
+  return { providers, availability, watchLinks, runtimes, genres, hadFailures };
 }
 
 // ---------------------------------------------------------------------------

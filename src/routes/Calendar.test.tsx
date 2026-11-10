@@ -246,11 +246,13 @@ describe('Calendar event details', () => {
       title: 'Global show', mediaType: 'tv', kind: 'global_premiere', isTheatrical: false, region: null, tmdbId: 123,
     })] });
     vi.mocked(fetchProvidersBatch).mockResolvedValue({ providers: {}, runtimes: {}, genres: {},
-      availability: { 'tv:123': [{ provider: 'Netflix', type: 'subscription' }, { provider: 'Apple TV Store', type: 'rent' }] } });
+      availability: { 'tv:123': [{ provider: 'Netflix', type: 'subscription' }, { provider: 'Apple TV Store', type: 'rent' }] },
+      watchLinks: { 'tv:123': 'https://www.themoviedb.org/tv/123-show/watch?locale=IN' } });
     const user = userEvent.setup(); renderCalendar();
     await user.click(await screen.findByRole('button', { name: 'Check current India availability' }));
     expect(await screen.findByText(/Currently reported in India: Netflix \(subscription\).*Apple TV Store \(rent\)/)).toBeInTheDocument();
     expect(screen.getByText(/do not confirm this date or a specific season/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open TMDB watch options' })).toHaveAttribute('href', 'https://www.themoviedb.org/tv/123-show/watch?locale=IN');
   });
 
   it('does not turn a missing provider response into unavailability', async () => {

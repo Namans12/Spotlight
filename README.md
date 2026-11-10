@@ -564,20 +564,16 @@ but a spot-check of one real Friday found 8 of 16 films playing in Hyderabad
 cinemas were either absent from TMDB or present with no release date recorded
 at all (small regional-language films routinely have no typed theatrical
 release on TMDB whatsoever). No query change fixes that; the data isn't there.
-`scripts/sync_theatrical_district.py` covers the gap: district.in's per-city
-"upcoming movies" pages embed a fully structured, dated, per-language film list
-in the page's own Next.js JSON — no HTML fragility, real fields.
+The former District collector is disabled in scheduled workflows. District's
+[terms](https://www.district.in/policies/terms-of-service/) restrict scraping;
+existing District rows remain historical and are not refreshed as ticketing data.
 
 **district.in is IP-blocked from GitHub Actions.** Confirmed by dispatching a
 real workflow run and testing every plausible cause from an actual runner: the
 default UA, a full set of browser headers, and a cookie warm-up all still got
 a 403 — even on the plain homepage. That's Akamai denying GitHub's
-hosted-runner ranges outright, not a fingerprint check any header change gets
-past. The step is left in the nightly workflow (harmless — it just logs seven
-403s and writes nothing when blocked, and would start working again for free
-if the block is ever lifted or the job ever moves to a self-hosted runner),
-but `scripts/sync_theatrical_wikipedia.py` is what actually covers this gap in
-CI today: Wikipedia's per-language "List of *language* films of *year*" pages
+hosted-runner ranges outright. No bypass is used. The nightly workflow uses
+`scripts/sync_theatrical_wikipedia.py` as an additional source: Wikipedia's per-language "List of *language* films of *year*" pages
 carry the same kind of dated, per-title listing, and aren't blocked the same
 way. Coverage is narrower — Wikipedia maintains a dedicated per-year page only
 for languages with enough editors (Telugu, Tamil, Kannada, Malayalam, Hindi;
@@ -588,11 +584,9 @@ cell names a known streaming platform (`OTT_PRODUCTION_MARKERS` in the script)
 is skipped outright rather than guessed at, since wrongly marking a
 streaming-only release as theatrical is worse than missing a theatrical one.
 
-All three sync scripts are deliberately independent of one another for
-matching purposes: a second source with its own spelling of a title creates a
-near-duplicate row rather than an update, since `calendar_entries`'s
-uniqueness is on the exact title string — see **Duplicate releases** below for
-how that gets caught after the fact.
+The active TMDB and Wikipedia syncs use source-record identities. Independently
+sourced or unverified observations may remain separate when identity, territory
+or release kind cannot be established; do not delete them based on title alone.
 
 **The India-first date, with the home-market date in parentheses.** The site
 is not India-only, and a foreign film usually opens in its home market before
@@ -613,10 +607,10 @@ within India (no second date exists), and a title with no known India date at
 all just shows the one date it has.
 
     python scripts/sync_calendar_tmdb.py --months 6
-    python scripts/sync_theatrical_district.py
+    python scripts/sync_global_tv.py --months 6
     python scripts/sync_theatrical_wikipedia.py
 
-All three scripts enrich existing rows rather than overwrite them (every
+The movie syncs enrich existing rows rather than overwrite them (every
 updated column is a `COALESCE` that keeps whatever is already there) — the
 same convention `sync_calendar_tmdb.py` already used for editorial CSV rows.
 The trade-off: a row TMDB got to first with a *wrong* value (e.g. `Judaa`
@@ -706,10 +700,10 @@ article lists. `news_sources.py` closes that gap:
    - **ABP Live** (`news.abplive.com/entertainment/ott`) is a live, real OTT
      section, but its articles are single-title announcements rather than
      weekly round-ups — lower yield per fetch than the sources above.
-   - **Wikipedia list pages** (e.g. `List_of_Netflix_India_original_films`) and
-     **JustWatch India** (`justwatch.com/in/new`) are stable and scrape cleanly,
-     but as a title *cross-check* source rather than discovery — useful for a
-     future confidence signal, not a round-up harvester.
+   - **Wikipedia list pages** (e.g. `List_of_Netflix_India_original_films`)
+     can be considered under Wikimedia's attribution and reuse terms. Use the
+     licensed TMDB / JustWatch provider integration rather than scraping
+     JustWatch pages; a current provider listing does not prove a premiere date.
    - Ruled out: **IMDb's India new-releases page** (403, bot-blocked) and
      **WION's** RSS/tag feeds (403).
    - **Sacnilk** (`sacnilk.com/entertainmenttopbar/Upcoming_Movies`) — found

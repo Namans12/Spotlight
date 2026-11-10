@@ -22,6 +22,7 @@ export interface ProviderBatch {
   providers: Record<string, string[]>;
   /** Missing key means unknown or an older cached response. */
   availability?: Record<string, ProviderOffer[]>;
+  watchLinks?: Record<string, string>;
   /** Minutes for one sitting — a film's runtime, or a series' typical episode
    * length. Absent for a title TMDB has no runtime for. */
   runtimes: Record<string, number>;
@@ -47,7 +48,7 @@ export async function fetchProvidersBatch(keys: ProviderSubject[]): Promise<Prov
     // Each field defaulted independently, for the same reason: `genres` is the
     // newest of the three, so for an hour after a deploy the edge can still be
     // serving a `{ providers, runtimes }` response to a client that expects it.
-    return { providers: batch.providers ?? {}, availability: batch.availability ?? {}, runtimes: batch.runtimes ?? {}, genres: batch.genres ?? {} };
+    return { providers: batch.providers ?? {}, availability: batch.availability ?? {}, watchLinks: batch.watchLinks ?? {}, runtimes: batch.runtimes ?? {}, genres: batch.genres ?? {} };
   }
   return { providers: (data as Record<string, string[]>) ?? {}, runtimes: {}, genres: {} };
 }

@@ -163,6 +163,10 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
           offers.length ? `Currently reported in India: ${providerDetails(offerNames, offerTypes)}.` : 'No India listings reported; availability is unknown.'}
         {' '}Source: TMDB / JustWatch; results may be cached and do not confirm this date or a specific season.
       </p>}
+      {checkAvailability && Boolean(offers?.length) && entry.tmdbId && query.data?.watchLinks?.[providerKey('tv', entry.tmdbId)] && <a
+        href={query.data.watchLinks[providerKey('tv', entry.tmdbId)]} target="_blank" rel="noopener noreferrer" className="underline">
+        Open TMDB watch options
+      </a>}
     </div>}
   </div>;
 }

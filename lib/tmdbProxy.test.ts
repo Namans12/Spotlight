@@ -7,6 +7,7 @@ type TmdbRow = any;
 import {
   resolveProviders,
   resolveProviderOffers,
+  regionalWatchLink,
   tmdbWatchProvidersBatch,
   providerCacheKey,
   tmdbCollectionParts,
@@ -64,6 +65,16 @@ describe('resolveProviders', () => {
 });
 
 describe('tmdbWatchProvidersBatch', () => {
+  it('returns the source-provided India watch link alongside regional offers', async () => {
+    const link = 'https://www.themoviedb.org/tv/123-a-show/watch?locale=IN';
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, { 'watch/providers': { results: {
+      IN: { link, flatrate: [{ provider_name: 'Netflix' }] },
+      US: { link: 'https://www.themoviedb.org/tv/123-a-show/watch?locale=US' },
+    } } }));
+    const result = await tmdbWatchProvidersBatch([{ mediaType: 'tv', id: 123 }], 'IN');
+    expect(result.watchLinks['tv:123']).toBe(link);
+    expect(result.availability['tv:123']).toEqual([{ provider: 'Netflix', type: 'subscription' }]);
+  });
   it('resolves every key from a single fetch attempt each, with no retries', async () => {
     // Two keys: one succeeds immediately, one fails immediately. If a failed
     // leg were still going through fetchWithRetry's default 3 attempts, this
@@ -564,4 +575,14 @@ it('retains each regional subscription, free, ads, rent and purchase offer indep
     { provider: 'Netflix', type: 'subscription' }, { provider: 'ZEE5', type: 'free' },
     { provider: 'ZEE5', type: 'ads' }, { provider: 'Netflix', type: 'rent' }, { provider: 'Netflix', type: 'buy' },
   ]);
+});
+
+it('accepts only the requested title and region’s official TMDB watch link', () => {
+  const data = (link: string) => ({ 'watch/providers': { results: { IN: { link } } } });
+  const key = { mediaType: 'tv' as const, id: 123 };
+  const valid = 'https://www.themoviedb.org/tv/123-example/watch?locale=IN';
+  expect(regionalWatchLink(data(valid), 'IN', key)).toBe(valid);
+  expect(regionalWatchLink(data('https://www.themoviedb.org/tv/123-example/watch?locale=US'), 'IN', key)).toBeNull();
+  expect(regionalWatchLink(data('https://www.themoviedb.org/tv/456-example/watch?locale=IN'), 'IN', key)).toBeNull();
+  expect(regionalWatchLink(data('https://evil.example/tv/123/watch?locale=IN'), 'IN', key)).toBeNull();
 });
