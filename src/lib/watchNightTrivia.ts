@@ -17,3 +17,15 @@ const questions: Record<string, TriviaQuestion> = {
 export function watchNightTrivia(mediaType: 'movie' | 'tv', id: number): TriviaQuestion | null {
   return questions[`${mediaType}:${id}`] ?? null;
 }
+
+const extraQuestions: Record<string, TriviaQuestion[]> = {
+  'tv:1668': [{ prompt: 'Whose apartment is featured in the Friends experience?', choices: ['Rachel and Monica', 'Joey and Ross', 'Phoebe and Gunther'], answer: 'Rachel and Monica',
+    source: 'Warner Bros. Discovery', sourceUrl: 'https://press.wbd.com/ca/property/fast-friends/videos' }],
+  'movie:2062': [{ prompt: 'What is the title of Gusteau’s cookbook?', choices: ['Anyone Can Cook', 'The Paris Kitchen', 'A Chef’s Secret'], answer: 'Anyone Can Cook',
+    source: 'Pixar', sourceUrl: 'https://www.pixar.com/ratatouille' }],
+};
+
+export function watchNightTriviaQuestions(mediaType: 'movie' | 'tv', id: number): readonly TriviaQuestion[] {
+  const first = watchNightTrivia(mediaType, id);
+  return first ? [first, ...(extraQuestions[`${mediaType}:${id}`] ?? [])] : [];
+}

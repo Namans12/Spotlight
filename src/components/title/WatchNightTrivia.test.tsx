@@ -22,6 +22,32 @@ describe('watch-night trivia', () => {
     rerender(<WatchNightTrivia mediaType="tv" id={123} />);
     expect(container).toBeEmptyDOMElement();
   });
+  it('advances through sourced questions without revealing the next answer', async () => {
+    const user = userEvent.setup();
+    render(<WatchNightTrivia mediaType="tv" id={1668} />);
+    await user.click(screen.getByRole('button', { name: 'Try trivia' }));
+    expect(screen.getByText('Question 1 of 2')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Central Perk' }));
+    await user.click(screen.getByRole('button', { name: 'Next question' }));
+    expect(screen.getByText('Question 2 of 2')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Rachel and Monica' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Correct!');
+    expect(screen.getByRole('link', { name: 'Source: Warner Bros. Discovery' })).toHaveAttribute('href', 'https://press.wbd.com/ca/property/fast-friends/videos');
+    expect(screen.queryByRole('button', { name: 'Next question' })).not.toBeInTheDocument();
+  });
+  it('resets the quiz when the title changes', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<WatchNightTrivia mediaType="tv" id={1668} />);
+    await user.click(screen.getByRole('button', { name: 'Try trivia' }));
+    await user.click(screen.getByRole('button', { name: 'Central Perk' }));
+    await user.click(screen.getByRole('button', { name: 'Next question' }));
+    rerender(<WatchNightTrivia mediaType="movie" id={2062} />);
+    expect(screen.getByRole('button', { name: 'Try trivia' })).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Try trivia' }));
+    expect(screen.getByText('Question 1 of 2')).toBeInTheDocument();
+  });
   it.each([
     ['movie', 2062, 'Paris'], ['tv', 2316, 'Pretzels'], ['movie', 673, 'The Three Broomsticks'],
   ] as const)('checks the sourced answer for %s:%i', async (mediaType, id, answer) => {
