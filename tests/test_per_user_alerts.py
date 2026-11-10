@@ -43,11 +43,14 @@ class FakeCursor:
         self._already_sent = already_sent
         self._result: list[tuple] = []
         self.inserts: list[tuple] = []
+        self.disabled_users: set[int] = set()
 
     def execute(self, sql: str, params: tuple = ()):  # noqa: D102
         text = " ".join(sql.split())
         if text.startswith("SELECT pg_advisory_xact_lock"):
             self._result = [(None,)]
+        elif text.startswith("SELECT 1 FROM users WHERE"):
+            self._result = [] if params[0] in self.disabled_users else [(1,)]
         elif text.startswith("SELECT u.id, u.email"):
             self._result = list(self._watchlist_rows)
         elif text.startswith("SELECT 1 FROM sent_notifications"):
@@ -161,6 +164,16 @@ def test_one_email_per_account_not_one_per_title():
     assert body.startswith("Hi Ada,")
     # A title with no known provider still reads as a sentence.
     assert "a streaming platform" in body
+
+
+def test_does_not_send_if_account_opted_out_after_matching():
+    cursor = FakeCursor([], set())
+    cursor.disabled_users.add(7)
+    entries = [{"user_id": 7, "email": "a@example.com", "display_name": "Ada",
+                "matches": [{"tmdb_id": 1, "media_type": "movie", "title": "Film", "providers": ["Netflix"]}]}]
+    sent = []
+    assert releasebot.send_user_watchlist_alerts(entries, FakeConn(cursor), lambda *args: sent.append(args)) == (0, 0)
+    assert sent == [] and cursor.inserts == []
 
 
 def test_never_repeats_a_title_to_the_same_account():

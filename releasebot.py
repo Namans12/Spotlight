@@ -1546,6 +1546,14 @@ def send_user_watchlist_alerts(
         cur.execute("SELECT pg_advisory_xact_lock(%s)", (WATCHLIST_ALERT_LOCK_KEY,))
         for entry in users_with_matches:
             user_id = entry["user_id"]
+            # The match list may have been built before another run released
+            # the advisory lock. Recheck opt-in and address before delivery.
+            cur.execute(
+                "SELECT 1 FROM users WHERE id=%s AND email=%s AND notify_watchlist_drops=true",
+                (user_id, entry["email"]),
+            )
+            if cur.fetchone() is None:
+                continue
             fresh = []
             for match in entry["matches"]:
                 cur.execute(
