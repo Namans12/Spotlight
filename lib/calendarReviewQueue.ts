@@ -1,5 +1,6 @@
 import { reviewedCalendarEntry } from './calendarReconciliation.js';
 import { reviewFreshness } from '../shared/calendarFreshness.js';
+import { hasUnverifiedEditorialTmdbIdentity } from './calendarIdentity.js';
 
 export interface ReviewQueueRow {
   id: string | number; origin: string; tmdb_id: number | null; media_type: string | null;
@@ -36,10 +37,11 @@ export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): Rev
     if (!evidence && !review) reasons.push('unreviewed');
     if (row.evidence != null && !evidence) reasons.push('invalid_evidence');
     if (row.tmdb_id == null) reasons.push('identity_missing');
-    if (review && 'suppressTitleLink' in review && review.suppressTitleLink) reasons.push('identity_unverified');
-    const globalPremiere = evidence?.date_source === 'tmdb_global_first_air' && row.media_type === 'tv' && row.tmdb_id != null &&
+    const identityUnverified = hasUnverifiedEditorialTmdbIdentity(row.origin, evidence);
+    if (identityUnverified || (review && 'suppressTitleLink' in review && review.suppressTitleLink)) reasons.push('identity_unverified');
+    const globalPremiere = !identityUnverified && evidence?.date_source === 'tmdb_global_first_air' && row.media_type === 'tv' && row.tmdb_id != null &&
       evidence.source_url === `https://www.themoviedb.org/tv/${row.tmdb_id}`;
-    const region = review?.type === 'regional' ? review.region : row.event_region;
+    const region = review?.type === 'regional' ? review.region : identityUnverified ? null : row.event_region;
     if (!region) reasons.push(globalPremiere ? 'global_premiere_local_unknown' : 'region_unknown');
     const tmdbClaim = typeof evidence?.date_source === 'string' && evidence.date_source.startsWith('tmdb_');
     if (evidence && (typeof evidence.date_source !== 'string' || !evidence.date_source ||

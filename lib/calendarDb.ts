@@ -3,6 +3,7 @@ import type { CalendarEntryDTO } from "../shared/types/calendar.js";
 import { classifyPlatform, isKnownStreamer, mediaTypeFromEntryType, normalizePlatforms, splitPlatformField } from "../shared/platforms.js";
 import { reviewedCalendarEntry } from "./calendarReconciliation.js";
 import { reviewFreshness } from "../shared/calendarFreshness.js";
+import { hasUnverifiedEditorialTmdbIdentity } from "./calendarIdentity.js";
 
 /** Only merge observations when all event dimensions are known and agree.
  * An unknown season is not interchangeable with a known season. */
@@ -33,7 +34,8 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
       (to_jsonb(calendar_entries) - 'id' - 'created_at' - 'source_key')::text AS observation_fingerprint
     FROM calendar_entries
     WHERE date_trunc('month', release_date::timestamp) = date_trunc('month', ${monthStart}::date)
-      AND (evidence->>'region' IS NULL OR evidence->>'region' = ${region})
+      AND (evidence->>'region' IS NULL OR evidence->>'region' = ${region} OR
+           (origin IN ('wikipedia','csv_seed','district_in') AND evidence->>'date_source' IN ('tmdb_regional_theatrical','tmdb_global_first_air')))
       AND (origin <> 'tmdb_upcoming' OR
            (media_type = 'movie' AND tmdb_id IS NOT NULL AND evidence->>'source_url' = 'https://www.themoviedb.org/movie/' || tmdb_id::text
              AND evidence->>'region' = ${region} AND evidence->>'date_source' = 'tmdb_regional_theatrical') OR
@@ -109,8 +111,9 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
       title: row.title, release_date: String(row.release_date), source_url: row.source_url,
       event_region: row.event_region, evidence: row.evidence, platform_or_distributor: row.platform_or_distributor, entry_type: row.entry_type, language: row.language });
     if (review?.type === 'regional' && review.region !== region) continue;
-    const suppressTitleLink = review != null && 'suppressTitleLink' in review && review.suppressTitleLink;
-    const matchingTmdbEvidence = row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
+    const identityUnverified = hasUnverifiedEditorialTmdbIdentity(row.origin, row.evidence);
+    const suppressTitleLink = identityUnverified || (review != null && 'suppressTitleLink' in review && review.suppressTitleLink);
+    const matchingTmdbEvidence = !identityUnverified && row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
       row.evidence?.source_url === `https://www.themoviedb.org/${row.media_type}/${row.tmdb_id}`;
     const globalPremiere = matchingTmdbEvidence && row.evidence?.date_source === 'tmdb_global_first_air' && !row.event_region && row.media_type === 'tv';
     const regionalEvidence = matchingTmdbEvidence && row.media_type === 'movie' && row.event_region &&

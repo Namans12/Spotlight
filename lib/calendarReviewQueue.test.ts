@@ -21,6 +21,20 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it.each(['wikipedia', 'csv_seed', 'district_in'])('queues legacy %s TMDB evidence for independent identity review', origin => {
+    const item = row({ origin, event_region: 'IN', evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical',
+      source_url: 'https://www.themoviedb.org/movie/123', observed_at: '2026-12-09T00:00:00Z' } });
+    const [review] = buildCalendarReviewQueue([item], now);
+    expect(review.reasons).toEqual(expect.arrayContaining(['identity_unverified', 'region_unknown']));
+    expect(review.region).toBeNull();
+  });
+  it('does not treat editorial TMDB first-air evidence as an established global event', () => {
+    const item = row({ origin: 'csv_seed', media_type: 'tv', event_region: null,
+      evidence: { date_source: 'tmdb_global_first_air', source_url: 'https://www.themoviedb.org/tv/123', observed_at: '2026-12-09T00:00:00Z' } });
+    const [review] = buildCalendarReviewQueue([item], now);
+    expect(review.reasons).toEqual(expect.arrayContaining(['identity_unverified', 'region_unknown']));
+    expect(review.reasons).not.toContain('global_premiere_local_unknown');
+  });
   it('records the SVC64 announcement and retains its unresolved identity and territory', () => {
     const item = row({ origin: 'wikipedia', tmdb_id: null, title: 'SVC64', language: 'te', release_date: '2027-01-14',
       source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2027' });
@@ -101,9 +115,9 @@ describe('calendar reconciliation queue', () => {
   });
 
   it('distinguishes a source-matched global first-air date from an unknown event region', () => {
-    const global = row({ id: 1, media_type: 'tv', tmdb_id: 123, evidence: {
+    const global = row({ id: 1, origin: 'tmdb_upcoming', media_type: 'tv', tmdb_id: 123, evidence: {
       date_source: 'tmdb_global_first_air', source_url: 'https://www.themoviedb.org/tv/123', observed_at: '2026-12-09T00:00:00Z' } });
-    const mismatch = row({ id: 2, media_type: 'tv', tmdb_id: 123, evidence: {
+    const mismatch = row({ id: 2, origin: 'tmdb_upcoming', media_type: 'tv', tmdb_id: 123, evidence: {
       date_source: 'tmdb_global_first_air', source_url: 'https://www.themoviedb.org/tv/999', observed_at: '2026-12-09T00:00:00Z' } });
     const items = buildCalendarReviewQueue([global, mismatch], now);
     expect(items.find(item => item.id === '1')?.reasons).toEqual(['global_premiere_local_unknown']);
@@ -129,9 +143,9 @@ describe('calendar reconciliation queue', () => {
 
   it('does not promote an observation with missing time or incompatible identity', () => {
     const items = buildCalendarReviewQueue([
-      row({ id: 1, event_region: 'IN', evidence: { date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/123', observed_at: 'invalid' } }),
-      row({ id: 2, event_region: 'IN', evidence: { date_source: 'tmdb_regional_theatrical', observed_at: '2026-12-09T00:00:00Z', source_url: 'https://www.themoviedb.org/movie/999' } }),
-      row({ id: 3, event_region: 'IN', evidence: { date_source: 'tmdb_regional_theatrical', observed_at: '2026-12-09T00:00:00Z', source_url: 'https://www.themoviedb.org/movie/123' } }),
+      row({ id: 1, origin: 'tmdb_upcoming', event_region: 'IN', evidence: { date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/123', observed_at: 'invalid' } }),
+      row({ id: 2, origin: 'tmdb_upcoming', event_region: 'IN', evidence: { date_source: 'tmdb_regional_theatrical', observed_at: '2026-12-09T00:00:00Z', source_url: 'https://www.themoviedb.org/movie/999' } }),
+      row({ id: 3, origin: 'tmdb_upcoming', event_region: 'IN', evidence: { date_source: 'tmdb_regional_theatrical', observed_at: '2026-12-09T00:00:00Z', source_url: 'https://www.themoviedb.org/movie/123' } }),
     ], now);
     expect(items).toHaveLength(2);
     expect(items[0].reasons).toContain('identity_conflict');
@@ -150,10 +164,10 @@ describe('calendar reconciliation queue', () => {
   it('flags TMDB date evidence without a linked identity, media type, or TMDB source', () => {
     const evidence = { date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/123', observed_at: '2026-12-09T00:00:00Z' };
     const items = buildCalendarReviewQueue([
-      row({ id: 1, tmdb_id: null, media_type: null, event_region: 'IN', evidence }),
-      row({ id: 2, media_type: null, event_region: 'IN', evidence }),
-      row({ id: 3, event_region: 'IN', evidence: { ...evidence, source_url: 'https://example.org/movie/123' } }),
-      row({ id: 4, event_region: 'IN', evidence }),
+      row({ id: 1, origin: 'tmdb_upcoming', tmdb_id: null, media_type: null, event_region: 'IN', evidence }),
+      row({ id: 2, origin: 'tmdb_upcoming', media_type: null, event_region: 'IN', evidence }),
+      row({ id: 3, origin: 'tmdb_upcoming', event_region: 'IN', evidence: { ...evidence, source_url: 'https://example.org/movie/123' } }),
+      row({ id: 4, origin: 'tmdb_upcoming', event_region: 'IN', evidence }),
     ], now);
     expect(items).toHaveLength(3);
     for (const item of items) expect(item.reasons).toContain('evidence_incomplete');
