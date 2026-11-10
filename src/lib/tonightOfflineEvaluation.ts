@@ -71,3 +71,18 @@ export function evaluateOfflineCases(cases: OfflineCase[]) {
       updatedMetrics: { ...metrics.updated, reciprocalRank: relevant.length ? metrics.updated.reciprocalRank : null, precisionAtCutoff: partial ? null : metrics.updated.precisionAtCutoff, topThree: judgedTopThree(updated, test.judgments) } };
   });
 }
+
+/** Macro-average paired cases only when both values for a metric are available. */
+export function summarizeOfflineEvaluation(results: ReturnType<typeof evaluateOfflineCases>) {
+  const paired = (select: (row: typeof results[number]) => [number | null, number | null]) => {
+    const values = results.map(select).filter((pair): pair is [number, number] => pair[0] !== null && pair[1] !== null);
+    if (!values.length) return { cases: 0, baseline: null, updated: null, delta: null };
+    const baseline = values.reduce((sum, pair) => sum + pair[0], 0) / values.length;
+    const updated = values.reduce((sum, pair) => sum + pair[1], 0) / values.length;
+    return { cases: values.length, baseline, updated, delta: updated - baseline };
+  };
+  return { totalCases: results.length,
+    reciprocalRank: paired(row => [row.baselineMetrics.reciprocalRank, row.updatedMetrics.reciprocalRank]),
+    precisionAtCutoff: paired(row => [row.baselineMetrics.precisionAtCutoff, row.updatedMetrics.precisionAtCutoff]),
+    relevantCoverage: paired(row => [row.baselineMetrics.relevantCoverage, row.updatedMetrics.relevantCoverage]) };
+}

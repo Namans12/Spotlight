@@ -3,7 +3,7 @@ import { feedbackWeights, type TonightFeedbackMap } from '../src/lib/tonightFeed
 import type { DuelCandidate } from '../src/lib/duel';
 import { compareRankings } from '../src/lib/tonightEvaluation';
 import { readFileSync } from 'node:fs';
-import { evaluateOfflineCases, parseOfflineCases } from '../src/lib/tonightOfflineEvaluation';
+import { evaluateOfflineCases, parseOfflineCases, summarizeOfflineEvaluation } from '../src/lib/tonightOfflineEvaluation';
 
 // Synthetic, hand-labelled examples; these are regression probes, not user outcomes.
 const film = (id: number, genre: string): DuelCandidate => ({ id, title: `Film ${id}`, mediaType: 'movie',
@@ -39,7 +39,8 @@ try {
   if (!args.length) console.log(JSON.stringify(evaluateTonight(), null, 2));
   else if (args.length === 2 && args[0] === '--input') {
     const input: unknown = JSON.parse(readFileSync(args[1], 'utf8'));
-    console.log(JSON.stringify({ mode: 'offline_labelled', cases: evaluateOfflineCases(parseOfflineCases(input)) }, null, 2));
+    const results = evaluateOfflineCases(parseOfflineCases(input));
+    console.log(JSON.stringify({ mode: 'offline_labelled', summary: summarizeOfflineEvaluation(results), cases: results }, null, 2));
   } else throw new Error('Usage: npm run evaluate:tonight -- [--input path.json]');
 } catch (error) {
   console.error(error instanceof SyntaxError ? 'Invalid JSON evaluation input' : error instanceof Error ? error.message : 'Evaluation failed');
