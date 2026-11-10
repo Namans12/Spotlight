@@ -34,6 +34,21 @@ describe('calendar event identity', () => {
     expect(changed.tmdbId).toBeNull();
     expect(changed.region).toBeNull();
   });
+  it.each([
+    [1417808, 'Haindava', 'te', '2026-11-27', 'Telangana Today'],
+    [1179380, 'Cosmic Samson', 'ml', '2026-11-27', 'Cinema Express'],
+    [1654912, 'Mayan: Chapter 1', 'ml', '2026-12-03', 'Simply Mollywood'],
+  ])('restores a credit-matched identity only for its exact observation: %s', async (id, title, language, release_date, source) => {
+    const item = editorial({ origin: 'wikipedia', tmdb_id: id, title, language, release_date,
+      source_url: `https://en.wikipedia.org/wiki/List_of_${language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_2026`,
+      event_region: 'IN', evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: `https://www.themoviedb.org/movie/${id}` } });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, release_date.slice(0, 7), 'IN');
+    expect(entry).toMatchObject({ tmdbId: id, region: 'IN', evidenceStatus: 'regional' });
+    expect(entry.dateCorroboration?.source).toBe(source);
+    const [changed] = await getCalendarMonth(db([], [{ ...item, source_url: 'https://example.org' }]) as unknown as postgres.Sql, release_date.slice(0, 7), 'IN');
+    expect(changed.tmdbId).toBeNull();
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, release_date.slice(0, 7), 'US')).toEqual([]);
+  });
   it('does not present legacy editorial TMDB date evidence as proof of a title match', async () => {
     const item = editorial({ origin: 'wikipedia', title: 'Editorial title', source: 'wikipedia',
       source_url: 'https://example.org/list', poster_url: 'unverified-poster', event_region: 'IN',

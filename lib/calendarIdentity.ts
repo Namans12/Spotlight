@@ -29,8 +29,17 @@ export function reviewedEditorialTmdbIdentity(row: {
     { id: 1808841, title: 'Maya Lady', language: 'te', date: '2026-11-13',
       sourceUrl: 'https://www.cinemaexpress.com/telugu/news/2026/Oct/28/rakesh-varres-maya-lady-locks-november-release-date',
       message: 'The editorial listing and TMDB agree on leads Rakesh Varre and Madhumita Sarcar.' },
+    { id: 1417808, title: 'Haindava', language: 'te', date: '2026-11-27', source: 'Telangana Today', checkedAt: '2026-11-10T19:05:44Z',
+      sourceUrl: 'https://telanganatoday.com/haindava-teaser-unveiled-bellamkonda-sai-sreenivass-pan-indian-film-set-for-nov-27-release',
+      message: 'The editorial listing and TMDB agree on director Ludheer Byreddy and leads Bellamkonda Sai Sreenivas and Samyuktha.' },
+    { id: 1179380, title: 'Cosmic Samson', language: 'ml', date: '2026-11-27', checkedAt: '2026-11-10T19:05:44Z',
+      sourceUrl: 'https://www.cinemaexpress.com/malayalam/news/2026/Oct/20/cosmic-samson-starring-sandeep-pradeep-gets-release-date',
+      message: 'The editorial listing and TMDB agree on director Abhijith Joseph and lead Sandeep Pradeep.' },
+    { id: 1654912, title: 'Mayan: Chapter 1', language: 'ml', date: '2026-12-03', source: 'Simply Mollywood', checkedAt: '2026-11-10T19:05:44Z',
+      sourceUrl: 'https://simplymollywood.com/movies/december-2026-malayalam-releases-mayan-padayaatra-athimanoharam-iffk',
+      message: 'The editorial listing and TMDB agree on director Jithin K Jose and lead Jayasurya.' },
   ];
   const match = matches.find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language &&
     row.release_date === item.date && row.source_url === `https://en.wikipedia.org/wiki/List_of_${item.language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_2026`);
-  return match ? { source: 'Cinema Express', sourceUrl: match.sourceUrl, checkedAt: '2026-11-10T19:01:57Z', message: match.message } : null;
+  return match ? { source: match.source ?? 'Cinema Express', sourceUrl: match.sourceUrl, checkedAt: match.checkedAt ?? '2026-11-10T19:01:57Z', message: match.message } : null;
 }
