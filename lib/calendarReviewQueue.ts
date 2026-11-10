@@ -5,27 +5,40 @@ export interface ReviewQueueRow {
   id: string | number; origin: string; tmdb_id: number | null; media_type: string | null;
   title: string; release_date: string; source_url: string | null; entry_type: string | null;
   event_region: string | null; evidence: unknown; platform_or_distributor: string | null;
+  observation_fingerprint?: string | null;
 }
 export interface ReviewQueueItem {
   id: string; title: string; releaseDate: string; origin: string; region: string | null;
   tmdbId: number | null; sourceUrl: string | null; reviewSourceUrl: string | null;
-  checkedAt: string | null; reasons: string[];
+  checkedAt: string | null; reasons: string[]; duplicateObservationIds: string[];
 }
 
 /** Read-only triage: a fresh observation does not verify identity or region. */
 export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): ReviewQueueItem[] {
   const queue: ReviewQueueItem[] = [];
+  const observations = new Map<string, string[]>();
+  for (const row of rows) {
+    if (row.origin !== 'wikipedia' || typeof row.observation_fingerprint !== 'string' || !row.observation_fingerprint) continue;
+    const ids = observations.get(row.observation_fingerprint) ?? [];
+    ids.push(String(row.id));
+    observations.set(row.observation_fingerprint, ids);
+  }
   for (const row of rows) {
     const review = reviewedCalendarEntry(row);
     const evidence = row.evidence && typeof row.evidence === 'object' && !Array.isArray(row.evidence)
       ? row.evidence as Record<string, unknown> : null;
     const reasons: string[] = [];
+    const duplicateObservationIds = row.origin === 'wikipedia' && row.observation_fingerprint
+      ? (observations.get(row.observation_fingerprint) ?? []).filter(id => id !== String(row.id)) : [];
+    if (duplicateObservationIds.length) reasons.push('duplicate_observation');
     if (review?.type === 'conflict') reasons.push('date_conflict');
     if (!evidence && !review) reasons.push('unreviewed');
     if (row.evidence != null && !evidence) reasons.push('invalid_evidence');
     if (row.tmdb_id == null) reasons.push('identity_missing');
     if (review?.type === 'conflict' && 'suppressTitleLink' in review && review.suppressTitleLink) reasons.push('identity_unverified');
-    if (!row.event_region) reasons.push('region_unknown');
+    const globalPremiere = evidence?.date_source === 'tmdb_global_first_air' && row.media_type === 'tv' && row.tmdb_id != null &&
+      evidence.source_url === `https://www.themoviedb.org/tv/${row.tmdb_id}`;
+    if (!row.event_region) reasons.push(globalPremiere ? 'global_premiere_local_unknown' : 'region_unknown');
     if (evidence && (typeof evidence.date_source !== 'string' || !evidence.date_source ||
         typeof evidence.source_url !== 'string' || !evidence.source_url.startsWith('https://'))) reasons.push('evidence_incomplete');
     if (evidence && row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
@@ -40,7 +53,7 @@ export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): Rev
     if (!reasons.length) continue;
     queue.push({ id: String(row.id), title: row.title, releaseDate: row.release_date, origin: row.origin,
       region: row.event_region, tmdbId: row.tmdb_id == null ? null : Number(row.tmdb_id), sourceUrl: row.source_url,
-      reviewSourceUrl: review?.sourceUrl ?? null, checkedAt: checked, reasons });
+      reviewSourceUrl: review?.sourceUrl ?? null, checkedAt: checked, reasons, duplicateObservationIds });
   }
   const rank = (x: ReviewQueueItem) => x.reasons.includes('date_conflict') || x.reasons.includes('identity_conflict') ? 0 : x.reasons.includes('unreviewed') ? 1 : 2;
   return queue.sort((a, b) => rank(a) - rank(b) || a.releaseDate.localeCompare(b.releaseDate) || a.id.localeCompare(b.id, 'en', { numeric: true }));

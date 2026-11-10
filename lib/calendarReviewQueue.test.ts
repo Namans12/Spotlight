@@ -21,6 +21,26 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('links only exact Wikipedia observations and keeps both records reviewable', () => {
+    const original = row({ id: 1, origin: 'wikipedia', observation_fingerprint: 'same' });
+    const items = buildCalendarReviewQueue([original, { ...original, id: 2 },
+      { ...original, id: 3, observation_fingerprint: 'different' }, { ...original, id: 4, origin: 'csv_seed' }], now);
+    expect(items.find(item => item.id === '1')?.duplicateObservationIds).toEqual(['2']);
+    expect(items.find(item => item.id === '2')?.duplicateObservationIds).toEqual(['1']);
+    expect(items.find(item => item.id === '1')?.reasons).toContain('duplicate_observation');
+    expect(items.find(item => item.id === '3')?.duplicateObservationIds).toEqual([]);
+    expect(items.find(item => item.id === '4')?.duplicateObservationIds).toEqual([]);
+  });
+
+  it('distinguishes a source-matched global first-air date from an unknown event region', () => {
+    const global = row({ id: 1, media_type: 'tv', tmdb_id: 123, evidence: {
+      date_source: 'tmdb_global_first_air', source_url: 'https://www.themoviedb.org/tv/123', observed_at: '2026-12-09T00:00:00Z' } });
+    const mismatch = row({ id: 2, media_type: 'tv', tmdb_id: 123, evidence: {
+      date_source: 'tmdb_global_first_air', source_url: 'https://www.themoviedb.org/tv/999', observed_at: '2026-12-09T00:00:00Z' } });
+    const items = buildCalendarReviewQueue([global, mismatch], now);
+    expect(items.find(item => item.id === '1')?.reasons).toEqual(['global_premiere_local_unknown']);
+    expect(items.find(item => item.id === '2')?.reasons).toEqual(['region_unknown', 'identity_conflict']);
+  });
   it('surfaces a regional editorial conflict while preserving the unverified source date', () => {
     const item = row({ origin: 'wikipedia', tmdb_id: 1450342, title: 'Bhogi', release_date: '2026-11-12',
       source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026' });
