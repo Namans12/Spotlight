@@ -43,6 +43,20 @@ export function reviewedCalendarEntry(row: {
       sourceUrl: 'https://www.123telugu.com/mnews/sharwanands-bhogi-postponed-heres-why-hk.html',
       message: 'Date needs review: local reporting says the announced 12 November release has been postponed; no replacement date is confirmed here.' };
   }
+  if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie') {
+    if (Number(row.tmdb_id) === 1733518 && row.language === 'ml' && row.title === 'Bouma' &&
+        row.release_date === '2026-11-12' && row.source_url === 'https://www.themoviedb.org/movie/1733518') {
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-10T18:47:38Z', source: 'Cinema Express',
+        sourceUrl: 'https://www.cinemaexpress.com/malayalam/news/2026/Oct/22/dileesh-pothan-starrer-bouma-gets-a-release-date',
+        message: 'Reporting cites the makers’ 12 November theatrical announcement and names a Kerala distributor. Actual showtimes and streaming availability are unconfirmed.' };
+    }
+    if (Number(row.tmdb_id) === 1440539 && row.language === 'te' && row.title === 'Itllu Arjuna' &&
+        row.release_date === '2026-11-13' && row.source_url === 'https://www.themoviedb.org/movie/1440539') {
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-10T18:47:38Z', source: 'BookMyShow',
+        sourceUrl: 'https://in.bookmyshow.com/movies/angara/itllu-arjuna/ET00514068',
+        message: 'BookMyShow lists the Telugu film for 13 November in India; bookings were not yet open when checked. Streaming availability is unconfirmed.' };
+    }
+  }
   if (row.origin === 'wikipedia' && row.entry_type === 'Movie' &&
       (row.media_type === 'movie' || (row.media_type == null && row.tmdb_id == null && row.title === 'Donga Naa Koduku'))) {
     if (row.tmdb_id == null && row.language === 'te' && row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') {
