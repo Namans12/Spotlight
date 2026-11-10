@@ -6,7 +6,29 @@ export function reviewedCalendarEntry(row: {
   title: string; release_date: string; source_url: string | null;
   event_region: string | null; evidence: unknown; platform_or_distributor: string | null; entry_type: string | null;
 }) {
-  if (row.origin !== 'csv_seed' || row.event_region != null || row.evidence != null) return null;
+  if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'wikipedia' && row.media_type === 'movie' && row.entry_type === 'Movie') {
+    if (Number(row.tmdb_id) === 1450342 && row.title === 'Bhogi' && row.release_date === '2026-11-12' &&
+        row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') {
+      return { type: 'conflict' as const, checkedAt: '2026-11-10', source: '123telugu',
+        sourceUrl: 'https://www.123telugu.com/mnews/sharwanands-bhogi-postponed-heres-why-hk.html',
+        message: 'Date needs review: local reporting says the announced 12 November release has been postponed; no replacement date is confirmed here.' };
+    }
+    if (Number(row.tmdb_id) === 1434462 && row.title === 'Melcow Pondicherry' && row.release_date === '2026-11-12' &&
+        row.source_url === 'https://en.wikipedia.org/wiki/List_of_Malayalam_films_of_2026') {
+      return { type: 'conflict' as const, checkedAt: '2026-11-10', source: 'Simply Mollywood',
+        sourceUrl: 'https://simplymollywood.com/movies/malayalam-releases-this-week-bouma-melcow-gondhal-itllu-november-12-13',
+        message: 'Date needs review: regional reporting citing maker and exhibitor announcements lists 13 November. This entry’s release event and region remain unconfirmed.' };
+    }
+    if (row.tmdb_id == null && row.title === 'Itlu Arjuna' && row.release_date === '2026-11-13' &&
+        row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') {
+      return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Telangana Today',
+        sourceUrl: 'https://telanganatoday.com/itlu-arjuna-release-date-announced-anish-anaswara-rajans-film-to-arrive-on-november-13',
+        message: 'Regional reporting cites the producers’ 13 November theatrical announcement. The linked title identity and local release event remain unconfirmed.' };
+    }
+    return null;
+  }
+  if (row.origin !== 'csv_seed') return null;
   if (Number(row.tmdb_id) === 84773 && row.media_type === 'tv' &&
       row.title === 'The Lord of the Rings: The Rings of Power' && row.release_date === '2026-11-11' &&
       row.source_url === 'https://deadline.com/feature/2026-tv-premiere-dates-1236391902/') {

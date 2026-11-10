@@ -18,6 +18,17 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it.each([
+    [1450342, 'Bhogi', '2026-11-12', 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', 'conflict'],
+    [1434462, 'Melcow Pondicherry', '2026-11-12', 'https://en.wikipedia.org/wiki/List_of_Malayalam_films_of_2026', 'conflict'],
+    [null, 'Itlu Arjuna', '2026-11-13', 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', 'corroboration'],
+  ])('attaches scoped regional reporting for the specific Wikipedia row', async (tmdb_id, title, release_date, source_url, kind) => {
+    const item = editorial({ origin: 'wikipedia', tmdb_id, title, release_date, source_url, event_region: null, evidence: null });
+    const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, source_url: 'https://example.com' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(kind === 'conflict' ? entries[0].dateConflict : entries[0].dateCorroboration).toBeTruthy();
+    expect(entries[0].region).toBeNull();
+    expect(entries[1].dateConflict ?? entries[1].dateCorroboration).toBeNull();
+  });
   it('flags the specific untitled film without asserting a replacement date or transferring the warning', async () => {
     const item = editorial({ origin: 'csv_seed', tmdb_id: 1774728, media_type: 'movie', entry_type: 'Movie', title: 'Untitled film',
       release_date: '2026-12-04', platform_or_distributor: 'Sri Venkateswara Creations, Cape of Good Films',

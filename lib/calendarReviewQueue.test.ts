@@ -21,6 +21,14 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('surfaces a regional editorial conflict while preserving the unverified source date', () => {
+    const item = row({ origin: 'wikipedia', tmdb_id: 1450342, title: 'Bhogi', release_date: '2026-11-12',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026' });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T12:00:00Z'));
+    expect(review.reasons).toContain('date_conflict');
+    expect(review.reviewSourceUrl).toContain('123telugu.com');
+    expect(review.releaseDate).toBe('2026-11-12');
+  });
   it('prioritizes conflicts and reports separate unresolved region and stale review reasons', () => {
     const conflict = row({ id: 3, tmdb_id: 1774728, title: 'Untitled film', release_date: '2026-12-04',
       source_url: 'https://en.wikipedia.org/wiki/List_of_Hindi_films_of_2026', platform_or_distributor: 'Sri Venkateswara Creations, Cape of Good Films' });
