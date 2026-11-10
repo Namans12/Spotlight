@@ -42,6 +42,9 @@ describe('calendar event identity', () => {
     [1713050, 'Alias Rukmini', 'te', '2026-12-04', 'Telangana Today'],
     [1436202, 'Legacy', 'te', '2026-12-04', 'The Times of India'],
     [1395627, 'Vrushakarma', 'te', '2026-12-04', 'Cinema Express'],
+    [1505644, 'ENE Repeat', 'te', '2026-11-19', 'S Originals'],
+    [1533928, "Bachelor Party D'eux", 'ml', '2026-11-19', 'Onmanorama'],
+    [1704200, 'Hail Mary', 'ml', '2026-11-26', 'Cinema Express'],
   ])('restores a credit-matched identity only for its exact observation: %s', async (id, title, language, release_date, source) => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: id, title, language, release_date,
       source_url: `https://en.wikipedia.org/wiki/List_of_${language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_2026`,

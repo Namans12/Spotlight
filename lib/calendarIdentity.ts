@@ -50,6 +50,15 @@ export function reviewedEditorialTmdbIdentity(row: {
     { id: 1395627, title: 'Vrushakarma', language: 'te', date: '2026-12-04', checkedAt: '2026-11-10T19:07:49Z',
       sourceUrl: 'https://www.cinemaexpress.com/telugu/news/2026/Sep/10/naga-chaitanyas-vrushakarma-confirms-december-release-date',
       message: 'The editorial listing and TMDB agree on director Karthik Varma Dandu and lead Naga Chaitanya.' },
+    { id: 1505644, title: 'ENE Repeat', language: 'te', date: '2026-11-19', source: 'S Originals', checkedAt: '2026-11-10T19:10:03Z',
+      sourceUrl: 'https://www.youtube.com/watch?v=Y4Zzy7SVLp4',
+      message: 'The editorial listing and TMDB agree on director Tharun Bhascker and leads Vishwak Sen and Abhinav Gomatam; the producer also identifies them.' },
+    { id: 1533928, title: "Bachelor Party D'eux", language: 'ml', date: '2026-11-19', source: 'Onmanorama', checkedAt: '2026-11-10T19:10:03Z',
+      sourceUrl: 'https://www.onmanorama.com/entertainment/entertainment-news/2026/09/20/bachelor-party-deux-first-look-poster-amal-neerad-naslen.amp.html',
+      message: 'The editorial listing and TMDB agree on director Amal Neerad and cast Naslen, Kunchacko Boban and Tovino Thomas.' },
+    { id: 1704200, title: 'Hail Mary', language: 'ml', date: '2026-11-26', checkedAt: '2026-11-10T19:10:03Z',
+      sourceUrl: 'https://www.cinemaexpress.com/malayalam/news/2026/Nov/05/kunchacko-bobans-hail-mary-gets-a-release-date',
+      message: 'The editorial listing and TMDB agree on director Vishnu Revikumar and leads Kunchacko Boban and Suraj Venjaramoodu.' },
   ];
   const match = matches.find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language &&
     row.release_date === item.date && row.source_url === `https://en.wikipedia.org/wiki/List_of_${item.language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_2026`);
