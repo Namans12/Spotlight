@@ -38,9 +38,9 @@ export function reviewedCalendarEntry(row: {
           message: 'Reporting cites the filmmakers’ 20 November theatrical announcement. The TMDB identity and local release event remain unconfirmed.' };
       }
       if (row.title === 'Jayannth And The Jingo Pen' && row.release_date === '2026-11-12') {
-        return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Simply Mollywood',
-          sourceUrl: 'https://simplymollywood.com/movies/jayannth-and-the-jingo-pen-trailer-november-12-philips-and-the-monkey-pen',
-          message: 'Regional reporting lists a 12 November theatrical release. The TMDB identity and local release event remain unconfirmed.' };
+        return { type: 'conflict' as const, checkedAt: '2026-11-10', source: 'The Hans India',
+          sourceUrl: 'https://www.thehansindia.com/cinema/jayannth-and-the-jingo-pen-locks-nov-14-release-1140244',
+          message: 'Date needs review: the filmmakers’ trailer announcement lists 12 November, while later reporting lists 14 November. The TMDB identity and local release event remain unconfirmed.' };
       }
     }
     if (Number(row.tmdb_id) === 1450342 && row.title === 'Bhogi' && row.release_date === '2026-11-12' &&

@@ -21,6 +21,12 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('retains the Jayannth date conflict and missing identity for review', () => {
+    const item = row({ origin: 'wikipedia', tmdb_id: null, title: 'Jayannth And The Jingo Pen', language: 'te', release_date: '2026-11-12',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026' });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T12:00:00Z'));
+    expect(review.reasons).toEqual(expect.arrayContaining(['date_conflict', 'identity_missing', 'region_unknown']));
+  });
   it('flags the disputed TMDB Bhogi observation as a date conflict', () => {
     const item = row({ origin: 'tmdb_upcoming', tmdb_id: 1450342, title: 'Bhogi', language: 'te', release_date: '2026-11-12',
       source_url: 'https://www.themoviedb.org/movie/1450342' });

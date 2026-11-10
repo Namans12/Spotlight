@@ -43,7 +43,6 @@ describe('calendar event identity', () => {
   it.each([
     ['Aakasamlo Oka Tara', '2026-11-20', 'Telangana Today'],
     ['Dear Astronaut', '2026-11-20', 'Cinema Express'],
-    ['Jayannth And The Jingo Pen', '2026-11-12', 'Simply Mollywood'],
   ])('adds reporting for the exact Telugu record without assigning a region', async (title, release_date, source) => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: null, title, language: 'te', release_date,
       source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', event_region: null, evidence: null });
@@ -51,6 +50,15 @@ describe('calendar event identity', () => {
     expect(entry.dateCorroboration?.source).toBe(source);
     expect(entry.region).toBeNull();
     expect(entry.evidenceStatus).toBe('unverified');
+  });
+  it('warns that reporting conflicts with the announced Jayannth release date', async () => {
+    const item = editorial({ origin: 'wikipedia', tmdb_id: null, title: 'Jayannth And The Jingo Pen', language: 'te', release_date: '2026-11-12',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', event_region: null, evidence: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry.dateConflict?.source).toBe('The Hans India');
+    expect(entry.dateConflict?.message).toContain('14 November');
+    expect(entry.dateCorroboration).toBeNull();
+    expect(entry.region).toBeNull();
   });
   it('collapses only byte-identical Wikipedia observations and preserves different evidence', async () => {
     const item = editorial({ origin: 'wikipedia', event_region: null, evidence: null, observation_fingerprint: 'same observation' });
