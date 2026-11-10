@@ -312,6 +312,8 @@ def test_movie_discovery_emits_each_regional_date_in_window():
 def test_real_evidence_builder_produces_an_eligible_movie_alert():
     from dataclasses import replace
     details = movie_payload(movie_id=42, title='A Film', digital_in='2026-08-19', providers_in=('Netflix',))
+    details['watch/providers']['results']['IN']['rent'] = [{'provider_name': 'Apple TV+'}]
+    details['watch/providers']['results']['US'] = {'rent': [{'provider_name': 'Foreign Service'}]}
     class DiscoverTmdb:
         region = 'IN'
         def discover(self, *_args, **_kwargs): return [details]
@@ -321,6 +323,12 @@ def test_real_evidence_builder_produces_an_eligible_movie_alert():
     digest = {'region': 'IN', 'generated_at': '2026-08-19T14:00:00+05:30',
               'out_now': {'start': '2026-08-19', 'end': '2026-08-20', 'sections': {'films': [item]}}}
     assert rb.eligible_watchlist_items(digest) == [item]
+    assert item.providers == ('Netflix', 'Apple TV+ (Buy/Rent)')
+    assert item.evidence.provider_types == {'Netflix': ['subscription'], 'Apple TV+ (Buy/Rent)': ['rent']}
+    notification = rb.eligible_watchlist_notifications(digest)[(42, 'movie')]
+    provider_text = rb.alert_provider_text(notification)
+    assert 'subscription' in provider_text and 'rent' in provider_text
+    assert 'Foreign Service' not in provider_text
 
 
 def test_provider_types_preserve_region_and_monetization():

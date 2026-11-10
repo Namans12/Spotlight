@@ -265,8 +265,6 @@ BUY_RENT_SUFFIX = " (Buy/Rent)"
 # Used when a title is known to be purchase-only but we have no usable store
 # name — better than "Platform TBA", which implies we know nothing at all.
 GENERIC_BUY_RENT = "Buy/Rent"
-# A title can be purchasable in 30+ territories; listing every store is noise.
-MAX_PROVIDERS = 3
 
 
 def _names_in_region(details: dict[str, Any], region: str, buckets: tuple[str, ...]) -> list[str]:
@@ -316,7 +314,7 @@ def _tag_buy_rent(names: list[str]) -> tuple[str, ...]:
     Telling a reader "Amazon Prime" when the title is really a paid rental there
     is a worse error than telling them nothing, so the tag is not optional.
     """
-    tagged = tuple(f"{n}{BUY_RENT_SUFFIX}" for n in normalize_platforms(names)[:MAX_PROVIDERS])
+    tagged = tuple(f"{n}{BUY_RENT_SUFFIX}" for n in normalize_platforms(names))
     # Purchase availability with no usable store name still beats "Platform TBA".
     return tagged or ((GENERIC_BUY_RENT,) if names else ())
 
@@ -334,7 +332,7 @@ def resolve_providers(
     Network names and editorial hints are not availability evidence. The
     fallback parameter remains for callers but is intentionally not promoted.
     """
-    return flatrate_providers(details, region)[:MAX_PROVIDERS] or rent_buy_providers(details, region)
+    return flatrate_providers(details, region) + rent_buy_providers(details, region)
 
 
 def digital_release_dates(details: dict[str, Any], region: str) -> list[str]:
@@ -375,7 +373,7 @@ def regional_movie_evidence(details: dict[str, Any], region: str, release_date: 
              if country.get("iso_3166_1") == region
              for rd in country.get("release_dates", []) or []
              if rd.get("type") == 4 and rd.get("release_date")]
-    local_providers = flatrate_providers(details, region) or rent_buy_providers(details, region)
+    local_providers = resolve_providers(details, region)
     return ReleaseEvidence(
         region=region,
         date_source="tmdb_regional_digital" if release_date in dates else None,

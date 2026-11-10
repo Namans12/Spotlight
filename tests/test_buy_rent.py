@@ -47,11 +47,18 @@ def test_rent_buy_names_are_still_canonicalized():
     assert rb.rent_buy_providers(details, "IN") == ("Amazon Prime (Buy/Rent)",)
 
 
-def test_resolve_prefers_subscription_over_buy_rent():
-    """A title with BOTH a subscription tier and a rent/buy tier is on the
-    service — the rent/buy tag would misleadingly downgrade it."""
+def test_resolve_keeps_subscription_and_distinct_buy_rent_offers():
+    """Keep both types without labelling a paid store as a subscription."""
     details = watch_providers(flatrate=("Netflix",), buy=("Apple TV+",))
-    assert rb.resolve_providers(details, "IN") == ("Netflix",)
+    assert rb.resolve_providers(details, "IN") == ("Netflix", "Apple TV+ (Buy/Rent)")
+
+
+def test_resolve_keeps_distinct_offer_types_for_the_same_service():
+    details = watch_providers(flatrate=("Amazon Prime",), rent=("Amazon Prime",))
+    assert rb.resolve_providers(details, "IN") == ("Amazon Prime", "Amazon Prime (Buy/Rent)")
+    assert rb.regional_provider_types(details, "IN") == {
+        "Amazon Prime": ["subscription"], "Amazon Prime (Buy/Rent)": ["rent"],
+    }
 
 
 def test_resolve_falls_back_to_buy_rent_before_network_guess():
@@ -141,11 +148,11 @@ def test_foreign_listings_are_not_reported_in_india():
     assert rb.resolve_providers(details, "IN") == ()
 
 
-def test_provider_list_is_capped():
+def test_provider_list_preserves_all_regional_listings():
     details = multi_region({
         "IN": {"flatrate": ["Netflix", "Hulu", "Peacock", "Paramount+", "HBO Max"]},
     })
-    assert len(rb.resolve_providers(details, "IN")) <= rb.MAX_PROVIDERS
+    assert len(rb.resolve_providers(details, "IN")) == 5
 
 
 def test_purchase_with_no_usable_store_name_falls_back_to_generic_label():

@@ -24,6 +24,7 @@ Concurrent watchlist alert senders use a transaction-scoped PostgreSQL advisory 
 
 When multiple individually eligible digest observations refer to the same movie or show identity, alerts combine their reported providers once. Ineligible or unverified observations cannot contribute providers, and combining current listings does not claim that a provider launched the title on the release date.
 Alert messages identify subscription, ad-supported, free, rental and purchase types when observed, and label missing types unknown; TMDB / JustWatch is credited and availability may change.
+Regional digest records retain all observed local providers, including separately labelled rental and purchase offers alongside subscriptions. Compact digest headings may display only a subset; the stored provider evidence retains the full observed list.
 
 ## Deployment sequence
 
