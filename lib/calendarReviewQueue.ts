@@ -1,6 +1,6 @@
 import { reviewedCalendarEntry } from './calendarReconciliation.js';
 import { reviewFreshness } from '../shared/calendarFreshness.js';
-import { hasUnverifiedEditorialTmdbIdentity, reviewedEditorialTmdbIdentity } from './calendarIdentity.js';
+import { hasUnverifiedEditorialTmdbIdentity, reviewedEditorialDateConflict, reviewedEditorialTmdbIdentity } from './calendarIdentity.js';
 
 export interface ReviewQueueRow {
   id: string | number; origin: string; tmdb_id: number | null; media_type: string | null;
@@ -27,13 +27,14 @@ export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): Rev
   }
   for (const row of rows) {
     const review = reviewedCalendarEntry(row);
+    const identityDateConflict = reviewedEditorialDateConflict(row);
     const evidence = row.evidence && typeof row.evidence === 'object' && !Array.isArray(row.evidence)
       ? row.evidence as Record<string, unknown> : null;
     const reasons: string[] = [];
     const duplicateObservationIds = row.origin === 'wikipedia' && row.observation_fingerprint
       ? (observations.get(row.observation_fingerprint) ?? []).filter(id => id !== String(row.id)) : [];
     if (duplicateObservationIds.length) reasons.push('duplicate_observation');
-    if (review?.type === 'conflict') reasons.push('date_conflict');
+    if (review?.type === 'conflict' || identityDateConflict) reasons.push('date_conflict');
     if (!evidence && !review) reasons.push('unreviewed');
     if (row.evidence != null && !evidence) reasons.push('invalid_evidence');
     if (row.tmdb_id == null) reasons.push('identity_missing');
@@ -59,10 +60,11 @@ export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): Rev
       else if (freshness === 'stale') reasons.push('evidence_stale');
     }
     if (identityReview && reviewFreshness(identityReview.checkedAt, now) !== 'fresh') reasons.push('identity_review_stale');
+    if (identityDateConflict && reviewFreshness(identityDateConflict.checkedAt, now) !== 'fresh') reasons.push('date_review_stale');
     if (!reasons.length) continue;
     queue.push({ id: String(row.id), title: row.title, releaseDate: row.release_date, origin: row.origin,
       region, tmdbId: row.tmdb_id == null ? null : Number(row.tmdb_id), sourceUrl: row.source_url,
-      reviewSourceUrl: review?.sourceUrl ?? identityReview?.sourceUrl ?? null, checkedAt: checked, reasons, duplicateObservationIds });
+      reviewSourceUrl: review?.sourceUrl ?? identityDateConflict?.sourceUrl ?? identityReview?.sourceUrl ?? null, checkedAt: identityDateConflict?.checkedAt ?? checked, reasons, duplicateObservationIds });
   }
   const rank = (x: ReviewQueueItem) => x.reasons.includes('date_conflict') || x.reasons.includes('identity_conflict') ? 0 : x.reasons.includes('unreviewed') ? 1 : 2;
   return queue.sort((a, b) => rank(a) - rank(b) || a.releaseDate.localeCompare(b.releaseDate) || a.id.localeCompare(b.id, 'en', { numeric: true }));

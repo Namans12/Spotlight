@@ -59,8 +59,36 @@ export function reviewedEditorialTmdbIdentity(row: {
     { id: 1704200, title: 'Hail Mary', language: 'ml', date: '2026-11-26', checkedAt: '2026-11-10T19:10:03Z',
       sourceUrl: 'https://www.cinemaexpress.com/malayalam/news/2026/Nov/05/kunchacko-bobans-hail-mary-gets-a-release-date',
       message: 'The editorial listing and TMDB agree on director Vishnu Revikumar and leads Kunchacko Boban and Suraj Venjaramoodu.' },
+    { id: 1443139, title: 'Reality', language: 'te', date: '2026-12-25', source: 'The New Indian Express', checkedAt: '2026-11-10T19:12:41Z',
+      sourceUrl: 'https://www.newindianexpress.com/entertainment/entertainment-news/2026/Oct/06/telugunews2026oct05kiran-abbavarams-directorial-debut-titled-reality-locks-release-date',
+      message: 'The editorial listing and TMDB agree on actor-director Kiran Abbavaram and cast members Sai Kumar and Rohini.' },
+    { id: 1370456, title: 'Mahakāli', language: 'te', date: '2027-01-08', source: 'The Hollywood Reporter India', checkedAt: '2026-11-10T19:12:41Z',
+      sourceUrl: 'https://www.hollywoodreporterindia.com/features/insight/mahakali-teaser-akshaye-khannas-shukracharya-sriya-reddys-mahakali-introduced-in-powerful-glimpses',
+      message: 'The editorial listing and TMDB agree on director Puja Aparna Kolluru and cast Akshaye Khanna and Sriya Reddy.' },
+    { id: 1703718, title: 'Harivarasanam', language: 'ml', date: '2027-01-15', checkedAt: '2026-11-10T19:12:41Z',
+      sourceUrl: 'https://www.cinemaexpress.com/malayalam/news/2026/Oct/27/saiju-kurups-harivarasanam-gets-release-date-first-look-out',
+      message: 'The editorial listing and TMDB agree on director Rajesh Nair and cast Saiju Kurup and Yogi Babu.' },
   ];
   const match = matches.find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language &&
-    row.release_date === item.date && row.source_url === `https://en.wikipedia.org/wiki/List_of_${item.language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_2026`);
+    row.release_date === item.date && row.source_url === `https://en.wikipedia.org/wiki/List_of_${item.language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_${item.date.slice(0, 4)}`);
   return match ? { source: match.source ?? 'Cinema Express', sourceUrl: match.sourceUrl, checkedAt: match.checkedAt ?? '2026-11-10T19:01:57Z', message: match.message } : null;
+}
+
+/** Later reporting can cast doubt on a scheduled event without confirming a
+ * replacement date or proving the TMDB link. */
+export function reviewedEditorialDateConflict(row: {
+  origin: string; tmdb_id: number | null; media_type: string | null; title: string;
+  language?: string | null; release_date: string; source_url: string | null;
+  entry_type: string | null; evidence: unknown;
+}) {
+  if (row.origin !== 'wikipedia' || Number(row.tmdb_id) !== 1533741 || row.media_type !== 'movie' ||
+      row.entry_type !== 'Movie' || row.title !== 'Kaaka' || row.language !== 'te' || row.release_date !== '2027-01-13' ||
+      row.source_url !== 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2027' || !row.evidence ||
+      typeof row.evidence !== 'object' || Array.isArray(row.evidence)) return null;
+  const evidence = row.evidence as Record<string, unknown>;
+  if (evidence.date_source !== 'tmdb_regional_theatrical' || evidence.region !== 'IN' ||
+      evidence.source_url !== 'https://www.themoviedb.org/movie/1533741') return null;
+  return { source: 'Deccan Chronicle', checkedAt: '2026-11-10T19:12:41Z',
+    sourceUrl: 'https://www.deccanchronicle.com/tabloid/hyderabad-chronicle/chiranjeevi-puts-kaaka-on-hold-2001788',
+    message: 'Date needs review: later reporting says the film was reportedly put on hold. The makers have not confirmed a replacement date here, and the linked title identity remains unverified.' };
 }

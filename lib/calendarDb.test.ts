@@ -18,6 +18,17 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('warns about the Kaaka report without asserting a replacement date or title identity', async () => {
+    const item = editorial({ origin: 'wikipedia', tmdb_id: 1533741, title: 'Kaaka', language: 'te', release_date: '2027-01-13',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2027', event_region: 'IN',
+      evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1533741' } });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2027-01', 'IN');
+    expect(entry.dateConflict?.source).toBe('Deccan Chronicle');
+    expect(entry.dateConflict?.message).toContain('reportedly put on hold');
+    expect(entry).toMatchObject({ tmdbId: null, region: null, releaseDate: '2027-01-13' });
+    const [changed] = await getCalendarMonth(db([], [{ ...item, source_url: 'https://example.org' }]) as unknown as postgres.Sql, '2027-01', 'IN');
+    expect(changed.dateConflict).toBeNull();
+  });
   it.each([
     [1733518, 'Bouma', 'ml', '2026-11-12'],
     [1445172, 'Dark Chocolate', 'te', '2026-11-13'],
@@ -45,9 +56,12 @@ describe('calendar event identity', () => {
     [1505644, 'ENE Repeat', 'te', '2026-11-19', 'S Originals'],
     [1533928, "Bachelor Party D'eux", 'ml', '2026-11-19', 'Onmanorama'],
     [1704200, 'Hail Mary', 'ml', '2026-11-26', 'Cinema Express'],
+    [1443139, 'Reality', 'te', '2026-12-25', 'The New Indian Express'],
+    [1370456, 'Mahakāli', 'te', '2027-01-08', 'The Hollywood Reporter India'],
+    [1703718, 'Harivarasanam', 'ml', '2027-01-15', 'Cinema Express'],
   ])('restores a credit-matched identity only for its exact observation: %s', async (id, title, language, release_date, source) => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: id, title, language, release_date,
-      source_url: `https://en.wikipedia.org/wiki/List_of_${language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_2026`,
+      source_url: `https://en.wikipedia.org/wiki/List_of_${language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_${release_date.slice(0, 4)}`,
       event_region: 'IN', evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: `https://www.themoviedb.org/movie/${id}` } });
     const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, release_date.slice(0, 7), 'IN');
     expect(entry).toMatchObject({ tmdbId: id, region: 'IN', evidenceStatus: 'regional' });
