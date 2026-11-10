@@ -1514,6 +1514,11 @@ def find_watchlist_matches_by_user(digest: dict[str, Any], conn: Any) -> list[di
     return list(by_user.values())
 
 
+# Serialize both delivery paths across overlapping processes. PostgreSQL
+# releases this transaction-scoped lock at commit/rollback or disconnect.
+WATCHLIST_ALERT_LOCK_KEY = 0x53504F54414C4552
+
+
 def send_user_watchlist_alerts(
     users_with_matches: list[dict[str, Any]],
     conn: Any,
@@ -1538,6 +1543,7 @@ def send_user_watchlist_alerts(
     titles = 0
 
     with conn.cursor() as cur:
+        cur.execute("SELECT pg_advisory_xact_lock(%s)", (WATCHLIST_ALERT_LOCK_KEY,))
         for entry in users_with_matches:
             user_id = entry["user_id"]
             fresh = []
@@ -1611,6 +1617,7 @@ def send_watchlist_alerts(
     than count it as sent."""
     sent = 0
     with conn.cursor() as cur:
+        cur.execute("SELECT pg_advisory_xact_lock(%s)", (WATCHLIST_ALERT_LOCK_KEY,))
         for match in matches:
             for channel, sender in (("telegram", telegram_sender), ("email", email_sender)):
                 if not sender:

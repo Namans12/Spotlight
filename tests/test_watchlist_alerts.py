@@ -128,6 +128,8 @@ class FakeAlertCursor:
         return False
 
     def execute(self, query, params=None):
+        if query.strip().startswith("SELECT pg_advisory_xact_lock"):
+            return
         if query.strip().startswith("SELECT"):
             self._pending_select = params
         elif query.strip().startswith("INSERT"):

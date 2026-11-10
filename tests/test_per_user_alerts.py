@@ -46,7 +46,9 @@ class FakeCursor:
 
     def execute(self, sql: str, params: tuple = ()):  # noqa: D102
         text = " ".join(sql.split())
-        if text.startswith("SELECT u.id, u.email"):
+        if text.startswith("SELECT pg_advisory_xact_lock"):
+            self._result = [(None,)]
+        elif text.startswith("SELECT u.id, u.email"):
             self._result = list(self._watchlist_rows)
         elif text.startswith("SELECT 1 FROM sent_notifications"):
             tmdb_id, media_type, user_id = params

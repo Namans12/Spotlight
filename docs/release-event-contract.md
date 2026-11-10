@@ -18,6 +18,8 @@ An alert is permitted only when the item's valid date is inside Out Now and is n
 
 Only movie ingestion currently captures the evidence required by this rule. TV alerts, fallback-only titles and release items constructed without evidence will not be sent. No catch-up delivery is implemented: because sending is scheduled, an eligible release dated between send runs may be missed. Improving cadence or a separately bounded catch-up policy requires its own design and tests. Evidence is persisted in nullable JSONB columns and returned for eligible digest entries; with its observation time, region and known provider types displayed. Unknown fields remain labelled unknown. Existing legacy TMDB calendar rows without regional theatrical evidence are hidden until refreshed. Editorial calendar entries have not been individually reverified. The regional digest excludes TV until a regional OTT date source exists, and date/provider coverage can decrease substantially.
 
+Concurrent watchlist alert senders use a transaction-scoped PostgreSQL advisory lock before checking prior deliveries. A second run waits, then rechecks committed delivery records. This prevents overlapping runs from both passing the same deduplication check; it cannot guarantee exactly-once email if a process crashes after an external provider accepts a message but before the database commit.
+
 ## Deployment sequence
 
 Apply `migrations/0017_release_evidence.sql` before deploying readers, writers or scheduled jobs that use the evidence columns. Legacy rows stay NULL and are not treated as verified. After deployment, refresh the digest and calendar through the normal jobs; audit results before relying on coverage. No production migration or refresh was performed as part of this implementation.
