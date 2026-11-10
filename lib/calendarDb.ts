@@ -78,7 +78,7 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
   for (const row of calendarRows) {
     const review = reviewedCalendarEntry({ origin: row.origin, tmdb_id: row.tmdb_id, media_type: row.media_type,
       title: row.title, release_date: String(row.release_date), source_url: row.source_url,
-      event_region: row.event_region, evidence: row.evidence, platform_or_distributor: row.platform_or_distributor });
+      event_region: row.event_region, evidence: row.evidence, platform_or_distributor: row.platform_or_distributor, entry_type: row.entry_type });
     const matchingTmdbEvidence = row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
       row.evidence?.source_url === `https://www.themoviedb.org/${row.media_type}/${row.tmdb_id}`;
     const globalPremiere = matchingTmdbEvidence && row.evidence?.date_source === 'tmdb_global_first_air' && !row.event_region && row.media_type === 'tv';

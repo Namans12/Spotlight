@@ -19,6 +19,30 @@ function db(releases: unknown[], calendar: unknown[]) {
 
 describe('calendar event identity', () => {
   it.each([
+    [null, null, 'Show', 'Off the Scales', '2026-11-11', 'TLC', 'https://deadline.com/feature/2026-tv-premiere-dates-1236391902/', 'Boston.com'],
+    [null, null, 'Show', 'Harry Potter and the Philosopher’s Stone', '2026-12-25', 'HBO Max', 'https://deadline.com/feature/2026-tv-premiere-dates-1236391902/', 'Warner Bros. Discovery'],
+    [null, null, 'Movie', 'Ebenezer: A Christmas Carol', '2026-11-13', 'Paramount Pictures', 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026', 'Paramount'],
+    [1372443, 'movie', 'Movie', 'Mr. Irrelevant', '2026-12-25', 'Paramount Pictures / Skydance Sports', 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026', 'Paramount'],
+    [1421903, 'movie', 'Movie', 'Werwulf', '2026-12-25', 'Focus Features', 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026', 'Focus Features'],
+    [1634124, 'movie', 'Movie', 'Nutmeg & Mistletoe', '2026-12-25', 'Abyssal Films', 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026', 'The Numbers'],
+  ])('attaches scoped evidence to the exact reviewed entry %s %s %s %s', async (tmdb_id, media_type, entry_type, title, release_date, platform_or_distributor, source_url, source) => {
+    const item = editorial({ origin: 'csv_seed', tmdb_id, media_type, entry_type, title, release_date, platform_or_distributor, source_url, event_region: null, evidence: null });
+    const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, source_url: 'https://example.com' }]) as unknown as postgres.Sql, '2026-12', 'IN');
+    expect(entries[0].dateCorroboration?.source).toBe(source);
+    expect(entries[0].region).toBeNull();
+    expect(entries[0].evidenceStatus).toBe('unverified');
+    expect(entries[1].dateCorroboration).toBeNull();
+  });
+
+  it('flags the conflicting A Place in Hell theatrical date without replacing it', async () => {
+    const item = editorial({ origin: 'csv_seed', tmdb_id: 1437882, title: 'A Place in Hell', release_date: '2026-12-25',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026', event_region: null, evidence: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-12', 'IN');
+    expect(entry.dateConflict?.message).toContain('23 April 2027');
+    expect(entry.releaseDate).toBe('2026-12-25');
+    expect(entry.region).toBeNull();
+  });
+  it.each([
     [1457866, 'THE FURTHER MIS-ADVENTURES OF CLIFF BOOTH', '2026-11-25', 'Netflix / Plan B Entertainment / Heyday Films', 'theatrical'],
     [1137888, 'The Man with the Bag', '2026-12-02', 'Amazon MGM Studios', 'streaming'],
   ])('corrects the event kind for a specifically reviewed announcement', async (tmdb_id, title, release_date, platform_or_distributor, expectedKind) => {

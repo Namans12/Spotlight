@@ -4,7 +4,7 @@
 export function reviewedCalendarEntry(row: {
   origin: string; tmdb_id: number | null; media_type: string | null;
   title: string; release_date: string; source_url: string | null;
-  event_region: string | null; evidence: unknown; platform_or_distributor: string | null;
+  event_region: string | null; evidence: unknown; platform_or_distributor: string | null; entry_type: string | null;
 }) {
   if (row.origin !== 'csv_seed' || row.event_region != null || row.evidence != null) return null;
   if (Number(row.tmdb_id) === 84773 && row.media_type === 'tv' &&
@@ -24,6 +24,25 @@ export function reviewedCalendarEntry(row: {
   }
   const americanFilms = 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026';
   const hindiFilms = 'https://en.wikipedia.org/wiki/List_of_Hindi_films_of_2026';
+  const deadlineTv = 'https://deadline.com/feature/2026-tv-premiere-dates-1236391902/';
+  if (row.tmdb_id == null && row.media_type == null && row.entry_type === 'Show' && row.source_url === deadlineTv) {
+    if (row.title === 'Off the Scales' && row.release_date === '2026-11-11' && row.platform_or_distributor === 'TLC') {
+      return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Boston.com',
+        sourceUrl: 'https://www.boston.com/culture/tv/2026/09/08/2026-fall-tv-premiere-dates/',
+        message: 'A US television schedule lists a new TLC series on 11 November. The title identity, local date and availability remain unconfirmed.' };
+    }
+    if (row.title === 'Harry Potter and the Philosopher’s Stone' && row.release_date === '2026-12-25' && row.platform_or_distributor === 'HBO Max') {
+      return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Warner Bros. Discovery',
+        sourceUrl: 'https://press.warnerbrosdiscovery.fi/post/hbo-original-harry-potter-series-premieres-25-december-in-icelan',
+        message: 'The broadcaster announces a 25 December series premiere in Iceland. This entry has no verified title identity; local date and availability remain unconfirmed.' };
+    }
+  }
+  if (row.tmdb_id == null && row.media_type == null && row.entry_type === 'Movie' && row.source_url === americanFilms &&
+      row.title === 'Ebenezer: A Christmas Carol' && row.release_date === '2026-11-13' && row.platform_or_distributor === 'Paramount Pictures') {
+    return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Paramount',
+      sourceUrl: 'https://cms-corp.paramount.com/news/paramount-pictures-goes-all-in-on-theatrical-at-cinemaconr',
+      message: 'Paramount announced a 13 November theatrical release. This entry has no verified title identity; local date and availability remain unconfirmed.' };
+  }
   if (row.media_type === 'movie' && row.source_url === hindiFilms) {
     if (Number(row.tmdb_id) === 1209723 && row.title === 'Yeh Prem Mol Liya' && row.release_date === '2026-11-27') {
       return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Yash Raj Films',
@@ -48,6 +67,26 @@ export function reviewedCalendarEntry(row: {
       message: 'Date needs review: Angel Studios lists 11 December for Zero A.D.; this entry has no verified title identity or region.' };
   }
   if (row.media_type === 'movie' && row.source_url === americanFilms) {
+    if (Number(row.tmdb_id) === 1437882 && row.title === 'A Place in Hell' && row.release_date === '2026-12-25') {
+      return { type: 'conflict' as const, checkedAt: '2026-11-10', source: 'Bloody Disgusting',
+        sourceUrl: 'https://bloody-disgusting.com/movie/3961082/a-place-in-hell-michelle-williams-thriller-moves-from-christmas-2026-to-april-2027/',
+        message: 'Date needs review: industry reporting says the theatrical release moved from 25 December 2026 to 23 April 2027. The region of this entry remains unconfirmed.' };
+    }
+    if (Number(row.tmdb_id) === 1372443 && row.title === 'Mr. Irrelevant' && row.release_date === '2026-12-25') {
+      return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Paramount',
+        sourceUrl: 'https://www.paramount.com/movies',
+        message: 'Paramount lists a 25 December theatrical release. Local date and availability remain unconfirmed.' };
+    }
+    if (Number(row.tmdb_id) === 1421903 && row.title === 'Werwulf' && row.release_date === '2026-12-25') {
+      return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Focus Features',
+        sourceUrl: 'https://www.focusfeatures.com/werwulf',
+        message: 'Focus Features lists a 25 December theatrical release. Local date and availability remain unconfirmed.' };
+    }
+    if (Number(row.tmdb_id) === 1634124 && row.title === 'Nutmeg & Mistletoe' && row.release_date === '2026-12-25') {
+      return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'The Numbers',
+        sourceUrl: 'https://www.the-numbers.com/movie/Nutmeg-and-Mistletoe-%282026%29',
+        message: 'The Numbers lists a limited US theatrical release on 25 December. Local date and availability remain unconfirmed.' };
+    }
     if (Number(row.tmdb_id) === 1457866 && row.title === 'THE FURTHER MIS-ADVENTURES OF CLIFF BOOTH' && row.release_date === '2026-11-25') {
       return { type: 'event' as const, kind: 'theatrical' as const, checkedAt: '2026-11-10', source: 'Netflix Tudum',
         sourceUrl: 'https://www.netflix.com/tudum/articles/david-fincher-new-film-release-date',
