@@ -1,7 +1,7 @@
 /** How a title is reaching its audience. `tv_network` is a linear-TV premiere
  * (HGTV, AMC, PBS) — neither a cinema release nor an OTT drop, and the case the
  * old boolean-only model got wrong for 154 of 267 shows. */
-export type CalendarKind = "streaming" | "tv_network" | "theatrical";
+export type CalendarKind = "streaming" | "tv_network" | "theatrical" | "global_premiere";
 
 export interface CalendarEntryDTO {
   releaseDate: string; // YYYY-MM-DD
@@ -20,7 +20,7 @@ export interface CalendarEntryDTO {
   sourceUrl?: string | null;
   observedAt?: string | null;
   availabilityTypes?: Record<string, string[]> | null;
-  evidenceStatus?: "regional" | "unverified";
+  evidenceStatus?: "regional" | "global" | "unverified";
   tmdbId: number | null;
   posterUrl: string | null;
   rating: number | null;

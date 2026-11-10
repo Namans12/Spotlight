@@ -96,26 +96,8 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/sync_calendar_tmdb.py --months 6
 
-      # Regional Indian theatrical releases TMDB's own discover feed misses
-      # almost entirely — a spot-check of one real Friday found 8 of 16 films
-      # playing in Hyderabad cinemas absent from TMDB or dateless there.
-      # district.in's per-city listings cover the gap in principle, but in
-      # practice this step is currently a no-op IN CI: confirmed by dispatch
-      # that district.in 403s every request from a GitHub-hosted runner (an
-      # Akamai IP/ASN block, not a header fingerprint — a full browser header
-      # set and a cookie warm-up still 403, even on the plain homepage).
-      # Left in rather than removed: harmless when blocked, and would start
-      # working again for free if the block lifts or this job ever moves to
-      # a self-hosted runner. The Wikipedia step below is what actually
-      # covers this gap today. Runs before the TMDB linker so any new row
-      # either step adds gets a chance at a poster too.
-      - name: Sync regional theatrical releases from district.in
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: python scripts/sync_theatrical_district.py
-
-      # The real source for the gap above, since district.in is blocked from
-      # every GitHub-hosted runner (see previous step). Wikipedia's
+      # District's terms restrict scraping; no automated District fetch runs
+      # without a separately authorized integration. Wikipedia's
       # per-language "List of X films of YYYY" pages aren't blocked the same
       # way. Narrower coverage than district.in's (only languages with a
       # dedicated per-year Wikipedia page — no Punjabi, no Bengali) and mixes

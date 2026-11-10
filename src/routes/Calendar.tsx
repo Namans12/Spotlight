@@ -67,6 +67,7 @@ const SECTIONS: { kind: CalendarKind; label: string; icon: React.ReactNode }[] =
   { kind: 'theatrical', label: 'In Cinemas', icon: <Popcorn size={14} /> },
   { kind: 'streaming', label: 'Streaming', icon: <MonitorPlay size={14} /> },
   { kind: 'tv_network', label: 'On TV', icon: <Tv size={14} /> },
+  { kind: 'global_premiere', label: 'Global premieres', icon: <Tv size={14} /> },
 ];
 
 /** Tabs, not filter chips: theatrical and OTT are two different questions
@@ -77,6 +78,7 @@ const TABS: { id: KindFilter; label: string }[] = [
   { id: 'theatrical', label: 'In Cinemas' },
   { id: 'streaming', label: 'Streaming' },
   { id: 'tv_network', label: 'On TV' },
+  { id: 'global_premiere', label: 'Global premieres' },
 ];
 
 function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number | null }) {
@@ -126,8 +128,8 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
           Source: {entry.source || 'unknown'} · Region: {entry.region || 'unknown'} · {evidenceDate(entry.observedAt)}
         </p>
         <p className="text-[10px] text-muted-foreground leading-snug">
-          {entry.kind === 'streaming' ? providerDetails(entry.platforms ?? [], entry.availabilityTypes) : entry.kind === 'theatrical' ? 'Theatrical' : 'TV network'}
-          {' · '}{entry.evidenceStatus === 'regional' ? 'Date reported by source; may change' : 'Date and release type unverified'}
+          {entry.kind === 'streaming' ? providerDetails(entry.platforms ?? [], entry.availabilityTypes) : entry.kind === 'theatrical' ? 'Theatrical' : entry.kind === 'global_premiere' ? 'Global first-air date · Local availability unknown' : 'TV network'}
+          {' · '}{entry.evidenceStatus === 'regional' || entry.evidenceStatus === 'global' ? 'Date reported by source; may change' : 'Date and release type unverified'}
         </p>
       </div>
       {entry.rating != null && (
@@ -234,7 +236,7 @@ export default function Calendar() {
     selectedLanguageNames.size > 0
       ? scopedEntries.filter((e) => e.language && selectedLanguageNames.has(languageName(e.language)))
       : scopedEntries;
-  const counts: Record<CalendarKind, number> = { theatrical: 0, streaming: 0, tv_network: 0 };
+  const counts: Record<CalendarKind, number> = { theatrical: 0, streaming: 0, tv_network: 0, global_premiere: 0 };
   for (const entry of entries) counts[entry.kind] = (counts[entry.kind] ?? 0) + 1;
 
   // CalendarEntryDTO carries tmdbId/mediaType rather than Movie's id/mediaType

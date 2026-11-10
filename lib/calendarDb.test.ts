@@ -44,4 +44,21 @@ describe('calendar event identity', () => {
     const entries = await getCalendarMonth(sql as unknown as postgres.Sql, '2026-11', 'IN');
     expect(entries).toHaveLength(2);
   });
+  it('labels global first-air evidence without asserting local networks or availability', async () => {
+    const sql = db([], [editorial({ entry_type: 'Show', media_type: 'tv', event_region: null,
+      source: 'TMDB', platform_or_distributor: 'Netflix', evidence: { date_source: 'tmdb_global_first_air', observed_at: '2026-11-09T00:00:00Z' } })]);
+    const [entry] = await getCalendarMonth(sql as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry.kind).toBe('global_premiere');
+    expect(entry.evidenceStatus).toBe('global');
+    expect(entry.region).toBeNull();
+    expect(entry.platforms).toEqual([]);
+  });
+
+  it('attributes a corroborated editorial movie date to TMDB as well as its original source', async () => {
+    const sql = db([], [editorial({ source: 'wikipedia', event_region: 'IN', platform_or_distributor: null,
+      evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical' } })]);
+    const [entry] = await getCalendarMonth(sql as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry.source).toBe('wikipedia / TMDB');
+    expect(entry.evidenceStatus).toBe('regional');
+  });
 });

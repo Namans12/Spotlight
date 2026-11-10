@@ -21,3 +21,8 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: python scripts/recheck_calendar_evidence.py --region IN --limit 200 --apply
+      - name: Confirm global TV first-air dates
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: python scripts/recheck_global_tv.py --limit 300 --apply

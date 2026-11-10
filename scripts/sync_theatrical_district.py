@@ -1,4 +1,7 @@
-"""Fill in the regional Indian theatrical releases TMDB doesn't have.
+"""Legacy District parser, retained for tests and historical data provenance.
+
+Automated District collection is disabled in scheduled workflows: District's
+terms restrict scraping. Do not run this collector without authorization.
 
 sync_calendar_tmdb.py's theatrical coverage is licensed and reliable, but it is
 bounded by what TMDB records: a spot-check of one Friday found 8 of 16 films

@@ -15,7 +15,7 @@ def test_only_exact_regional_dates_are_verified_and_requests_are_shared():
     def lookup(session, key, title_id, region, fallback):
         calls.append((title_id, region))
         return ('2026-11-10' if title_id == 1 else None, None, None)
-    rows = [(1, 1, '2026-11-10'), (2, 1, '2026-11-11'), (3, 2, '2026-11-10')]
+    rows = [(1, 1, '2026-11-10', 'tmdb_upcoming', 'A'), (2, 1, '2026-11-11', 'tmdb_upcoming', 'A'), (3, 2, '2026-11-10', 'tmdb_upcoming', 'B')]
     verified = recheck.verified_candidates(rows, None, 'key', 'IN', lookup)
     assert len(verified) == 1 and verified[0][:3] == (1, 1, '2026-11-10')
     assert verified[0][3].endswith('+00:00')
@@ -27,7 +27,7 @@ def test_upstream_failure_stops_before_any_write(monkeypatch):
         def __enter__(self): return self
         def __exit__(self, *args): pass
         def execute(self, sql, args): assert sql == recheck.SELECT_CANDIDATES
-        def fetchall(self): return [(1, 1, '2026-11-10')]
+        def fetchall(self): return [(1, 1, '2026-11-10', 'tmdb_upcoming', 'A')]
     class Connection:
         def cursor(self): return Cursor()
         def commit(self): pytest.fail('must not write after failure')
@@ -35,6 +35,24 @@ def test_upstream_failure_stops_before_any_write(monkeypatch):
     monkeypatch.setattr(recheck, 'verified_candidates', fail)
     with pytest.raises(TmdbUnavailable):
         recheck.run(Connection(), None, 'key', apply=True)
+
+
+def test_external_movies_require_exact_title_and_regional_date():
+    rows = [(1, 11, '2026-11-10', 'wikipedia', 'Right Film'),
+            (2, 12, '2026-11-10', 'district_in', 'Wrong Film'),
+            (3, 13, '2026-11-10', 'csv_seed', 'Right Film')]
+    def detail(_s, path, _k):
+        return {'title': 'Different Film' if path.endswith('/12') else 'Right Film'}
+    def window(_s, _k, movie_id, _r, _f):
+        return ('2026-11-11' if movie_id == 13 else '2026-11-10', None, None)
+    result = recheck.verified_candidates(rows, None, 'key', 'IN', window, detail)
+    assert [r[0] for r in result] == [1]
+
+
+def test_title_match_preserves_non_latin_identity():
+    assert recheck.exact_title_match('東京物語', '東京物語')
+    assert not recheck.exact_title_match('東京物語', '七人の侍')
+    assert not recheck.exact_title_match('!!!', '???')
 
 
 @pytest.mark.skipif(not os.getenv('SPOTLIGHT_TEST_DATABASE_URL'), reason='requires disposable PostgreSQL')
@@ -45,14 +63,14 @@ def test_database_recheck_skips_conflicts_and_is_idempotent(monkeypatch):
         with conn.cursor() as cur:
             cur.execute('''CREATE TEMP TABLE calendar_entries (id bigint primary key, tmdb_id bigint,
                 release_date date, origin text, entry_type text, media_type text, is_theatrical boolean,
-                evidence jsonb, source_url text)''')
+                evidence jsonb, source_url text, title text)''')
             for item_id, movie_id in [(1, 101), (2, 102), (3, 103), (4, 103)]:
                 cur.execute('''INSERT INTO calendar_entries VALUES (%s,%s,%s,'tmdb_upcoming','Movie',
-                    'movie',true,NULL,%s)''', (item_id, movie_id, future, f'https://www.themoviedb.org/movie/{movie_id}'))
+                    'movie',true,NULL,%s,'A')''', (item_id, movie_id, future, f'https://www.themoviedb.org/movie/{movie_id}'))
             cur.execute("UPDATE calendar_entries SET evidence = '{\"region\":\"IN\",\"date_source\":\"tmdb_regional_theatrical\"}' WHERE id=4")
         def verified(rows, session, key, region):
             assert [r[0] for r in rows] == [1, 2]
-            return [(1, 101, str(future), '2026-11-10T00:00:00+00:00')]
+            return [(1, 101, str(future), '2026-11-10T00:00:00+00:00', 'tmdb_upcoming', 'A')]
         monkeypatch.setattr(recheck, 'verified_candidates', verified)
         assert recheck.run(conn, None, 'key', apply=True) == (2, 1, 1)
         with conn.cursor() as cur:

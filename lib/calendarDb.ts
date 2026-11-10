@@ -30,7 +30,8 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
     WHERE date_trunc('month', release_date::timestamp) = date_trunc('month', ${monthStart}::date)
       AND (evidence->>'region' IS NULL OR evidence->>'region' = ${region})
       AND (origin <> 'tmdb_upcoming' OR
-           (evidence->>'region' = ${region} AND evidence->>'date_source' = 'tmdb_regional_theatrical'))
+           (evidence->>'region' = ${region} AND evidence->>'date_source' = 'tmdb_regional_theatrical') OR
+           (evidence->>'date_source' = 'tmdb_global_first_air' AND evidence->>'region' IS NULL AND media_type = 'tv'))
     ORDER BY release_date, id
   `;
 
@@ -70,18 +71,19 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
       availabilityTypes: row.evidence?.provider_types ?? null, evidenceStatus: "regional" });
   }
   for (const row of calendarRows) {
-    const kind = classifyPlatform(row.entry_type, row.platform_or_distributor);
+    const globalPremiere = row.evidence?.date_source === 'tmdb_global_first_air' && !row.event_region && row.media_type === 'tv';
+    const kind = globalPremiere ? 'global_premiere' : classifyPlatform(row.entry_type, row.platform_or_distributor);
     const parts = splitPlatformField(row.platform_or_distributor);
-    const platforms = kind === "streaming" ? normalizePlatforms(parts.filter(isKnownStreamer)) : parts;
+    const platforms = globalPremiere ? [] : kind === "streaming" ? normalizePlatforms(parts.filter(isKnownStreamer)) : parts;
     add({ releaseDate: String(row.release_date), title: row.title, language: row.language,
       mediaType: row.media_type ?? mediaTypeFromEntryType(row.entry_type), kind,
       isTheatrical: kind === "theatrical", platform: platforms[0] ?? null, platforms,
       region: row.event_region ?? null, tmdbId: row.tmdb_id !== null ? Number(row.tmdb_id) : null,
       posterUrl: row.poster_url ?? null, rating: null, overview: row.details,
       origin: "csv_seed", originRegion: row.origin_region ?? null, originReleaseDate: row.origin_release_date ?? null,
-      source: row.source ?? null, sourceUrl: row.source_url ?? null,
+      source: (row.evidence?.date_source === 'tmdb_regional_theatrical' || globalPremiere) && row.source && row.source.toLowerCase() !== 'tmdb' ? `${row.source} / TMDB` : row.source ?? null, sourceUrl: row.source_url ?? null,
       observedAt: row.evidence?.observed_at ?? null, availabilityTypes: null,
-      evidenceStatus: row.event_region && row.evidence?.date_source ? "regional" : "unverified" });
+      evidenceStatus: globalPremiere ? "global" : row.event_region && row.evidence?.date_source === 'tmdb_regional_theatrical' ? "regional" : "unverified" });
   }
   entries.sort((a, b) => a.releaseDate.localeCompare(b.releaseDate) || a.title.localeCompare(b.title));
   return entries;
