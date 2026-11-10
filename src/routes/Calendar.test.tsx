@@ -231,6 +231,27 @@ describe('Calendar release-kind tabs', () => {
 });
 
 describe('Calendar event details', () => {
+  it('shows linked editorial review and preserves regional uncertainty', async () => {
+    vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({
+      title: 'Reviewed film', region: null, dateConflict: { message: 'Date needs review', source: 'Studio',
+        sourceUrl: 'https://example.com/studio', checkedAt: '2026-11-10' },
+    })] });
+    renderCalendar();
+    expect(await screen.findByText(/Date needs review/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Studio' })).toHaveAttribute('href', 'https://example.com/studio');
+    expect(screen.getByText('Region unknown')).toBeInTheDocument();
+  });
+
+  it('distinguishes an announced season premiere from the series first air date', async () => {
+    vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({
+      title: 'Reviewed show', mediaType: 'tv', kind: 'global_premiere', region: null,
+      seasonPremiere: { season: 3, source: 'Amazon', sourceUrl: 'https://example.com/announcement', checkedAt: '2026-11-10' },
+    })] });
+    renderCalendar();
+    expect(await screen.findByText('Season 3 premiere')).toBeInTheDocument();
+    expect(screen.getByText(/Local date and availability unknown/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Amazon' })).toHaveAttribute('href', 'https://example.com/announcement');
+  });
   it('shows all providers and labels an unknown region', async () => {
     vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({
       title: 'Shared event', kind: 'streaming', isTheatrical: false,

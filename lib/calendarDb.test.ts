@@ -18,6 +18,27 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('attaches a studio season announcement without claiming a regional offer', async () => {
+    const item = editorial({ origin: 'csv_seed', tmdb_id: 84773, media_type: 'tv', entry_type: 'Show',
+      title: 'The Lord of the Rings: The Rings of Power', release_date: '2026-11-11', event_region: null,
+      source_url: 'https://deadline.com/feature/2026-tv-premiere-dates-1236391902/', evidence: null });
+    const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, release_date: '2026-11-12' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entries[0].seasonPremiere?.season).toBe(3);
+    expect(entries[0].kind).toBe('global_premiere');
+    expect(entries[0].region).toBeNull();
+    expect(entries[0].platforms).toEqual([]);
+    expect(entries[1].seasonPremiere).toBeNull();
+  });
+
+  it('flags a disputed editorial date without changing it or transferring the warning to a different source', async () => {
+    const item = editorial({ origin: 'csv_seed', tmdb_id: 1286656, title: 'I Play Rocky', release_date: '2026-11-13',
+      event_region: null, evidence: null, source_url: 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026' });
+    const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, source_url: 'https://example.com/' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entries[0].dateConflict?.message).toContain('Date needs review');
+    expect(entries[0].releaseDate).toBe('2026-11-13');
+    expect(entries[0].region).toBeNull();
+    expect(entries[1].dateConflict).toBeNull();
+  });
   it('merges only the same region, type, title identity, date and event kind and preserves providers', async () => {
     const sql = db([
       release(), release({ providers: ['Amazon Prime'] }),

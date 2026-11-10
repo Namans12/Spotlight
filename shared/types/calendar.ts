@@ -21,6 +21,8 @@ export interface CalendarEntryDTO {
   observedAt?: string | null;
   availabilityTypes?: Record<string, string[]> | null;
   evidenceStatus?: "regional" | "global" | "unverified";
+  seasonPremiere?: { season: number; source: string; sourceUrl: string; checkedAt: string } | null;
+  dateConflict?: { message: string; source: string; sourceUrl: string; checkedAt: string } | null;
   tmdbId: number | null;
   posterUrl: string | null;
   rating: number | null;

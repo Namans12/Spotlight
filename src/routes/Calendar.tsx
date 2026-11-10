@@ -120,6 +120,7 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
         <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
           {(entry.platforms?.length ? entry.platforms.join(', ') : entry.platform) && <span>{entry.platforms?.length ? entry.platforms.join(', ') : entry.platform}</span>}
           {entry.region === null && <span className="shrink-0">Region unknown</span>}
+          {entry.seasonPremiere && <span className="shrink-0">Season {entry.seasonPremiere.season} premiere</span>}
           {entry.mediaType === 'tv' && seasons != null && (
             <span className="opacity-60 shrink-0">
               {seasons} {seasons === 1 ? 'Season' : 'Seasons'}
@@ -136,8 +137,8 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
           Source: {entry.source || 'unknown'} · Region: {entry.region || 'unknown'} · {evidenceDate(entry.observedAt)}
         </p>
         <p className="text-[10px] text-muted-foreground leading-snug">
-          {entry.kind === 'streaming' ? providerDetails(entry.platforms ?? [], entry.availabilityTypes) : entry.kind === 'theatrical' ? 'Theatrical' : entry.kind === 'global_premiere' ? 'Global first-air date · Local availability unknown' : 'TV network'}
-          {' · '}{entry.evidenceStatus === 'regional' || entry.evidenceStatus === 'global' ? 'Date reported by source; may change' : 'Date and release type unverified'}
+          {entry.seasonPremiere ? 'Prime Video announced a premiere in over 240 countries and territories · Local date and availability unknown' : entry.kind === 'streaming' ? providerDetails(entry.platforms ?? [], entry.availabilityTypes) : entry.kind === 'theatrical' ? 'Theatrical' : entry.kind === 'global_premiere' ? 'Global first-air date · Local availability unknown' : 'TV network'}
+          {' · '}{entry.seasonPremiere || entry.evidenceStatus === 'regional' || entry.evidenceStatus === 'global' ? 'Date reported by source; may change' : 'Date and release type unverified'}
         </p>
       </div>
       {entry.rating != null && (
@@ -154,6 +155,8 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
   for (const offer of offers ?? []) offerTypes[offer.provider] = [...new Set([...(offerTypes[offer.provider] ?? []), offer.type])];
   return <div>
     {entry.tmdbId && entry.mediaType ? <Link to={`/title/${entry.mediaType}/${entry.tmdbId}`}>{body}</Link> : body}
+    {entry.seasonPremiere && <p className="px-3 pb-2 text-xs text-muted-foreground">Announcement checked {entry.seasonPremiere.checkedAt}: <a className="underline" href={entry.seasonPremiere.sourceUrl} target="_blank" rel="noopener noreferrer">{entry.seasonPremiere.source}</a></p>}
+    {entry.dateConflict && <p className="px-3 pb-2 text-xs text-muted-foreground">{entry.dateConflict.message} <a className="underline" href={entry.dateConflict.sourceUrl} target="_blank" rel="noopener noreferrer">{entry.dateConflict.source}</a> · Checked {entry.dateConflict.checkedAt}</p>}
     {entry.mediaType === 'tv' && entry.tmdbId != null && <div className="px-3 pb-2 text-xs text-muted-foreground">
       <button type="button" className="underline" onClick={() => { if (checkAvailability) void query.refetch(); else setCheckAvailability(true); }}>
         {checkAvailability ? 'Check India availability again' : 'Check current India availability'}
