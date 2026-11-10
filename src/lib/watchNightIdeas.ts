@@ -16,3 +16,11 @@ const ideas: Record<string, WatchNightIdea[]> = {
 export function watchNightIdeas(mediaType: 'movie' | 'tv', id: number): readonly WatchNightIdea[] {
   return ideas[`${mediaType}:${id}`] ?? [];
 }
+
+/** User-selected atmosphere, independent of a title's story or metadata. */
+export const VIBE_IDEAS = {
+  cosy: { label: 'Cosy', foods: ['Pizza or a warm sandwich', 'Tea or hot chocolate'] },
+  fresh: { label: 'Fresh', foods: ['Fruit or vegetable sticks', 'Sparkling water or lemonade'] },
+  crunchy: { label: 'Crunchy', foods: ['Popcorn or pretzels', 'Iced tea or water'] },
+} as const;
+export type WatchNightVibe = keyof typeof VIBE_IDEAS;
