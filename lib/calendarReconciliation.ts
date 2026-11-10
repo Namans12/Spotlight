@@ -57,8 +57,22 @@ export function reviewedCalendarEntry(row: {
         message: 'BookMyShow lists the Telugu film for 13 November in India; bookings were not yet open when checked. Streaming availability is unconfirmed.' };
     }
   }
+  if (row.origin === 'wikipedia' && row.tmdb_id == null && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.language === 'te' && row.title === 'SVC64' && row.release_date === '2027-01-14' &&
+      row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2027') {
+    return { type: 'corroboration' as const, checkedAt: '2026-11-10T18:49:55Z', source: 'NTV Telugu',
+      sourceUrl: 'https://ntvtelugu.com/movie-news/cinema-news/ravi-teja-svc64-hasith-goli-movie-sankranti-2027-release-update-1010088.html',
+      message: 'Reporting cites the makers’ 14 January theatrical announcement but notes unconfirmed speculation about a delay. The final title, TMDB identity and local event remain unconfirmed.' };
+  }
   if (row.origin === 'wikipedia' && row.entry_type === 'Movie' &&
       (row.media_type === 'movie' || (row.media_type == null && row.tmdb_id == null && row.title === 'Donga Naa Koduku'))) {
+    if (Number(row.tmdb_id) === 1635803 && row.media_type === 'movie' && row.language === 'en' &&
+        row.title === 'Romeo Juliet' && row.release_date === '2026-11-13' &&
+        row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') {
+      return { type: 'regional' as const, region: 'IN', suppressTitleLink: true, correctedLanguage: 'te', checkedAt: '2026-11-10T18:49:55Z', source: 'Telugu Film Producers Council',
+        sourceUrl: 'https://photos.tfpc.in/2026/10/25/song-launch-event-from-harshits-romeo-juliet/',
+        message: 'The producers’ council reports a 13 November theatrical release, including Andhra Pradesh and Telangana. The stored TMDB link belongs to a different film; the correct title identity and showtimes are unconfirmed.' };
+    }
     if (row.tmdb_id == null && row.language === 'te' && row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') {
       if (row.title === 'High' && row.release_date === '2026-11-27') {
         return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-10T18:30:54Z', source: 'Ticketnew',

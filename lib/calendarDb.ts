@@ -109,7 +109,7 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
       title: row.title, release_date: String(row.release_date), source_url: row.source_url,
       event_region: row.event_region, evidence: row.evidence, platform_or_distributor: row.platform_or_distributor, entry_type: row.entry_type, language: row.language });
     if (review?.type === 'regional' && review.region !== region) continue;
-    const suppressTitleLink = review?.type === 'conflict' && 'suppressTitleLink' in review && review.suppressTitleLink;
+    const suppressTitleLink = review != null && 'suppressTitleLink' in review && review.suppressTitleLink;
     const matchingTmdbEvidence = row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
       row.evidence?.source_url === `https://www.themoviedb.org/${row.media_type}/${row.tmdb_id}`;
     const globalPremiere = matchingTmdbEvidence && row.evidence?.date_source === 'tmdb_global_first_air' && !row.event_region && row.media_type === 'tv';
@@ -118,7 +118,7 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
     const kind = globalPremiere || review?.type === 'season' ? 'global_premiere' : review?.type === 'event' ? review.kind : classifyPlatform(row.entry_type, row.platform_or_distributor);
     const parts = splitPlatformField(row.platform_or_distributor);
     const platforms = globalPremiere || review?.type === 'season' || review?.type === 'event' ? [] : kind === "streaming" ? normalizePlatforms(parts.filter(isKnownStreamer)) : parts;
-    add({ releaseDate: String(row.release_date), title: row.title, language: row.language,
+    add({ releaseDate: String(row.release_date), title: row.title, language: review && 'correctedLanguage' in review ? review.correctedLanguage : row.language,
       mediaType: row.media_type ?? mediaTypeFromEntryType(row.entry_type), kind,
       isTheatrical: kind === "theatrical", platform: platforms[0] ?? null, platforms,
       region: review?.type === 'regional' ? review.region : regionalEvidence ? row.event_region : null, tmdbId: !suppressTitleLink && row.tmdb_id !== null ? Number(row.tmdb_id) : null,

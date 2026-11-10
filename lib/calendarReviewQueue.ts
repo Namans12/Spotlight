@@ -36,7 +36,7 @@ export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): Rev
     if (!evidence && !review) reasons.push('unreviewed');
     if (row.evidence != null && !evidence) reasons.push('invalid_evidence');
     if (row.tmdb_id == null) reasons.push('identity_missing');
-    if (review?.type === 'conflict' && 'suppressTitleLink' in review && review.suppressTitleLink) reasons.push('identity_unverified');
+    if (review && 'suppressTitleLink' in review && review.suppressTitleLink) reasons.push('identity_unverified');
     const globalPremiere = evidence?.date_source === 'tmdb_global_first_air' && row.media_type === 'tv' && row.tmdb_id != null &&
       evidence.source_url === `https://www.themoviedb.org/tv/${row.tmdb_id}`;
     const region = review?.type === 'regional' ? review.region : row.event_region;

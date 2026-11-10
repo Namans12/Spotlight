@@ -18,6 +18,18 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('deduplicates the reviewed Telugu Romeo Juliet while hiding the wrong English-film identity', async () => {
+    const item = editorial({ origin: 'wikipedia', tmdb_id: 1635803, title: 'Romeo Juliet', language: 'en', release_date: '2026-11-13',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', event_region: null, evidence: null,
+      poster_url: 'wrong-poster', observation_fingerprint: 'same' });
+    const entries = await getCalendarMonth(db([], [item, { ...item, id: 2 }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ tmdbId: null, posterUrl: null, region: 'IN', language: 'te' });
+    expect(entries[0].dateCorroboration?.source).toBe('Telugu Film Producers Council');
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
+    const [unmatched] = await getCalendarMonth(db([], [{ ...item, language: 'te' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(unmatched.tmdbId).toBe(1635803);
+  });
   it.each([
     [1733518, 'Bouma', 'ml', '2026-11-12', 'Cinema Express'],
     [1440539, 'Itllu Arjuna', 'te', '2026-11-13', 'BookMyShow'],

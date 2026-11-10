@@ -21,6 +21,25 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('records the SVC64 announcement and retains its unresolved identity and territory', () => {
+    const item = row({ origin: 'wikipedia', tmdb_id: null, title: 'SVC64', language: 'te', release_date: '2027-01-14',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2027' });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T19:00:00Z'));
+    expect(review.reasons).toEqual(expect.arrayContaining(['identity_missing', 'region_unknown']));
+    expect(review.reasons).not.toContain('unreviewed');
+    expect(review.reviewSourceUrl).toContain('ntvtelugu.com');
+  });
+  it('retains duplicate and incorrect identity warnings for the reviewed Romeo Juliet event', () => {
+    const item = row({ origin: 'wikipedia', tmdb_id: 1635803, title: 'Romeo Juliet', language: 'en', release_date: '2026-11-13',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', observation_fingerprint: 'same' });
+    const items = buildCalendarReviewQueue([item, { ...item, id: 2 }], new Date('2026-11-10T19:00:00Z'));
+    expect(items).toHaveLength(2);
+    for (const review of items) {
+      expect(review.region).toBe('IN');
+      expect(review.reasons).toEqual(expect.arrayContaining(['duplicate_observation', 'identity_unverified']));
+      expect(review.reasons).not.toContain('unreviewed');
+    }
+  });
   it('retains the missing identity of the reviewed High announcement', () => {
     const item = row({ origin: 'wikipedia', tmdb_id: null, title: 'High', language: 'te', release_date: '2026-11-27',
       source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026' });
