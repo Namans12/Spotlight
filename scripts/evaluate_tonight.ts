@@ -1,6 +1,7 @@
 import { rankTonight, type TonightFilters } from '../src/lib/tonight';
 import { feedbackWeights, type TonightFeedbackMap } from '../src/lib/tonightFeedback';
 import type { DuelCandidate } from '../src/lib/duel';
+import { compareRankings } from '../src/lib/tonightEvaluation';
 
 // Synthetic, hand-labelled examples; these are regression probes, not user outcomes.
 const film = (id: number, genre: string): DuelCandidate => ({ id, title: `Film ${id}`, mediaType: 'movie',
@@ -25,7 +26,8 @@ export function evaluateTonight() {
   const rows = cases.map(test => {
     const baseline = rankTonight(test.candidates, filters, {}, () => undefined).map(x => x.candidate.id);
     const updated = rankTonight(test.candidates, filters, {}, () => undefined, feedbackWeights(test.feedback)).map(x => x.candidate.id);
-    return { name: test.name, baseline, updated, baselineRR: reciprocalRank(baseline, test.relevant), updatedRR: reciprocalRank(updated, test.relevant) };
+    const metrics = compareRankings(baseline.map(id => `movie:${id}`), updated.map(id => `movie:${id}`), test.relevant.map(id => `movie:${id}`));
+    return { name: test.name, baseline, updated, baselineRR: reciprocalRank(baseline, test.relevant), updatedRR: reciprocalRank(updated, test.relevant), metrics };
   });
   return { cases: rows, baselineMRR: rows.reduce((s, r) => s + r.baselineRR, 0) / rows.length,
     updatedMRR: rows.reduce((s, r) => s + r.updatedRR, 0) / rows.length };
