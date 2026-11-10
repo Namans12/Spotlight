@@ -309,6 +309,20 @@ def test_movie_discovery_emits_each_regional_date_in_window():
     assert [x.release_date for x in items] == ['2026-08-19', '2026-08-20']
 
 
+def test_real_evidence_builder_produces_an_eligible_movie_alert():
+    from dataclasses import replace
+    details = movie_payload(movie_id=42, title='A Film', digital_in='2026-08-19', providers_in=('Netflix',))
+    class DiscoverTmdb:
+        region = 'IN'
+        def discover(self, *_args, **_kwargs): return [details]
+        def details_or_empty(self, *_args): return details
+    [item] = rb.fetch_ott_movies(DiscoverTmdb(), '2026-08-19', '2026-08-20')
+    item = replace(item, evidence=replace(item.evidence, observed_at='2026-08-19T08:00:00Z'))
+    digest = {'region': 'IN', 'generated_at': '2026-08-19T14:00:00+05:30',
+              'out_now': {'start': '2026-08-19', 'end': '2026-08-20', 'sections': {'films': [item]}}}
+    assert rb.eligible_watchlist_items(digest) == [item]
+
+
 def test_provider_types_preserve_region_and_monetization():
     details = movie_payload(digital_in='2026-08-19', providers_in=('Netflix',))
     details['watch/providers']['results']['IN']['ads'] = [{'provider_name': 'Netflix'}]

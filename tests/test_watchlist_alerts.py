@@ -50,7 +50,7 @@ def item(title, tmdb_id, media_type="movie", providers=("Netflix",)):
         tmdb_url="https://example.invalid",
         poster_url="/p.jpg",
         providers=providers,
-        evidence=rb.ReleaseEvidence("IN", "tmdb_regional_digital", "tmdb_regional_availability", "2026-09-02T08:00:00+00:00"),
+        evidence=rb.ReleaseEvidence("IN", "tmdb_regional_digital", "tmdb_regional_availability", "2026-09-02T08:00:00+00:00", "day", "digital", f"https://www.themoviedb.org/movie/{tmdb_id}"),
     )
 
 
@@ -289,6 +289,18 @@ def test_alerts_reject_stale_missing_and_future_evidence():
     assert rb.eligible_watchlist_items(digest_with(replace(current, evidence=stale))) == []
     assert rb.eligible_watchlist_items(digest_with(replace(current, evidence=future))) == []
     assert rb.eligible_watchlist_items(digest_with(replace(current, evidence=replace(current.evidence, observed_at=None)))) == []
+
+
+def test_alert_evidence_must_match_the_movie_and_digital_event():
+    from dataclasses import replace
+    current = item('Film', 42)
+    variants = [replace(current, media_type='tv'),
+                replace(current, evidence=replace(current.evidence, source_url='https://www.themoviedb.org/movie/999')),
+                replace(current, evidence=replace(current.evidence, source_url=None)),
+                replace(current, evidence=replace(current.evidence, event_kind='theatrical')),
+                replace(current, evidence=replace(current.evidence, date_precision='month'))]
+    assert rb.eligible_watchlist_items(digest_with(*variants)) == []
+    assert rb.eligible_watchlist_items(digest_with(current)) == [current]
 
 
 def test_alert_sender_deduplicates_identical_title_events_per_user():

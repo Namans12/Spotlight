@@ -1418,9 +1418,12 @@ def eligible_watchlist_items(digest: dict[str, Any]) -> list[ReleaseItem]:
                 age = None
             if (age is not None and -timedelta(minutes=5) <= age <= timedelta(hours=24)
                     and start <= event_date <= end and event_date <= run_date and region
+                    and item.media_type == 'movie' and isinstance(item.tmdb_id, int) and not isinstance(item.tmdb_id, bool) and item.tmdb_id > 0
                     and evidence and evidence.region == region
                     and evidence.date_source == "tmdb_regional_digital"
                     and evidence.provider_source == "tmdb_regional_availability"
+                    and evidence.date_precision == 'day' and evidence.event_kind == 'digital'
+                    and evidence.source_url == tmdb_item_url('movie', item.tmdb_id)
                     and item.providers):
                 result.append(item)
     return result

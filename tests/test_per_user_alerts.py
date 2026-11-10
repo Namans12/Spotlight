@@ -31,7 +31,7 @@ class FakeItem:
         self.title = title
         self.providers = providers
         self.release_date = "2026-09-02"
-        self.evidence = releasebot.ReleaseEvidence("IN", "tmdb_regional_digital", "tmdb_regional_availability", "2026-09-02T08:00:00+00:00")
+        self.evidence = releasebot.ReleaseEvidence("IN", "tmdb_regional_digital", "tmdb_regional_availability", "2026-09-02T08:00:00+00:00", "day", "digital", f"https://www.themoviedb.org/{media_type}/{tmdb_id}")
 
 
 class FakeCursor:
