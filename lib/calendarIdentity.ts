@@ -68,6 +68,15 @@ export function reviewedEditorialTmdbIdentity(row: {
     { id: 1703718, title: 'Harivarasanam', language: 'ml', date: '2027-01-15', checkedAt: '2026-11-10T19:12:41Z',
       sourceUrl: 'https://www.cinemaexpress.com/malayalam/news/2026/Oct/27/saiju-kurups-harivarasanam-gets-release-date-first-look-out',
       message: 'The editorial listing and TMDB agree on director Rajesh Nair and cast Saiju Kurup and Yogi Babu.' },
+    { id: 1783023, title: 'Pocket Rockkets', language: 'te', date: '2026-12-11', checkedAt: '2026-11-10T19:16:51Z',
+      sourceUrl: 'https://www.cinemaexpress.com/telugu/news/2026/Nov/03/niharika-konidelas-pocket-rockkets-locks-release-date',
+      message: 'The editorial listing and TMDB agree on cast Trinadh Varma, Shriya Kontham and J. D. Chakravarthy.' },
+    { id: 1494621, title: 'Dada', language: 'te', date: '2026-12-24', source: 'The Times of India', checkedAt: '2026-11-10T19:16:51Z',
+      sourceUrl: 'https://timesofindia.indiatimes.com/articleshow/135545128.cms',
+      message: 'The editorial listing and TMDB agree on director Gopichand Malineni and cast Nandamuri Balakrishna and Kajal Aggarwal.' },
+    { id: 1511403, title: 'King 100', language: 'te', date: '2026-12-24', checkedAt: '2026-11-10T19:16:51Z',
+      sourceUrl: 'https://www.cinemaexpress.com/telugu/news/2026/Aug/29/king100-glimpse-features-nagarjuna-chasing-identity-release-date-out',
+      message: 'The editorial listing and TMDB agree on director Ra Karthik and cast Nagarjuna and Tabu.' },
   ];
   const match = matches.find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language &&
     row.release_date === item.date && row.source_url === `https://en.wikipedia.org/wiki/List_of_${item.language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_${item.date.slice(0, 4)}`);

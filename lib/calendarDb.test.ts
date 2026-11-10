@@ -59,6 +59,9 @@ describe('calendar event identity', () => {
     [1443139, 'Reality', 'te', '2026-12-25', 'The New Indian Express'],
     [1370456, 'Mahakāli', 'te', '2027-01-08', 'The Hollywood Reporter India'],
     [1703718, 'Harivarasanam', 'ml', '2027-01-15', 'Cinema Express'],
+    [1783023, 'Pocket Rockkets', 'te', '2026-12-11', 'Cinema Express'],
+    [1494621, 'Dada', 'te', '2026-12-24', 'The Times of India'],
+    [1511403, 'King 100', 'te', '2026-12-24', 'Cinema Express'],
   ])('restores a credit-matched identity only for its exact observation: %s', async (id, title, language, release_date, source) => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: id, title, language, release_date,
       source_url: `https://en.wikipedia.org/wiki/List_of_${language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_${release_date.slice(0, 4)}`,
