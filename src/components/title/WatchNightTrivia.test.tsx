@@ -22,4 +22,13 @@ describe('watch-night trivia', () => {
     rerender(<WatchNightTrivia mediaType="tv" id={123} />);
     expect(container).toBeEmptyDOMElement();
   });
+  it.each([
+    ['movie', 2062, 'Paris'], ['tv', 2316, 'Pretzels'], ['movie', 673, 'The Three Broomsticks'],
+  ] as const)('checks the sourced answer for %s:%i', async (mediaType, id, answer) => {
+    render(<WatchNightTrivia mediaType={mediaType} id={id} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Try trivia' }));
+    await userEvent.click(screen.getByRole('button', { name: answer }));
+    expect(screen.getByRole('status')).toHaveTextContent('Correct!');
+    expect(screen.getByRole('link', { name: /^Source:/ })).toHaveAttribute('href', expect.stringMatching(/^https:\/\//));
+  });
 });

@@ -26,4 +26,12 @@ describe('watch-night ideas', () => {
     expect(screen.getByText('Lemon cakes')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Source: George R. R. Martin' })).toHaveAttribute('href', 'https://georgerrmartin.com/dining-in-westeros-a-feast-of-ice-and-fire/');
   });
+  it.each([
+    ['movie', 2062, 'Ratatouille'], ['tv', 2316, 'Soft pretzels'], ['movie', 673, 'Butterbeer-inspired drink'],
+  ] as const)('shows a curated idea for %s:%i', async (mediaType, id, food) => {
+    render(<WatchNightIdeas mediaType={mediaType} id={id} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Show food ideas' }));
+    expect(screen.getByText(food)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Source:/ })).toHaveAttribute('href', expect.stringMatching(/^https:\/\//));
+  });
 });
