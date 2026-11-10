@@ -21,6 +21,14 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('retains the missing identity of the reviewed High announcement', () => {
+    const item = row({ origin: 'wikipedia', tmdb_id: null, title: 'High', language: 'te', release_date: '2026-11-27',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026' });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-11T12:00:00Z'));
+    expect(review.region).toBe('IN');
+    expect(review.reasons).toContain('identity_missing');
+    expect(review.reasons).not.toContain('region_unknown');
+  });
   it('flags the legacy Paper Tiger disagreement and keeps the region unknown', () => {
     const item = row({ origin: 'district_in', tmdb_id: 1381273, title: 'Paper Tiger', language: 'en', release_date: '2026-11-20',
       source_url: 'https://www.district.in/movies/paper-tiger-movie-tickets-in-hyderabad-MV227340' });

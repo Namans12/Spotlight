@@ -46,6 +46,11 @@ export function reviewedCalendarEntry(row: {
   if (row.origin === 'wikipedia' && row.entry_type === 'Movie' &&
       (row.media_type === 'movie' || (row.media_type == null && row.tmdb_id == null && row.title === 'Donga Naa Koduku'))) {
     if (row.tmdb_id == null && row.language === 'te' && row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') {
+      if (row.title === 'High' && row.release_date === '2026-11-27') {
+        return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-10T18:30:54Z', source: 'Ticketnew',
+          sourceUrl: 'https://ticketnew.com/movies/high-movie-detail-238606',
+          message: 'Ticketnew lists the Telugu film for 27 November in India. Showtimes and the TMDB identity remain unverified.' };
+      }
       if (row.release_date === '2026-11-13' && (row.title === 'Chandrayan' || row.title === 'Donga Naa Koduku')) {
         return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-10', source: 'BookMyShow',
           sourceUrl: row.title === 'Chandrayan' ? 'https://in.bookmyshow.com/movies/bengaluru/chandrayan/ET00522567' : 'https://in.bookmyshow.com/movies/bengaluru/donga-naa-koduku/ET00521157',

@@ -18,6 +18,16 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('scopes the exact Telugu High announcement to India while leaving its identity unresolved', async () => {
+    const item = editorial({ origin: 'wikipedia', tmdb_id: null, title: 'High', language: 'te', release_date: '2026-11-27',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', event_region: null, evidence: null });
+    const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, language: 'en' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entries[0].region).toBe('IN');
+    expect(entries[0].tmdbId).toBeNull();
+    expect(entries[0].dateCorroboration?.source).toBe('Ticketnew');
+    expect(entries[1].region).toBeNull();
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
+  });
   it('scopes the reviewed Ebenezer announcement to India without asserting bookings', async () => {
     const item = editorial({ origin: 'district_in', tmdb_id: 1567605, title: 'Ebenezer', language: 'en', release_date: '2026-11-20',
       source_url: 'https://www.district.in/movies/ebenezer-movie-tickets-in-hyderabad-MV213946', event_region: null, evidence: null });
