@@ -56,6 +56,8 @@ IMG_BASE = "https://image.tmdb.org/t/p/w342"
 # cinema", as opposed to 4 (digital) / 5 (physical) / 6 (TV).
 THEATRICAL_RELEASE_TYPES = "2|3"
 MAX_PAGES = 3
+REGIONAL_LANGUAGES = ('hi', 'te', 'ta', 'ml', 'kn', 'bn', 'pa', 'mr')
+MAX_PAGES_PER_REGIONAL_LANGUAGE = 1
 # TV gets a higher cap than movies: even scoped to --tv-countries, a busy month
 # ran to 88 real matches (measured directly) — comfortably inside 5 pages, with
 # room to spare, without paying for the ~19 pages an unscoped month needs.
@@ -132,6 +134,28 @@ def discover(session, tmdb_key, path, params, max_pages=MAX_PAGES) -> list[dict]
     return out
 
 
+def discover_theatrical_candidates(session, tmdb_key, params, regional_languages=()):
+    """Give each selected original language a bounded discovery quota.
+
+    A language is only a search partition, never evidence of country or date.
+    Every candidate still goes through the regional release-date detail check.
+    """
+    films = discover(session, tmdb_key, '/discover/movie', params)
+    if len(films) >= MAX_PAGES * 20:
+        print('  overall theatrical discovery reached its page cap')
+    seen = {film.get('id') for film in films}
+    for language in dict.fromkeys(regional_languages):
+        extra = discover(session, tmdb_key, '/discover/movie',
+                         {**params, 'with_original_language': language},
+                         max_pages=MAX_PAGES_PER_REGIONAL_LANGUAGE)
+        print(f'  language {language}: {len(extra)} candidates' + (' (page cap reached)' if len(extra) >= 20 else ''))
+        for film in extra:
+            if film.get('id') is not None and film['id'] not in seen:
+                films.append(film)
+                seen.add(film['id'])
+    return films
+
+
 def tv_networks(session, tmdb_key, tmdb_id: int) -> str | None:
     """Networks decide the Streaming vs On TV split, and discover doesn't
     return them — hence one detail call per show."""
@@ -202,6 +226,8 @@ def main() -> int:
     parser.add_argument("--months", type=int, default=6, help="Months ahead to cover (default 6).")
     parser.add_argument("--region", default=os.getenv("REGION", "IN"), help="TMDB release region (default IN).")
     parser.add_argument("--skip-tv", action="store_true", help="Theatrical only; skips the per-show detail calls.")
+    parser.add_argument('--regional-languages', default=','.join(REGIONAL_LANGUAGES),
+                        help='Additional original-language discovery partitions; empty disables them.')
     parser.add_argument(
         "--tv-countries",
         default=DEFAULT_TV_COUNTRIES,
@@ -237,10 +263,9 @@ def main() -> int:
 
     try:
         for month_start, month_end in ranges:
-            films = discover(
+            films = discover_theatrical_candidates(
                 session,
                 tmdb_key,
-                "/discover/movie",
                 {
                     "region": args.region,
                     "with_release_type": THEATRICAL_RELEASE_TYPES,
@@ -257,9 +282,9 @@ def main() -> int:
                     "sort_by": "popularity.desc",
                     "include_adult": "false",
                 },
+                [x.strip().lower() for x in args.regional_languages.split(',') if x.strip()] if args.region.upper() == 'IN' else (),
             )
-            truncated = " (TRUNCATED — more exist than the page cap covers)" if len(films) >= MAX_PAGES * 20 else ""
-            print(f"  {month_start[:7]}: {len(films)} theatrical films{truncated}")
+            print(f"  {month_start[:7]}: {len(films)} distinct theatrical candidates")
 
             for film in films:
                 if film["id"] in seen_movie_ids:
@@ -268,7 +293,10 @@ def main() -> int:
                 release_date, origin_region, origin_release_date = theatrical_window(
                     session, tmdb_key, film["id"], args.region, film.get("release_date")
                 )
-                if not release_date:
+                # Discover can return a title for a later regional re-release,
+                # while this lookup selects an earlier theatrical date. Do not
+                # write that earlier date into this month's upcoming results.
+                if not release_date or not month_start <= release_date <= month_end:
                     continue
                 rows.append(
                     {

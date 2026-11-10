@@ -96,6 +96,12 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python scripts/sync_calendar_tmdb.py --months 6
 
+      - name: Sync global TV first-air dates
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/sync_global_tv.py --months 6
+
       # District's terms restrict scraping; no automated District fetch runs
       # without a separately authorized integration. Wikipedia's
       # per-language "List of X films of YYYY" pages aren't blocked the same

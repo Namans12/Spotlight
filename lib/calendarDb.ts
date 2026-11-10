@@ -5,6 +5,8 @@ import { classifyPlatform, isKnownStreamer, mediaTypeFromEntryType, normalizePla
 /** Only merge observations when all event dimensions are known and agree.
  * An unknown season is not interchangeable with a known season. */
 function eventKey(entry: CalendarEntryDTO): string | null {
+  if (entry.kind === 'global_premiere' && entry.evidenceStatus === 'global' && entry.mediaType === 'tv' && entry.tmdbId)
+    return JSON.stringify(['global_first_air', entry.mediaType, entry.tmdbId, entry.releaseDate]);
   if (!entry.region || !entry.mediaType || !entry.tmdbId) return null;
   const part = entry.title.match(/\b(?:season|series|s|part|chapter)\s*(\d+)\s*$/i);
   return JSON.stringify([entry.region, entry.mediaType, entry.tmdbId, entry.releaseDate, entry.kind,

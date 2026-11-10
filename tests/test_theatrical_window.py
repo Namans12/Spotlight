@@ -127,3 +127,16 @@ def test_type_1_premiere_dates_are_ignored():
 def test_missing_production_countries_field_never_crashes():
     got = window(release_dates(production_country=None, IN=["2026-08-21"]))
     assert got == ("2026-08-21", None, None)
+
+
+def test_regional_language_discovery_expands_without_changing_regional_filters(monkeypatch):
+    calls = []
+    def fake(_s, _key, path, params, max_pages=sync.MAX_PAGES):
+        calls.append((path, params, max_pages))
+        return [{'id': 1}] if 'with_original_language' not in params else [{'id': 1}, {'id': 2}]
+    monkeypatch.setattr(sync, 'discover', fake)
+    base = {'region': 'IN', 'with_release_type': '2|3', 'release_date.gte': '2026-11-01'}
+    assert [row['id'] for row in sync.discover_theatrical_candidates(None, 'key', base, ['te', 'te'])] == [1, 2]
+    assert len(calls) == 2
+    assert calls[1][1] == {**base, 'with_original_language': 'te'}
+    assert calls[1][2] == 1

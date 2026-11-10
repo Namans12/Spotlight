@@ -1,0 +1,22 @@
+name: Calendar discovery dry run
+on:
+  workflow_dispatch: {}
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - name: Check regional theatrical discovery without writing
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: python scripts/sync_calendar_tmdb.py --months 1 --dry-run
+      - name: Check global TV discovery without writing
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: python scripts/sync_global_tv.py --months 1 --dry-run
