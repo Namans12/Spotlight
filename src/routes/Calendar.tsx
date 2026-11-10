@@ -30,6 +30,14 @@ function currentMonth(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function httpsSource(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
+}
+
 function shiftMonth(month: string, delta: number): string {
   const [y, m] = month.split('-').map(Number);
   const d = new Date(y, m - 1 + delta, 1);
@@ -155,6 +163,10 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
   for (const offer of offers ?? []) offerTypes[offer.provider] = [...new Set([...(offerTypes[offer.provider] ?? []), offer.type])];
   return <div>
     {entry.tmdbId && entry.mediaType ? <Link to={`/title/${entry.mediaType}/${entry.tmdbId}`}>{body}</Link> : body}
+    {entry.additionalSources?.map((item, index) => {
+      const url = httpsSource(item.sourceUrl);
+      return <p key={`${item.source ?? ''}:${item.sourceUrl ?? ''}:${index}`} className="px-3 pb-2 text-xs text-muted-foreground">Additional source: {url ? <a className="underline" href={url} target="_blank" rel="noopener noreferrer">{item.source || 'source'}</a> : item.source || 'unknown'} · {evidenceDate(item.observedAt)}</p>;
+    })}
     {(entry.reviewFreshness === 'stale' || entry.reviewFreshness === 'unknown') && <p className="px-3 pb-2 text-xs text-muted-foreground">{entry.reviewFreshness === 'stale' ? 'Source review may be stale; check the linked source.' : 'Source review age is unknown; check the linked source.'}</p>}
     {entry.seasonPremiere && <p className="px-3 pb-2 text-xs text-muted-foreground">Announcement checked {entry.seasonPremiere.checkedAt}: <a className="underline" href={entry.seasonPremiere.sourceUrl} target="_blank" rel="noopener noreferrer">{entry.seasonPremiere.source}</a></p>}
     {entry.dateCorroboration && <p className="px-3 pb-2 text-xs text-muted-foreground">{entry.dateCorroboration.message} <a className="underline" href={entry.dateCorroboration.sourceUrl} target="_blank" rel="noopener noreferrer">{entry.dateCorroboration.source}</a> · Checked {entry.dateCorroboration.checkedAt}</p>}

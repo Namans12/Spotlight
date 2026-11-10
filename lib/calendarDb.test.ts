@@ -26,6 +26,22 @@ describe('calendar event identity', () => {
     expect(entry.dateCorroboration?.message).toContain('bookings were not yet open');
     expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
   });
+  it('keeps reviewed source evidence when merging the same verified event in either order', async () => {
+    const reviewed = editorial({ origin: 'district_in', tmdb_id: 1567605, title: 'Ebenezer', language: 'en', release_date: '2026-11-20',
+      source: 'District', source_url: 'https://www.district.in/movies/ebenezer-movie-tickets-in-hyderabad-MV213946', event_region: null, evidence: null });
+    const tmdb = editorial({ id: 2, origin: 'tmdb_upcoming', tmdb_id: 1567605, title: 'Ebenezer', language: 'en', release_date: '2026-11-20',
+      source: 'TMDB', source_url: 'https://www.themoviedb.org/movie/1567605', event_region: 'IN',
+      evidence: { date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1567605', observed_at: '2026-11-09T00:00:00Z' } });
+    for (const rows of [[tmdb, reviewed], [reviewed, tmdb]]) {
+      const entries = await getCalendarMonth(db([], rows) as unknown as postgres.Sql, '2026-11', 'IN');
+      expect(entries).toHaveLength(1);
+      expect(entries[0].dateCorroboration?.source).toBe('BookMyShow');
+      expect(entries[0].additionalSources).toHaveLength(1);
+      expect([entries[0].source, entries[0].additionalSources?.[0].source].join(' ')).toContain('TMDB');
+      expect([entries[0].source, entries[0].additionalSources?.[0].source].join(' ')).toContain('BookMyShow');
+      expect(entries[0].reviewFreshness).toBeTruthy();
+    }
+  });
   it('flags the legacy Paper Tiger date without asserting that different regions share an event', async () => {
     const item = editorial({ origin: 'district_in', tmdb_id: 1381273, title: 'Paper Tiger', language: 'en', release_date: '2026-11-20',
       source_url: 'https://www.district.in/movies/paper-tiger-movie-tickets-in-hyderabad-MV227340', event_region: null, evidence: null });

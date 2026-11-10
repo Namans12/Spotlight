@@ -246,6 +246,15 @@ describe('Calendar event details', () => {
     expect(screen.getByRole('link', { name: 'Cinema United' })).toHaveAttribute('href', 'https://cinemaunited.org/release-calendar/');
     expect(screen.getByText('Region unknown')).toBeInTheDocument();
   });
+  it('shows additional merged sources and does not link unsafe URLs', async () => {
+    vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({ title: 'Multiple sources',
+      additionalSources: [{ source: 'TMDB', sourceUrl: 'https://www.themoviedb.org/movie/1', observedAt: '2026-08-01T00:00:00Z' },
+        { source: 'Untrusted', sourceUrl: 'javascript:alert(1)', observedAt: null }] })] });
+    renderCalendar();
+    expect(await screen.findByRole('link', { name: 'TMDB' })).toHaveAttribute('href', 'https://www.themoviedb.org/movie/1');
+    expect(screen.getByText(/Additional source: Untrusted/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Untrusted' })).not.toBeInTheDocument();
+  });
   it('shows linked editorial review and preserves regional uncertainty', async () => {
     vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({
       title: 'Reviewed film', region: null, dateConflict: { message: 'Date needs review', source: 'Studio',

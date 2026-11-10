@@ -52,6 +52,26 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
       if (key) byEvent.set(key, entry);
       return;
     }
+    // Preserve distinct review annotations instead of silently dropping one.
+    if ((existing.dateCorroboration && entry.dateCorroboration &&
+         JSON.stringify(existing.dateCorroboration) !== JSON.stringify(entry.dateCorroboration)) ||
+        (existing.dateConflict && entry.dateConflict && JSON.stringify(existing.dateConflict) !== JSON.stringify(entry.dateConflict)) ||
+        (existing.seasonPremiere && entry.seasonPremiere && JSON.stringify(existing.seasonPremiere) !== JSON.stringify(entry.seasonPremiere))) {
+      entries.push(entry);
+      return;
+    }
+    const extraSource = { source: entry.source ?? null, sourceUrl: entry.sourceUrl ?? null, observedAt: entry.observedAt ?? null };
+    const prior = { source: existing.source ?? null, sourceUrl: existing.sourceUrl ?? null, observedAt: existing.observedAt ?? null };
+    if ((extraSource.source || extraSource.sourceUrl) &&
+        (extraSource.source !== prior.source || extraSource.sourceUrl !== prior.sourceUrl) &&
+        !(existing.additionalSources ?? []).some(source => source.source === extraSource.source && source.sourceUrl === extraSource.sourceUrl)) {
+      existing.additionalSources = [...(existing.additionalSources ?? []), extraSource];
+    }
+    existing.dateCorroboration ??= entry.dateCorroboration;
+    existing.dateConflict ??= entry.dateConflict;
+    existing.seasonPremiere ??= entry.seasonPremiere;
+    if (entry.reviewFreshness === 'stale' || (entry.reviewFreshness === 'unknown' && existing.reviewFreshness !== 'stale') || !existing.reviewFreshness)
+      existing.reviewFreshness = entry.reviewFreshness ?? existing.reviewFreshness;
     // The same event may occur in multiple digest sections. Preserve all
     // observed providers, while keeping each event and region distinct.
     existing.platforms = [...new Set([...existing.platforms, ...entry.platforms])];

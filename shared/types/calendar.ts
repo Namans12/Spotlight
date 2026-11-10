@@ -18,6 +18,8 @@ export interface CalendarEntryDTO {
   region: string | null;
   source?: string | null;
   sourceUrl?: string | null;
+  /** Further observations merged into this same verified event. */
+  additionalSources?: { source: string | null; sourceUrl: string | null; observedAt: string | null }[];
   observedAt?: string | null;
   availabilityTypes?: Record<string, string[]> | null;
   evidenceStatus?: "regional" | "global" | "unverified";
