@@ -39,7 +39,7 @@ def test_upstream_failure_stops_before_any_write(monkeypatch):
         recheck.run(Connection(), None, 'key', apply=True)
 
 
-def test_external_movies_require_exact_title_and_regional_date(monkeypatch):
+def test_external_movies_are_not_verified_by_title_and_date_alone(monkeypatch):
     monkeypatch.setattr(recheck, 'rate_limit_gap', lambda *_: None)
     rows = [(1, 11, '2026-11-10', 'wikipedia', 'Right Film'),
             (2, 12, '2026-11-10', 'district_in', 'Wrong Film'),
@@ -48,7 +48,7 @@ def test_external_movies_require_exact_title_and_regional_date(monkeypatch):
         return {'title': 'Different Film' if path.endswith('/12') else 'Right Film', 'release_dates': {'results': [
             {'iso_3166_1': 'IN', 'release_dates': [{'type': 3, 'release_date': '2026-11-11' if path.endswith('/13') else '2026-11-10'}]}]}}
     result = recheck.verified_candidates(rows, None, 'key', 'IN', detail)
-    assert [r[0] for r in result] == [1]
+    assert result == []
 
 
 def test_regional_dates_ignore_invalid_foreign_and_non_theatrical():
@@ -79,6 +79,7 @@ def test_database_recheck_skips_conflicts_and_is_idempotent(monkeypatch):
                 cur.execute('''INSERT INTO calendar_entries VALUES (%s,%s,%s,'tmdb_upcoming','Movie',
                     'movie',true,NULL,%s,'A')''', (item_id, movie_id, future, f'https://www.themoviedb.org/movie/{movie_id}'))
             cur.execute("UPDATE calendar_entries SET evidence = '{\"region\":\"IN\",\"date_source\":\"tmdb_regional_theatrical\"}' WHERE id=4")
+            cur.execute("INSERT INTO calendar_entries VALUES (5,101,%s,'wikipedia','Movie','movie',true,NULL,'https://example.org','A')", (future,))
         def verified(rows, session, key, region):
             assert [r[0] for r in rows] == [1, 2]
             return [(1, 101, str(future), '2026-11-10T00:00:00+00:00', 'tmdb_upcoming', 'A')]
@@ -89,6 +90,6 @@ def test_database_recheck_skips_conflicts_and_is_idempotent(monkeypatch):
             rows = cur.fetchall()
             assert rows[0][1]['region'] == 'IN'
             assert rows[0][1]['observed_at']
-            assert rows[1][1] is None and rows[2][1] is None
+            assert rows[1][1] is None and rows[2][1] is None and rows[4][1] is None
         monkeypatch.setattr(recheck, 'verified_candidates', lambda rows, *args: [])
         assert recheck.run(conn, None, 'key', apply=True) == (1, 0, 0)

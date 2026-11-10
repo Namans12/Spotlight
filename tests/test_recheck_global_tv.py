@@ -45,7 +45,7 @@ def test_tv_upstream_failure_prevents_all_writes(monkeypatch):
 
 
 @pytest.mark.skipif(not os.getenv('SPOTLIGHT_TEST_DATABASE_URL'), reason='requires disposable PostgreSQL')
-def test_database_global_tv_requires_exact_editorial_title(monkeypatch):
+def test_database_global_tv_excludes_editorial_identity_guesses(monkeypatch):
     import psycopg
     monkeypatch.setattr(tv, 'rate_limit_gap', lambda *_: None)
     future = date.today() + timedelta(days=1)
@@ -55,9 +55,9 @@ def test_database_global_tv_requires_exact_editorial_title(monkeypatch):
                 release_date date, origin text, entry_type text, media_type text, is_theatrical boolean,
                 evidence jsonb, source_url text, title text)''')
             cur.execute("INSERT INTO calendar_entries VALUES (1,11,%s,'csv_seed','Show','tv',false,NULL,'https://example.org','Good Show'), (2,12,%s,'csv_seed','Show','tv',false,NULL,'https://example.org','Wrong Show')", (future, future))
-        assert tv.run(conn, None, 'key', apply=True, fetch=lambda s, p, k: {'name':'Good Show','first_air_date':str(future)}) == (2, 1, 1)
+        assert tv.run(conn, None, 'key', apply=True, fetch=lambda s, p, k: {'name':'Good Show','first_air_date':str(future)}) == (0, 0, 0)
         with conn.cursor() as cur:
             cur.execute('SELECT evidence FROM calendar_entries ORDER BY id')
             rows = cur.fetchall()
-            assert rows[0][0]['region'] is None and rows[0][0]['date_source'] == 'tmdb_global_first_air'
+            assert rows[0][0] is None
             assert rows[1][0] is None

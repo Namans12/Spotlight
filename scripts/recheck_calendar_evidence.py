@@ -1,7 +1,8 @@
-"""Recheck legacy TMDB theatrical rows without inferring dates or deleting rows.
+"""Recheck TMDB-origin theatrical rows without inferring dates or deleting rows.
 
 Dry-run by default. --apply updates only still-unchanged, unverified rows after
 the exact stored date is confirmed as a theatrical date in the region.
+Editorial title and date matches do not independently establish identity.
 Rows already represented by a verified event are deliberately left untouched.
 """
 from __future__ import annotations
@@ -30,10 +31,10 @@ def exact_title_match(a, b):
 SELECT_CANDIDATES = """
 SELECT a.id, a.tmdb_id, a.release_date::text, a.origin, a.title
 FROM calendar_entries a
-WHERE a.origin IN ('tmdb_upcoming','csv_seed','wikipedia','district_in') AND a.entry_type = 'Movie'
+WHERE a.origin = 'tmdb_upcoming' AND a.entry_type = 'Movie'
   AND a.media_type = 'movie' AND a.is_theatrical = true
   AND a.evidence IS NULL AND a.tmdb_id IS NOT NULL
-  AND (a.origin <> 'tmdb_upcoming' OR a.source_url = 'https://www.themoviedb.org/movie/' || a.tmdb_id::text)
+  AND a.source_url = 'https://www.themoviedb.org/movie/' || a.tmdb_id::text
   AND a.release_date >= CURRENT_DATE
   AND (a.origin <> 'tmdb_upcoming' OR NOT EXISTS (SELECT 1 FROM calendar_entries b
     WHERE b.origin = 'tmdb_upcoming' AND b.tmdb_id = a.tmdb_id
@@ -46,9 +47,9 @@ ORDER BY a.release_date, a.id LIMIT %s
 UPDATE_EVIDENCE = """
 UPDATE calendar_entries a SET evidence = %s
 WHERE a.id = %s AND a.tmdb_id = %s AND a.release_date = %s::date
-  AND a.origin = %s AND a.origin IN ('tmdb_upcoming','csv_seed','wikipedia','district_in') AND a.title = %s AND a.entry_type = 'Movie'
+  AND a.origin = %s AND a.origin = 'tmdb_upcoming' AND a.title = %s AND a.entry_type = 'Movie'
   AND a.media_type = 'movie' AND a.is_theatrical = true AND a.evidence IS NULL
-  AND (a.origin <> 'tmdb_upcoming' OR a.source_url = 'https://www.themoviedb.org/movie/' || a.tmdb_id::text)
+  AND a.source_url = 'https://www.themoviedb.org/movie/' || a.tmdb_id::text
   AND (a.origin <> 'tmdb_upcoming' OR NOT EXISTS (SELECT 1 FROM calendar_entries b
     WHERE b.id <> a.id AND b.origin = 'tmdb_upcoming' AND b.tmdb_id = a.tmdb_id
       AND b.media_type = 'movie' AND b.release_date = a.release_date
@@ -80,14 +81,12 @@ def verified_candidates(rows, session, key, region, detail=tmdb_get):
     verified = []
     details = {}
     for row_id, tmdb_id, stored_date, origin, title in rows:
+        if origin != 'tmdb_upcoming':
+            continue
         if tmdb_id not in details:
             details[tmdb_id] = detail(session, f'/movie/{tmdb_id}', key, {'append_to_response': 'release_dates'}) or {}
             checked[tmdb_id] = (regional_theatrical_dates(details[tmdb_id], region), datetime.now(timezone.utc).isoformat())
             rate_limit_gap(0.15)
-        if origin != 'tmdb_upcoming':
-            names = [details[tmdb_id].get('title'), details[tmdb_id].get('original_title')]
-            if not any(exact_title_match(title, name) for name in names if name):
-                continue
         if str(stored_date) in checked[tmdb_id][0]:
             verified.append((row_id, tmdb_id, str(stored_date), checked[tmdb_id][1], origin, title))
     return verified

@@ -1,4 +1,4 @@
-"""Recheck legacy first-air dates; they do not establish regional availability."""
+"""Recheck TMDB-origin first-air dates; they do not establish regional availability."""
 import argparse
 import os
 from datetime import datetime, timezone
@@ -9,17 +9,16 @@ import requests
 from psycopg.types.json import Jsonb
 
 from lib_relations import TmdbUnavailable, load_local_env, tmdb_get, rate_limit_gap
-from recheck_calendar_evidence import exact_title_match
 
 SELECT = """SELECT id, tmdb_id, release_date::text, origin, title FROM calendar_entries
-WHERE origin IN ('tmdb_upcoming','csv_seed') AND entry_type='Show' AND media_type='tv'
+WHERE origin = 'tmdb_upcoming' AND entry_type='Show' AND media_type='tv'
   AND is_theatrical=false AND evidence IS NULL AND tmdb_id IS NOT NULL
-  AND (origin <> 'tmdb_upcoming' OR source_url='https://www.themoviedb.org/tv/' || tmdb_id::text)
+  AND source_url='https://www.themoviedb.org/tv/' || tmdb_id::text
   AND release_date >= CURRENT_DATE ORDER BY release_date,id LIMIT %s"""
 UPDATE = """UPDATE calendar_entries SET evidence=%s WHERE id=%s AND tmdb_id=%s
-  AND release_date=%s::date AND origin=%s AND title=%s AND origin IN ('tmdb_upcoming','csv_seed') AND entry_type='Show'
+  AND release_date=%s::date AND origin=%s AND title=%s AND origin = 'tmdb_upcoming' AND entry_type='Show'
   AND media_type='tv' AND is_theatrical=false AND evidence IS NULL
-  AND (origin <> 'tmdb_upcoming' OR source_url='https://www.themoviedb.org/tv/' || tmdb_id::text)"""
+  AND source_url='https://www.themoviedb.org/tv/' || tmdb_id::text"""
 
 
 def run(conn, session, key, limit=200, apply=False, fetch=tmdb_get):
@@ -29,13 +28,14 @@ def run(conn, session, key, limit=200, apply=False, fetch=tmdb_get):
     observations = {}
     matches = []
     for row_id, tmdb_id, stored_date, origin, title in rows:
+        if origin != 'tmdb_upcoming':
+            continue
         if tmdb_id not in observations:
             data = fetch(session, f'/tv/{tmdb_id}', key) or {}
             observations[tmdb_id] = (data, datetime.now(timezone.utc).isoformat())
             rate_limit_gap(0.15)
         data, checked = observations[tmdb_id]
-        names = [data.get('name'), data.get('original_name')]
-        if data.get('first_air_date') == str(stored_date) and (origin == 'tmdb_upcoming' or any(exact_title_match(title, n) for n in names if n)):
+        if data.get('first_air_date') == str(stored_date):
             matches.append((row_id, tmdb_id, str(stored_date), checked, origin, title))
     updated = 0
     if apply:
