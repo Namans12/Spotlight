@@ -15,8 +15,14 @@ export function reviewedCalendarEntry(row: {
       sourceUrl: 'https://www.123telugu.com/mnews/sharwanands-bhogi-postponed-heres-why-hk.html',
       message: 'Date needs review: local reporting says the announced 12 November release has been postponed; no replacement date is confirmed here.' };
   }
-  if (row.origin === 'wikipedia' && row.media_type === 'movie' && row.entry_type === 'Movie') {
+  if (row.origin === 'wikipedia' && row.entry_type === 'Movie' &&
+      (row.media_type === 'movie' || (row.media_type == null && row.tmdb_id == null && row.title === 'Donga Naa Koduku'))) {
     if (row.tmdb_id == null && row.language === 'te' && row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') {
+      if (row.release_date === '2026-11-13' && (row.title === 'Chandrayan' || row.title === 'Donga Naa Koduku')) {
+        return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-10', source: 'BookMyShow',
+          sourceUrl: row.title === 'Chandrayan' ? 'https://in.bookmyshow.com/movies/bengaluru/chandrayan/ET00522567' : 'https://in.bookmyshow.com/movies/bengaluru/donga-naa-koduku/ET00521157',
+          message: 'BookMyShow lists the Telugu film for 13 November in India; bookings were not yet open when checked. The TMDB identity remains unverified.' };
+      }
       if (row.title === 'Itlu Arjuna' && row.release_date === '2026-11-13') {
         return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-10', source: 'BookMyShow',
           sourceUrl: 'https://in.bookmyshow.com/movies/angara/itllu-arjuna/ET00514068',

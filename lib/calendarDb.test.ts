@@ -26,8 +26,8 @@ describe('calendar event identity', () => {
     expect(entries.find(entry => entry.dateConflict)?.dateConflict?.source).toBe('123telugu');
     expect(entries.filter(entry => entry.dateConflict)).toHaveLength(1);
   });
-  it.each(['Talcum Powder', 'Itlu Arjuna'])('uses a scoped Indian ticketing announcement for %s only for the exact Telugu record and region', async (title) => {
-    const item = editorial({ origin: 'wikipedia', tmdb_id: null, title, language: 'te', release_date: '2026-11-13',
+  it.each(['Talcum Powder', 'Itlu Arjuna', 'Chandrayan', 'Donga Naa Koduku'])('uses a scoped Indian ticketing announcement for %s only for the exact Telugu record and region', async (title) => {
+    const item = editorial({ origin: 'wikipedia', tmdb_id: null, media_type: title === 'Donga Naa Koduku' ? null : 'movie', title, language: 'te', release_date: '2026-11-13',
       source: 'wikipedia', source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', event_region: null, evidence: null });
     const [entry, mismatch] = await getCalendarMonth(db([], [item, { ...item, id: 2, language: 'en' }]) as unknown as postgres.Sql, '2026-11', 'IN');
     expect(entry.region).toBe('IN');
