@@ -38,6 +38,18 @@ export function reviewedEditorialTmdbIdentity(row: {
     { id: 1654912, title: 'Mayan: Chapter 1', language: 'ml', date: '2026-12-03', source: 'Simply Mollywood', checkedAt: '2026-11-10T19:05:44Z',
       sourceUrl: 'https://simplymollywood.com/movies/december-2026-malayalam-releases-mayan-padayaatra-athimanoharam-iffk',
       message: 'The editorial listing and TMDB agree on director Jithin K Jose and lead Jayasurya.' },
+    { id: 1504630, title: 'Mysaa', language: 'te', date: '2026-11-27', checkedAt: '2026-11-10T19:07:49Z',
+      sourceUrl: 'https://www.cinemaexpress.com/telugu/news/2026/Sep/01/rashmika-mandannas-mysaa-gets-release-date',
+      message: 'The editorial listing and TMDB agree on director Rawindra Pulle and lead Rashmika Mandanna.' },
+    { id: 1713050, title: 'Alias Rukmini', language: 'te', date: '2026-12-04', source: 'Telangana Today', checkedAt: '2026-11-10T19:07:49Z',
+      sourceUrl: 'https://telanganatoday.com/alias-rukmini-nithiins-new-look-unveiled-ahead-of-december-4-release',
+      message: 'The editorial listing and TMDB agree on director Murali Kanth Devasoth and leads Nithiin and Aafiya Sayed.' },
+    { id: 1436202, title: 'Legacy', language: 'te', date: '2026-12-04', source: 'The Times of India', checkedAt: '2026-11-10T19:07:49Z',
+      sourceUrl: 'https://timesofindia.indiatimes.com/entertainment/telugu/movies/news/legacy-vishwak-sen-announces-december-4-release-date-for-political-action-drama-says-politics-is-personal/articleshow/133837154.cms',
+      message: 'The editorial listing and TMDB agree on director Saikiran Reddy Daida and leads Vishwak Sen and Ekta Rathod.' },
+    { id: 1395627, title: 'Vrushakarma', language: 'te', date: '2026-12-04', checkedAt: '2026-11-10T19:07:49Z',
+      sourceUrl: 'https://www.cinemaexpress.com/telugu/news/2026/Sep/10/naga-chaitanyas-vrushakarma-confirms-december-release-date',
+      message: 'The editorial listing and TMDB agree on director Karthik Varma Dandu and lead Naga Chaitanya.' },
   ];
   const match = matches.find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language &&
     row.release_date === item.date && row.source_url === `https://en.wikipedia.org/wiki/List_of_${item.language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_2026`);
