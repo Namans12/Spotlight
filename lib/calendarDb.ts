@@ -2,6 +2,7 @@ import type postgres from "postgres";
 import type { CalendarEntryDTO } from "../shared/types/calendar.js";
 import { classifyPlatform, isKnownStreamer, mediaTypeFromEntryType, normalizePlatforms, splitPlatformField } from "../shared/platforms.js";
 import { reviewedCalendarEntry } from "./calendarReconciliation.js";
+import { reviewFreshness } from "../shared/calendarFreshness.js";
 
 /** Only merge observations when all event dimensions are known and agree.
  * An unknown season is not interchangeable with a known season. */
@@ -97,6 +98,7 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
       source: (regionalEvidence || globalPremiere) && row.source && row.source.toLowerCase() !== 'tmdb' ? `${row.source} / TMDB` : row.source ?? null, sourceUrl: row.source_url ?? null,
       observedAt: regionalEvidence || globalPremiere ? row.evidence?.observed_at ?? null : null, availabilityTypes: null,
       evidenceStatus: globalPremiere ? "global" : regionalEvidence ? "regional" : "unverified",
+      reviewFreshness: review ? reviewFreshness(review.checkedAt) : null,
       seasonPremiere: review?.type === 'season' ? review : null,
       dateCorroboration: review?.type === 'corroboration' || review?.type === 'event' ? review : null,
       dateConflict: review?.type === 'conflict' ? review : null });

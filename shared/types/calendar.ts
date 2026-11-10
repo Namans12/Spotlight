@@ -21,6 +21,7 @@ export interface CalendarEntryDTO {
   observedAt?: string | null;
   availabilityTypes?: Record<string, string[]> | null;
   evidenceStatus?: "regional" | "global" | "unverified";
+  reviewFreshness?: "fresh" | "stale" | "unknown" | null;
   seasonPremiere?: { season: number; coverage: string; source: string; sourceUrl: string; checkedAt: string } | null;
   dateCorroboration?: { message: string; source: string; sourceUrl: string; checkedAt: string } | null;
   dateConflict?: { message: string; source: string; sourceUrl: string; checkedAt: string } | null;

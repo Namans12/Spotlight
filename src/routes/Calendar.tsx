@@ -155,6 +155,7 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
   for (const offer of offers ?? []) offerTypes[offer.provider] = [...new Set([...(offerTypes[offer.provider] ?? []), offer.type])];
   return <div>
     {entry.tmdbId && entry.mediaType ? <Link to={`/title/${entry.mediaType}/${entry.tmdbId}`}>{body}</Link> : body}
+    {(entry.reviewFreshness === 'stale' || entry.reviewFreshness === 'unknown') && <p className="px-3 pb-2 text-xs text-muted-foreground">{entry.reviewFreshness === 'stale' ? 'Source review may be stale; check the linked source.' : 'Source review age is unknown; check the linked source.'}</p>}
     {entry.seasonPremiere && <p className="px-3 pb-2 text-xs text-muted-foreground">Announcement checked {entry.seasonPremiere.checkedAt}: <a className="underline" href={entry.seasonPremiere.sourceUrl} target="_blank" rel="noopener noreferrer">{entry.seasonPremiere.source}</a></p>}
     {entry.dateCorroboration && <p className="px-3 pb-2 text-xs text-muted-foreground">{entry.dateCorroboration.message} <a className="underline" href={entry.dateCorroboration.sourceUrl} target="_blank" rel="noopener noreferrer">{entry.dateCorroboration.source}</a> · Checked {entry.dateCorroboration.checkedAt}</p>}
     {entry.dateConflict && <p className="px-3 pb-2 text-xs text-muted-foreground">{entry.dateConflict.message} <a className="underline" href={entry.dateConflict.sourceUrl} target="_blank" rel="noopener noreferrer">{entry.dateConflict.source}</a> · Checked {entry.dateConflict.checkedAt}</p>}

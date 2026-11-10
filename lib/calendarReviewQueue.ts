@@ -1,0 +1,47 @@
+import { reviewedCalendarEntry } from './calendarReconciliation.js';
+import { reviewFreshness } from '../shared/calendarFreshness.js';
+
+export interface ReviewQueueRow {
+  id: string | number; origin: string; tmdb_id: number | null; media_type: string | null;
+  title: string; release_date: string; source_url: string | null; entry_type: string | null;
+  event_region: string | null; evidence: unknown; platform_or_distributor: string | null;
+}
+export interface ReviewQueueItem {
+  id: string; title: string; releaseDate: string; origin: string; region: string | null;
+  tmdbId: number | null; sourceUrl: string | null; reviewSourceUrl: string | null;
+  checkedAt: string | null; reasons: string[];
+}
+
+/** Read-only triage: a fresh observation does not verify identity or region. */
+export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): ReviewQueueItem[] {
+  const queue: ReviewQueueItem[] = [];
+  for (const row of rows) {
+    const review = reviewedCalendarEntry(row);
+    const evidence = row.evidence && typeof row.evidence === 'object' && !Array.isArray(row.evidence)
+      ? row.evidence as Record<string, unknown> : null;
+    const reasons: string[] = [];
+    if (review?.type === 'conflict') reasons.push('date_conflict');
+    if (!evidence && !review) reasons.push('unreviewed');
+    if (row.evidence != null && !evidence) reasons.push('invalid_evidence');
+    if (row.tmdb_id == null) reasons.push('identity_missing');
+    if (review?.type === 'conflict' && 'suppressTitleLink' in review && review.suppressTitleLink) reasons.push('identity_unverified');
+    if (!row.event_region) reasons.push('region_unknown');
+    if (evidence && (typeof evidence.date_source !== 'string' || !evidence.date_source ||
+        typeof evidence.source_url !== 'string' || !evidence.source_url.startsWith('https://'))) reasons.push('evidence_incomplete');
+    if (evidence && row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
+        typeof evidence.source_url === 'string' && evidence.source_url.startsWith('https://www.themoviedb.org/') &&
+        evidence.source_url !== `https://www.themoviedb.org/${row.media_type}/${row.tmdb_id}`) reasons.push('identity_conflict');
+    const checked = review?.checkedAt ?? (typeof evidence?.observed_at === 'string' ? evidence.observed_at : null);
+    if (review || evidence) {
+      const freshness = reviewFreshness(checked, now);
+      if (freshness === 'unknown') reasons.push('freshness_unknown');
+      else if (freshness === 'stale') reasons.push('evidence_stale');
+    }
+    if (!reasons.length) continue;
+    queue.push({ id: String(row.id), title: row.title, releaseDate: row.release_date, origin: row.origin,
+      region: row.event_region, tmdbId: row.tmdb_id == null ? null : Number(row.tmdb_id), sourceUrl: row.source_url,
+      reviewSourceUrl: review?.sourceUrl ?? null, checkedAt: checked, reasons });
+  }
+  const rank = (x: ReviewQueueItem) => x.reasons.includes('date_conflict') || x.reasons.includes('identity_conflict') ? 0 : x.reasons.includes('unreviewed') ? 1 : 2;
+  return queue.sort((a, b) => rank(a) - rank(b) || a.releaseDate.localeCompare(b.releaseDate) || a.id.localeCompare(b.id, 'en', { numeric: true }));
+}

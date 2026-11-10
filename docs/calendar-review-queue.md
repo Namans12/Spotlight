@@ -1,0 +1,7 @@
+# Calendar reconciliation review queue
+
+Run `npm run calendar:review-queue -- --days 90` with `DATABASE_URL` set. The command reads a bounded upcoming date window in a read-only transaction and prints JSON, including the scanned count, reason counts, source links and actionable rows. It makes no network requests to sources and never updates records. `--as-of YYYY-MM-DD`, `--days 1..365` and `--limit 1..5000` support repeatable, bounded reviews. The `truncated` flag means the earliest rows filled the limit; increase it or narrow the date window before treating counts as complete.
+
+The queue prioritizes date and identity conflicts, then unreviewed entries, then other uncertainties. Reason counts overlap. Region unknown and missing identity remain review items even when a date is corroborated elsewhere; a global premiere is not automatically an India premiere. The queue does not assert that a source is reachable or still supports its old claim.
+
+Freshness uses the source observation time (or a curated review's checked date), with 30 days as the review threshold. Invalid, future or absent timestamps have unknown freshness. A fresh observation is not a guarantee of correctness. Reviewed dates can remain disputed even while fresh. Recheck source identity, event type, territory, date and terms before adding or changing an evidence decision; do not change production data based solely on a queue item. Existing manual annotations are matched to their original record identity and must be reviewed if that identity changes.

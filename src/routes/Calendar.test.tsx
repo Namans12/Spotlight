@@ -231,6 +231,11 @@ describe('Calendar release-kind tabs', () => {
 });
 
 describe('Calendar event details', () => {
+  it('warns when a source review is stale', async () => {
+    vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({ title: 'Old review', reviewFreshness: 'stale' })] });
+    renderCalendar();
+    expect(await screen.findByText('Source review may be stale; check the linked source.')).toBeInTheDocument();
+  });
   it('displays the scope and source of a corroborated theatrical date', async () => {
     vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({
       title: 'Reviewed release', region: null, dateCorroboration: { message: 'North American schedule; local date unconfirmed.',
