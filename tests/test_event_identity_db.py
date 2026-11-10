@@ -47,6 +47,17 @@ def test_migration_and_writers_keep_distinct_events(monkeypatch, tmp_path):
                         poster_url=None, origin_region=None, origin_release_date=None, event_region='IN', source_key='tmdb-1')
             for row in (base, base, dict(base, tmdb_id=2, source_key='tmdb-2'), dict(base, event_region='US', source_key='tmdb-us')):
                 cur.execute(tmdb.UPSERT_SQL, row); cur.fetchone()
+            cur.execute("UPDATE calendar_entries SET tmdb_id=NULL, media_type=NULL WHERE source_key='tmdb-1'")
+            cur.execute(tmdb.UPSERT_SQL, base)
+            assert cur.fetchone() is None
+            cur.execute("SELECT tmdb_id, media_type FROM calendar_entries WHERE source_key='tmdb-1'")
+            assert cur.fetchone() == (None, None)
+            cur.execute(tmdb.UPSERT_SQL, dict(base, tmdb_id=3, source_key='tmdb-2'))
+            assert cur.fetchone() is None
+            cur.execute("SELECT tmdb_id FROM calendar_entries WHERE source_key='tmdb-2'")
+            assert cur.fetchone()[0] == 2
+            cur.execute(tmdb.UPSERT_SQL, dict(base, event_region='IN', source_key='tmdb-us'))
+            assert cur.fetchone() is None
             d = dict(base, source_key='district-1')
             for row in (d, d, dict(d, source_key='district-2')):
                 cur.execute(district.UPSERT_SQL, row); cur.fetchone()

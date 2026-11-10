@@ -76,10 +76,7 @@ VALUES (%(release_date)s, %(title)s, %(language)s, %(entry_type)s, %(is_theatric
                            'observed_at', now(), 'date_precision', 'day', 'event_kind', 'theatrical',
                            'source_url', %(source_url)s::text), %(source_key)s)
 ON CONFLICT (origin, source_key) DO UPDATE SET
-    -- Enrich only. An editorial row keeps its own curated platform and details;
-    -- all it gains here is the TMDB linkage it never had.
-    tmdb_id                 = COALESCE(calendar_entries.tmdb_id, EXCLUDED.tmdb_id),
-    media_type              = COALESCE(calendar_entries.media_type, EXCLUDED.media_type),
+    -- Only refresh the same verified source event; never restore a cleared identity.
     poster_url              = COALESCE(calendar_entries.poster_url, EXCLUDED.poster_url),
     -- EXCLUDED names the target table's columns, not the VALUES placeholders,
     -- so this is platform_or_distributor even though the parameter is %(platform)s.
@@ -87,9 +84,12 @@ ON CONFLICT (origin, source_key) DO UPDATE SET
     details                 = COALESCE(calendar_entries.details, EXCLUDED.details),
     origin_region           = COALESCE(calendar_entries.origin_region, EXCLUDED.origin_region),
     origin_release_date     = COALESCE(calendar_entries.origin_release_date, EXCLUDED.origin_release_date),
-    evidence = CASE WHEN calendar_entries.origin = 'tmdb_upcoming'
-                    AND calendar_entries.tmdb_id = EXCLUDED.tmdb_id
-                    THEN EXCLUDED.evidence ELSE calendar_entries.evidence END
+    evidence = EXCLUDED.evidence
+WHERE calendar_entries.tmdb_id = EXCLUDED.tmdb_id
+  AND calendar_entries.media_type = EXCLUDED.media_type
+  AND calendar_entries.release_date = EXCLUDED.release_date
+  AND calendar_entries.source_url = EXCLUDED.source_url
+  AND (calendar_entries.evidence IS NULL OR calendar_entries.evidence->>'region' = EXCLUDED.evidence->>'region')
 RETURNING (xmax = 0) AS inserted
 """
 
@@ -333,19 +333,21 @@ def main() -> int:
         print(f"\nwould upsert {len(rows)} rows")
         return 0
 
-    inserted = updated = 0
+    inserted = updated = skipped = 0
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:
             for row in rows:
                 cur.execute(UPSERT_SQL, row)
                 result = cur.fetchone()
-                if result and result[0]:
+                if result is None:
+                    skipped += 1
+                elif result[0]:
                     inserted += 1
                 else:
                     updated += 1
         conn.commit()
 
-    print(f"\n{inserted} new calendar rows, {updated} existing rows enriched")
+    print(f"\n{inserted} new calendar rows, {updated} existing rows enriched, {skipped} identity/evidence conflicts skipped for review")
     return 0
 
 
