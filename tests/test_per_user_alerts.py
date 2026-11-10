@@ -44,6 +44,7 @@ class FakeCursor:
         self._result: list[tuple] = []
         self.inserts: list[tuple] = []
         self.disabled_users: set[int] = set()
+        self.removed_titles: set[tuple] = set()
 
     def execute(self, sql: str, params: tuple = ()):  # noqa: D102
         text = " ".join(sql.split())
@@ -51,6 +52,8 @@ class FakeCursor:
             self._result = [(None,)]
         elif text.startswith("SELECT 1 FROM users WHERE"):
             self._result = [] if params[0] in self.disabled_users else [(1,)]
+        elif text.startswith("SELECT 1 FROM watchlist_items WHERE"):
+            self._result = [] if params in self.removed_titles else [(1,)]
         elif text.startswith("SELECT u.id, u.email"):
             self._result = list(self._watchlist_rows)
         elif text.startswith("SELECT 1 FROM sent_notifications"):
@@ -169,6 +172,16 @@ def test_one_email_per_account_not_one_per_title():
 def test_does_not_send_if_account_opted_out_after_matching():
     cursor = FakeCursor([], set())
     cursor.disabled_users.add(7)
+    entries = [{"user_id": 7, "email": "a@example.com", "display_name": "Ada",
+                "matches": [{"tmdb_id": 1, "media_type": "movie", "title": "Film", "providers": ["Netflix"]}]}]
+    sent = []
+    assert releasebot.send_user_watchlist_alerts(entries, FakeConn(cursor), lambda *args: sent.append(args)) == (0, 0)
+    assert sent == [] and cursor.inserts == []
+
+
+def test_does_not_send_if_title_removed_or_marked_watched_after_matching():
+    cursor = FakeCursor([], set())
+    cursor.removed_titles.add((7, 1, 'movie'))
     entries = [{"user_id": 7, "email": "a@example.com", "display_name": "Ada",
                 "matches": [{"tmdb_id": 1, "media_type": "movie", "title": "Film", "providers": ["Netflix"]}]}]
     sent = []

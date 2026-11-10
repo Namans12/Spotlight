@@ -1556,6 +1556,18 @@ def send_user_watchlist_alerts(
                 continue
             fresh = []
             for match in entry["matches"]:
+                # A saved title can be removed or marked watched after the
+                # match list was built, including while this run waited.
+                cur.execute(
+                    """
+                    SELECT 1 FROM watchlist_items
+                    WHERE user_id=%s AND tmdb_id=%s AND media_type=%s
+                      AND bucket IN ('watchlist','watchLater')
+                    """,
+                    (user_id, match["tmdb_id"], match["media_type"]),
+                )
+                if cur.fetchone() is None:
+                    continue
                 cur.execute(
                     """
                     SELECT 1 FROM sent_notifications
