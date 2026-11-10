@@ -2,6 +2,8 @@ import { rankTonight, type TonightFilters } from '../src/lib/tonight';
 import { feedbackWeights, type TonightFeedbackMap } from '../src/lib/tonightFeedback';
 import type { DuelCandidate } from '../src/lib/duel';
 import { compareRankings } from '../src/lib/tonightEvaluation';
+import { readFileSync } from 'node:fs';
+import { evaluateOfflineCases, parseOfflineCases } from '../src/lib/tonightOfflineEvaluation';
 
 // Synthetic, hand-labelled examples; these are regression probes, not user outcomes.
 const film = (id: number, genre: string): DuelCandidate => ({ id, title: `Film ${id}`, mediaType: 'movie',
@@ -32,4 +34,14 @@ export function evaluateTonight() {
   return { cases: rows, baselineMRR: rows.reduce((s, r) => s + r.baselineRR, 0) / rows.length,
     updatedMRR: rows.reduce((s, r) => s + r.updatedRR, 0) / rows.length };
 }
-console.log(JSON.stringify(evaluateTonight(), null, 2));
+try {
+  const args = process.argv.slice(2);
+  if (!args.length) console.log(JSON.stringify(evaluateTonight(), null, 2));
+  else if (args.length === 2 && args[0] === '--input') {
+    const input: unknown = JSON.parse(readFileSync(args[1], 'utf8'));
+    console.log(JSON.stringify({ mode: 'offline_labelled', cases: evaluateOfflineCases(parseOfflineCases(input)) }, null, 2));
+  } else throw new Error('Usage: npm run evaluate:tonight -- [--input path.json]');
+} catch (error) {
+  console.error(error instanceof SyntaxError ? 'Invalid JSON evaluation input' : error instanceof Error ? error.message : 'Evaluation failed');
+  process.exitCode = 1;
+}

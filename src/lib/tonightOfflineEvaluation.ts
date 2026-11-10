@@ -1,0 +1,73 @@
+import { rankTonight, MOODS, type TonightFilters } from './tonight';
+import { feedbackWeights, type TonightFeedbackMap } from './tonightFeedback';
+import { compareRankings } from './tonightEvaluation';
+import type { DuelCandidate, Weights } from './duel';
+import type { ProviderOffer } from '../../shared/types/availability';
+
+type Judgment = 'relevant' | 'not_relevant';
+interface OfflineCase {
+  name: string; filters: TonightFilters; candidates: DuelCandidate[];
+  feedback: TonightFeedbackMap; duelWeights: Weights;
+  offers: Record<string, ProviderOffer[]>; judgments: Record<string, Judgment>;
+}
+const keyOf = (candidate: DuelCandidate) => `${candidate.mediaType}:${candidate.id}`;
+const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+const keyPattern = /^(movie|tv):[1-9]\d*$/;
+const stringArray = (value: unknown) => Array.isArray(value) && value.every(item => typeof item === 'string');
+
+/** Reject malformed fixtures rather than silently changing eligibility. */
+export function parseOfflineCases(input: unknown): OfflineCase[] {
+  if (!object(input) || !Array.isArray(input.cases) || !input.cases.length) throw new Error('Expected a non-empty cases array');
+  return input.cases.map((item: unknown, index: number) => {
+    const fail = () => { throw new Error(`Invalid evaluation case at index ${index}`); };
+    if (!object(item) || typeof item.name !== 'string' || !item.name.trim() || !object(item.filters) || !Array.isArray(item.candidates) || !item.candidates.length ||
+        !object(item.feedback) || !object(item.duelWeights) || !object(item.offers) || !object(item.judgments)) return fail();
+    const f = item.filters;
+    if (typeof f.mood !== 'string' || (f.mood !== '' && !Object.prototype.hasOwnProperty.call(MOODS, f.mood)) ||
+        !(f.maxMinutes === null || (typeof f.maxMinutes === 'number' && Number.isFinite(f.maxMinutes) && f.maxMinutes > 0)) ||
+        typeof f.language !== 'string' || f.language !== f.language.toLowerCase() || !stringArray(f.services) ||
+        typeof f.includeRentBuy !== 'boolean' || !['', 'movie', 'tv'].includes(String(f.mediaType))) return fail();
+    const keys = new Set<string>();
+    for (const c of item.candidates) {
+      if (!object(c) || !Number.isSafeInteger(c.id) || Number(c.id) <= 0 || !['movie', 'tv'].includes(String(c.mediaType)) ||
+          typeof c.title !== 'string' || typeof c.originalLanguage !== 'string' || typeof c.releaseDate !== 'string' ||
+          (c.genres !== undefined && !stringArray(c.genres)) ||
+          (c.runtime !== undefined && !(typeof c.runtime === 'number' && Number.isFinite(c.runtime) && c.runtime > 0))) return fail();
+      const key = `${c.mediaType}:${c.id}`;
+      if (keys.has(key)) return fail();
+      keys.add(key);
+    }
+    for (const [key, value] of Object.entries(item.offers)) {
+      if (!keys.has(key) || !Array.isArray(value) || value.some(offer => !object(offer) || typeof offer.provider !== 'string' ||
+          !offer.provider || !['subscription', 'free', 'ads', 'rent', 'buy'].includes(String(offer.type)))) return fail();
+    }
+    for (const [key, value] of Object.entries(item.feedback)) {
+      if (!keyPattern.test(key) || !object(value) || !['not_interested', 'already_watched', 'not_available'].includes(String(value.kind)) || !stringArray(value.genres)) return fail();
+    }
+    for (const value of Object.values(item.duelWeights)) if (typeof value !== 'number' || !Number.isFinite(value)) return fail();
+    for (const [key, value] of Object.entries(item.judgments)) if (!keys.has(key) || !['relevant', 'not_relevant'].includes(String(value))) return fail();
+    return item as unknown as OfflineCase;
+  });
+}
+
+function judgedTopThree(ranking: string[], judgments: Record<string, Judgment>) {
+  const top = ranking.slice(0, 3);
+  const judged = top.filter(key => judgments[key] !== undefined);
+  return { shown: top.length, judged: judged.length, judgedPrecision: judged.length ? judged.filter(key => judgments[key] === 'relevant').length / judged.length : null };
+}
+
+export function evaluateOfflineCases(cases: OfflineCase[]) {
+  return cases.map(test => {
+    const remaining = test.candidates.filter(candidate => !test.feedback[keyOf(candidate)]);
+    const offersFor = (type: string, id: number) => test.offers[`${type}:${id}`];
+    const relevant = Object.keys(test.judgments).filter(key => test.judgments[key] === 'relevant' && !test.feedback[key]);
+    const baseline = rankTonight(remaining, test.filters, test.duelWeights, offersFor).map(choice => keyOf(choice.candidate));
+    const updated = rankTonight(remaining, test.filters, test.duelWeights, offersFor, feedbackWeights(test.feedback)).map(choice => keyOf(choice.candidate));
+    const metrics = compareRankings(baseline, updated, relevant);
+    // Overall precision treats unjudged titles as irrelevant; suppress it for partial labels.
+    const partial = baseline.some(key => test.judgments[key] === undefined);
+    return { name: test.name, baseline, updated, labelCoverage: baseline.length ? baseline.filter(key => test.judgments[key] !== undefined).length / baseline.length : null,
+      baselineMetrics: { ...metrics.baseline, reciprocalRank: relevant.length ? metrics.baseline.reciprocalRank : null, precisionAtCutoff: partial ? null : metrics.baseline.precisionAtCutoff, topThree: judgedTopThree(baseline, test.judgments) },
+      updatedMetrics: { ...metrics.updated, reciprocalRank: relevant.length ? metrics.updated.reciprocalRank : null, precisionAtCutoff: partial ? null : metrics.updated.precisionAtCutoff, topThree: judgedTopThree(updated, test.judgments) } };
+  });
+}

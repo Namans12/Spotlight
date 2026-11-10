@@ -1,0 +1,19 @@
+{
+  "cases": [
+    {
+      "name": "synthetic-example",
+      "filters": { "mood": "", "maxMinutes": 120, "language": "en", "services": ["Netflix"], "includeRentBuy": false, "mediaType": "" },
+      "candidates": [
+        { "id": 1, "mediaType": "movie", "title": "Example one", "originalLanguage": "en", "releaseDate": "2020-01-01", "runtime": 90, "genres": ["Thriller"] },
+        { "id": 1, "mediaType": "tv", "title": "Example two", "originalLanguage": "en", "releaseDate": "2021-01-01", "runtime": 45, "genres": ["Comedy"] }
+      ],
+      "offers": {
+        "movie:1": [{ "provider": "Netflix", "type": "subscription" }],
+        "tv:1": [{ "provider": "Netflix", "type": "subscription" }]
+      },
+      "feedback": { "movie:90": { "kind": "not_interested", "genres": ["Thriller"] } },
+      "duelWeights": {},
+      "judgments": { "movie:1": "not_relevant", "tv:1": "relevant" }
+    }
+  ]
+}
