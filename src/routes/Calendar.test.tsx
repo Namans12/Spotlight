@@ -231,6 +231,16 @@ describe('Calendar release-kind tabs', () => {
 });
 
 describe('Calendar event details', () => {
+  it('displays the scope and source of a corroborated theatrical date', async () => {
+    vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({
+      title: 'Reviewed release', region: null, dateCorroboration: { message: 'North American schedule; local date unconfirmed.',
+        source: 'Cinema United', sourceUrl: 'https://cinemaunited.org/release-calendar/', checkedAt: '2026-11-10' },
+    })] });
+    renderCalendar();
+    expect(await screen.findByText(/North American schedule; local date unconfirmed/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cinema United' })).toHaveAttribute('href', 'https://cinemaunited.org/release-calendar/');
+    expect(screen.getByText('Region unknown')).toBeInTheDocument();
+  });
   it('shows linked editorial review and preserves regional uncertainty', async () => {
     vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({
       title: 'Reviewed film', region: null, dateConflict: { message: 'Date needs review', source: 'Studio',
@@ -245,7 +255,7 @@ describe('Calendar event details', () => {
   it('distinguishes an announced season premiere from the series first air date', async () => {
     vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({
       title: 'Reviewed show', mediaType: 'tv', kind: 'global_premiere', region: null,
-      seasonPremiere: { season: 3, source: 'Amazon', sourceUrl: 'https://example.com/announcement', checkedAt: '2026-11-10' },
+      seasonPremiere: { season: 3, coverage: 'Prime Video announced a premiere in over 240 countries and territories', source: 'Amazon', sourceUrl: 'https://example.com/announcement', checkedAt: '2026-11-10' },
     })] });
     renderCalendar();
     expect(await screen.findByText('Season 3 premiere')).toBeInTheDocument();

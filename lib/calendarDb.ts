@@ -97,6 +97,7 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
       observedAt: regionalEvidence || globalPremiere ? row.evidence?.observed_at ?? null : null, availabilityTypes: null,
       evidenceStatus: globalPremiere ? "global" : regionalEvidence ? "regional" : "unverified",
       seasonPremiere: review?.type === 'season' ? review : null,
+      dateCorroboration: review?.type === 'corroboration' ? review : null,
       dateConflict: review?.type === 'conflict' ? review : null });
   }
   entries.sort((a, b) => a.releaseDate.localeCompare(b.releaseDate) || a.title.localeCompare(b.title));

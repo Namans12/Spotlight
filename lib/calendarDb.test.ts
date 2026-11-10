@@ -18,6 +18,44 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('attaches a season announcement only to the reviewed Chosen event', async () => {
+    const item = editorial({ origin: 'csv_seed', tmdb_id: 85077, media_type: 'tv', entry_type: 'Show', title: 'The Chosen',
+      release_date: '2026-11-15', event_region: null, evidence: null,
+      source_url: 'https://deadline.com/feature/2026-tv-premiere-dates-1236391902/' });
+    const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, tmdb_id: 85078 }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entries[0].seasonPremiere?.season).toBe(6);
+    expect(entries[0].seasonPremiere?.coverage).toContain('selected international markets');
+    expect(entries[0].region).toBeNull();
+    expect(entries[1].seasonPremiere).toBeNull();
+  });
+
+  it.each([
+    [1300968, 'The Hunger Games: Sunrise on the Reaping', '2026-11-20'],
+    [1400336, 'Focker-in-Law', '2026-11-25'], [1538497, 'Hexed', '2026-11-25'],
+    [1078446, 'Violent Night 2', '2026-12-04'], [1003596, 'Avengers: Doomsday', '2026-12-18'],
+    [1300926, 'The Angry Birds Movie 3', '2026-12-23'],
+  ])('corroborates the North American schedule for %s without asserting India', async (tmdb_id, title, release_date) => {
+    const item = editorial({ origin: 'csv_seed', tmdb_id, title, release_date, event_region: null, evidence: null,
+      source_url: 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026' });
+    const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, source_url: 'https://example.com' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entries[0].dateCorroboration?.source).toBe('Cinema United');
+    expect(entries[0].region).toBeNull();
+    expect(entries[0].evidenceStatus).toBe('unverified');
+    expect(entries[1].dateCorroboration).toBeNull();
+  });
+
+  it.each([
+    [1288211, 'The Great Beyond', '2026-11-13'],
+    [1280115, 'Way of the Warrior Kid', '2026-11-20'],
+    [1461490, 'Hershey', '2026-11-26'],
+  ])('flags a disputed date for %s without replacing it', async (tmdb_id, title, release_date) => {
+    const item = editorial({ origin: 'csv_seed', tmdb_id, title, release_date, event_region: null, evidence: null,
+      source_url: 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026' });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry.dateConflict?.message).toContain('Date needs review');
+    expect(entry.releaseDate).toBe(release_date);
+    expect(entry.region).toBeNull();
+  });
   it('attaches a studio season announcement without claiming a regional offer', async () => {
     const item = editorial({ origin: 'csv_seed', tmdb_id: 84773, media_type: 'tv', entry_type: 'Show',
       title: 'The Lord of the Rings: The Rings of Power', release_date: '2026-11-11', event_region: null,

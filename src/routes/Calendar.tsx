@@ -137,8 +137,8 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
           Source: {entry.source || 'unknown'} · Region: {entry.region || 'unknown'} · {evidenceDate(entry.observedAt)}
         </p>
         <p className="text-[10px] text-muted-foreground leading-snug">
-          {entry.seasonPremiere ? 'Prime Video announced a premiere in over 240 countries and territories · Local date and availability unknown' : entry.kind === 'streaming' ? providerDetails(entry.platforms ?? [], entry.availabilityTypes) : entry.kind === 'theatrical' ? 'Theatrical' : entry.kind === 'global_premiere' ? 'Global first-air date · Local availability unknown' : 'TV network'}
-          {' · '}{entry.seasonPremiere || entry.evidenceStatus === 'regional' || entry.evidenceStatus === 'global' ? 'Date reported by source; may change' : 'Date and release type unverified'}
+          {entry.seasonPremiere ? `${entry.seasonPremiere.coverage} · Local date and availability unknown` : entry.kind === 'streaming' ? providerDetails(entry.platforms ?? [], entry.availabilityTypes) : entry.kind === 'theatrical' ? 'Theatrical' : entry.kind === 'global_premiere' ? 'Global first-air date · Local availability unknown' : 'TV network'}
+          {' · '}{entry.seasonPremiere || entry.evidenceStatus === 'regional' || entry.evidenceStatus === 'global' ? 'Date reported by source; may change' : entry.dateCorroboration ? 'Regional date and release type unverified' : 'Date and release type unverified'}
         </p>
       </div>
       {entry.rating != null && (
@@ -156,6 +156,7 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
   return <div>
     {entry.tmdbId && entry.mediaType ? <Link to={`/title/${entry.mediaType}/${entry.tmdbId}`}>{body}</Link> : body}
     {entry.seasonPremiere && <p className="px-3 pb-2 text-xs text-muted-foreground">Announcement checked {entry.seasonPremiere.checkedAt}: <a className="underline" href={entry.seasonPremiere.sourceUrl} target="_blank" rel="noopener noreferrer">{entry.seasonPremiere.source}</a></p>}
+    {entry.dateCorroboration && <p className="px-3 pb-2 text-xs text-muted-foreground">{entry.dateCorroboration.message} <a className="underline" href={entry.dateCorroboration.sourceUrl} target="_blank" rel="noopener noreferrer">{entry.dateCorroboration.source}</a> · Checked {entry.dateCorroboration.checkedAt}</p>}
     {entry.dateConflict && <p className="px-3 pb-2 text-xs text-muted-foreground">{entry.dateConflict.message} <a className="underline" href={entry.dateConflict.sourceUrl} target="_blank" rel="noopener noreferrer">{entry.dateConflict.source}</a> · Checked {entry.dateConflict.checkedAt}</p>}
     {entry.mediaType === 'tv' && entry.tmdbId != null && <div className="px-3 pb-2 text-xs text-muted-foreground">
       <button type="button" className="underline" onClick={() => { if (checkAvailability) void query.refetch(); else setCheckAvailability(true); }}>
