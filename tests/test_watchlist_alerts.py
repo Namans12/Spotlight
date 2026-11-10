@@ -222,7 +222,7 @@ def test_send_watchlist_alerts_message_names_the_title_and_providers():
         telegram_sender=sent_texts.append,
     )
 
-    assert sent_texts == ["🎯 From your watchlist: Gandhari is now on Netflix, JioHotstar"]
+    assert sent_texts == ["🎯 From your watchlist: Gandhari is currently listed on Netflix (availability type unknown), JioHotstar (availability type unknown). Availability: TMDB / JustWatch; listings may change."]
 
 
 def test_alerts_require_arrived_date_and_local_evidence():
@@ -322,3 +322,22 @@ def test_owner_alert_combines_only_individually_verified_provider_observations()
     matches = rb.find_watchlist_matches(digest_with(current, second, unverified), FakeConn(rows=[(42, 'movie')]), ['owner@example.com'])
     assert len(matches) == 1
     assert matches[0]['providers'] == ['Netflix', 'Prime Video']
+
+
+def test_alert_displays_offer_types_and_does_not_infer_unknown_types():
+    from dataclasses import replace
+    current = item('Film', 42, providers=('Netflix', 'Apple TV+'))
+    current = replace(current, evidence=replace(current.evidence, provider_types={'Netflix': ['subscription'], 'Apple TV+': ['rent', 'buy']}))
+    [match] = rb.find_watchlist_matches(digest_with(current), FakeConn(rows=[(42, 'movie')]), ['owner@example.com'])
+    assert rb.alert_provider_text(match) == 'Netflix (subscription), Apple TV+ (rent, buy)'
+    assert rb.alert_provider_text({'providers': ['Unknown']}) == 'Unknown (availability type unknown)'
+
+
+def test_combined_offer_types_only_use_eligible_observations():
+    from dataclasses import replace
+    current = item('Film', 42)
+    subscription = replace(current, evidence=replace(current.evidence, provider_types={'Netflix': ['subscription']}))
+    rental = replace(current, evidence=replace(current.evidence, provider_types={'Netflix': ['rent']}))
+    stale = replace(current, evidence=replace(current.evidence, observed_at='2026-08-01T00:00:00Z', provider_types={'Netflix': ['buy']}))
+    [match] = rb.find_watchlist_matches(digest_with(subscription, rental, stale), FakeConn(rows=[(42, 'movie')]), ['owner@example.com'])
+    assert match['provider_types'] == {'Netflix': ['subscription', 'rent']}

@@ -23,6 +23,7 @@ Only movie ingestion currently captures the evidence required by this rule. TV a
 Concurrent watchlist alert senders use a transaction-scoped PostgreSQL advisory lock before checking prior deliveries. A second run waits, then rechecks the account's opt-in, email address, current watchlist placement and committed delivery records. This prevents overlapping runs from both passing the same deduplication check; it cannot guarantee exactly-once email if a process crashes after an external provider accepts a message but before the database commit. An opt-out or watchlist change committed after its final check can still race with a send already starting.
 
 When multiple individually eligible digest observations refer to the same movie or show identity, alerts combine their reported providers once. Ineligible or unverified observations cannot contribute providers, and combining current listings does not claim that a provider launched the title on the release date.
+Alert messages identify subscription, ad-supported, free, rental and purchase types when observed, and label missing types unknown; TMDB / JustWatch is credited and availability may change.
 
 ## Deployment sequence
 

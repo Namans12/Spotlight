@@ -1441,7 +1441,25 @@ def eligible_watchlist_notifications(digest: dict[str, Any]) -> dict[tuple[int, 
         for provider in item.providers:
             if provider not in match["providers"]:
                 match["providers"].append(provider)
+            types = item.evidence.provider_types if isinstance(item.evidence.provider_types, dict) else {}
+            values = types.get(provider, [])
+            for offer_type in values if isinstance(values, (list, tuple)) else []:
+                if offer_type in {'subscription', 'ad-supported', 'free', 'rent', 'buy'}:
+                    saved = match.setdefault('provider_types', {}).setdefault(provider, [])
+                    if offer_type not in saved:
+                        saved.append(offer_type)
     return combined
+
+
+def alert_provider_text(match: dict[str, Any]) -> str:
+    """Describe current listings without assuming that a service is included."""
+    labels = {'subscription': 'subscription', 'ad-supported': 'with ads', 'free': 'free', 'rent': 'rent', 'buy': 'buy'}
+    descriptions = []
+    for provider in match['providers']:
+        types = match.get('provider_types', {}).get(provider, [])
+        visible = [labels[value] for value in types if value in labels]
+        descriptions.append(f"{provider} ({', '.join(visible) if visible else 'availability type unknown'})")
+    return ', '.join(descriptions) or 'a streaming platform (availability type unknown)'
 
 
 def find_watchlist_matches(
@@ -1581,7 +1599,7 @@ def send_user_watchlist_alerts(
                 continue
 
             lines_out = [
-                f"- {m['title']} — now on {', '.join(m['providers']) or 'a streaming platform'}"
+                f"- {m['title']} — currently listed on {alert_provider_text(m)}"
                 for m in fresh
             ]
             subject = (
@@ -1593,7 +1611,8 @@ def send_user_watchlist_alerts(
                 f"Hi {entry['display_name'].split(' ')[0] or 'there'},\n\n"
                 "These landed on streaming this week, from your Spotlight watchlist:\n\n"
                 + "\n".join(lines_out)
-                + "\n\nYou can turn these off any time from the account menu on Spotlight.\n"
+                + "\n\nAvailability: TMDB / JustWatch; listings may change.\n"
+                + "You can turn these off any time from the account menu on Spotlight.\n"
             )
 
             try:
@@ -1648,8 +1667,8 @@ def send_watchlist_alerts(
                 )
                 if cur.fetchone():
                     continue
-                providers_text = ", ".join(match["providers"]) or "a streaming platform"
-                text = f"🎯 From your watchlist: {match['title']} is now on {providers_text}"
+                providers_text = alert_provider_text(match)
+                text = f"🎯 From your watchlist: {match['title']} is currently listed on {providers_text}. Availability: TMDB / JustWatch; listings may change."
                 sender(text)
                 sent += 1
                 cur.execute(
