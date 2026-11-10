@@ -25,6 +25,13 @@ export function reviewedCalendarEntry(row: {
   const americanFilms = 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026';
   const hindiFilms = 'https://en.wikipedia.org/wiki/List_of_Hindi_films_of_2026';
   const deadlineTv = 'https://deadline.com/feature/2026-tv-premiere-dates-1236391902/';
+  if (Number(row.tmdb_id) === 1774728 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.title === 'Untitled film' && row.release_date === '2026-12-04' && row.source_url === hindiFilms &&
+      row.platform_or_distributor === 'Sri Venkateswara Creations, Cape of Good Films') {
+    return { type: 'conflict' as const, checkedAt: '2026-11-10', source: 'Bollywood Hungama',
+      sourceUrl: 'https://www.bollywoodhungama.com/news/bollywood/scoop-akshay-kumar-shraddha-kapoors-second-consecutive-box-office-clash-averted-as-akshay-vidya-balan-comic-caper-pushed-to-2027-eetha-gets-solo-december-4-release/',
+      message: 'Date needs review: the original date and producers match an untitled Anees Bazmee comedy, but trade reporting says it may leave 4 December. The title match and replacement date remain unconfirmed.' };
+  }
   if (row.tmdb_id == null && row.media_type == null && row.entry_type === 'Show' && row.source_url === deadlineTv) {
     if (row.title === 'Off the Scales' && row.release_date === '2026-11-11' && row.platform_or_distributor === 'TLC') {
       return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Boston.com',

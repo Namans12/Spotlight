@@ -18,6 +18,17 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('flags the specific untitled film without asserting a replacement date or transferring the warning', async () => {
+    const item = editorial({ origin: 'csv_seed', tmdb_id: 1774728, media_type: 'movie', entry_type: 'Movie', title: 'Untitled film',
+      release_date: '2026-12-04', platform_or_distributor: 'Sri Venkateswara Creations, Cape of Good Films',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Hindi_films_of_2026', event_region: null, evidence: null });
+    const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, platform_or_distributor: 'Other' }]) as unknown as postgres.Sql, '2026-12', 'IN');
+    expect(entries[0].dateConflict?.message).toContain('title match and replacement date remain unconfirmed');
+    expect(entries[0].releaseDate).toBe('2026-12-04');
+    expect(entries[0].title).toBe('Untitled film');
+    expect(entries[0].region).toBeNull();
+    expect(entries[1].dateConflict).toBeNull();
+  });
   it.each([
     [null, null, 'Show', 'Off the Scales', '2026-11-11', 'TLC', 'https://deadline.com/feature/2026-tv-premiere-dates-1236391902/', 'Boston.com'],
     [null, null, 'Show', 'Harry Potter and the Philosopher’s Stone', '2026-12-25', 'HBO Max', 'https://deadline.com/feature/2026-tv-premiere-dates-1236391902/', 'Warner Bros. Discovery'],
