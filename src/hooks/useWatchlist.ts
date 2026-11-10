@@ -240,6 +240,11 @@ export function useWatchlist() {
     if (!requireLogin()) return;
     addMutation.mutate({ movie, bucket: 'watchlist' });
   };
+  const addToWatchlistAsync = async (movie: Movie) => {
+    if (!requireLogin()) return false;
+    await addMutation.mutateAsync({ movie, bucket: 'watchlist' });
+    return true;
+  };
   const addToWatchLater = (movie: Movie) => {
     if (!requireLogin()) return;
     addMutation.mutate({ movie, bucket: 'watchLater' });
@@ -356,6 +361,7 @@ export function useWatchlist() {
     ...state,
     isLoading: query.isLoading,
     addToWatchlist,
+    addToWatchlistAsync,
     addToWatchLater,
     markWatched,
     toggleWatched,

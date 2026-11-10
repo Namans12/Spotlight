@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Sparkles } from 'lucide-react';
@@ -30,6 +30,9 @@ export default function Tonight() {
   const [feedback, setFeedback] = useState<TonightFeedbackMap>({});
   const [showResults, setShowResults] = useState(false);
   const [offset, setOffset] = useState(0);
+  const pendingSaves = useRef(new Set<string>());
+  const [saving, setSaving] = useState<Set<string>>(() => new Set());
+  const [saveErrors, setSaveErrors] = useState<Set<string>>(() => new Set());
   const trending = useQuery({ queryKey: ['tmdb', 'trending'], queryFn: getTrending, staleTime: 60 * 60_000, retry: false });
   const films = useQuery({ queryKey: ['tmdb', 'popular-movies'], queryFn: getPopularMovies, staleTime: 60 * 60_000, retry: false });
   const shows = useQuery({ queryKey: ['tmdb', 'popular-tv'], queryFn: getPopularTV, staleTime: 60 * 60_000, retry: false });
@@ -70,6 +73,21 @@ export default function Tonight() {
     setOffset(0);
   };
   const visible = choices.slice(offset, offset + 3);
+  const save = async (candidate: DuelCandidate) => {
+    const key = providerKey(candidate.mediaType, candidate.id);
+    if (pendingSaves.current.has(key)) return;
+    pendingSaves.current.add(key);
+    setSaving(new Set(pendingSaves.current));
+    setSaveErrors(current => { const next = new Set(current); next.delete(key); return next; });
+    try {
+      if (!await wl.addToWatchlistAsync(candidate)) throw new Error('Not signed in');
+    } catch {
+      setSaveErrors(current => new Set(current).add(key));
+    } finally {
+      pendingSaves.current.delete(key);
+      setSaving(new Set(pendingSaves.current));
+    }
+  };
 
   return <div className="mx-auto max-w-4xl space-y-6 pb-10">
     <header className="space-y-2">
@@ -112,7 +130,8 @@ export default function Tonight() {
             <button type="button" className="underline" onClick={() => giveFeedback(candidate, 'already_watched')}>Already watched</button>
             <button type="button" className="underline" onClick={() => giveFeedback(candidate, 'not_available')}>Not available</button>
           </div>
-          <div className="mt-auto flex flex-wrap gap-3 text-xs font-semibold"><Link className="text-accent underline" to={`/title/${candidate.mediaType}/${candidate.id}`}>See where to watch</Link>{isAuthenticated ? <button type="button" disabled={saved.has(providerKey(candidate.mediaType, candidate.id))} onClick={() => wl.addToWatchlist(candidate)} className="underline disabled:opacity-60">{saved.has(providerKey(candidate.mediaType, candidate.id)) ? 'Saved' : 'Save'}</button> : <Link to="/login" className="underline">Sign in to save</Link>}</div>
+          <div className="mt-auto flex flex-wrap gap-3 text-xs font-semibold"><Link className="text-accent underline" to={`/title/${candidate.mediaType}/${candidate.id}`}>See where to watch</Link>{isAuthenticated ? <button type="button" disabled={saved.has(providerKey(candidate.mediaType, candidate.id)) || saving.has(providerKey(candidate.mediaType, candidate.id))} onClick={() => void save(candidate)} className="underline disabled:opacity-60">{saved.has(providerKey(candidate.mediaType, candidate.id)) ? 'Saved' : saving.has(providerKey(candidate.mediaType, candidate.id)) ? 'Saving…' : 'Save'}</button> : <Link to="/login" className="underline">Sign in to save</Link>}</div>
+          {saveErrors.has(providerKey(candidate.mediaType, candidate.id)) && <p role="alert" className="text-xs text-muted-foreground">Could not save this title. Please try again.</p>}
         </article>;
       })}</div>}
       <p className="text-xs text-muted-foreground">Optional feedback stays in this session. “Not for me” hides that title and gently lowers similar genres; the other options hide only that title.</p>

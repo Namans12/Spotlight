@@ -9,9 +9,9 @@ import type { Movie } from '@/types/movie';
 const movie = (id: number, title: string, language = 'en'): Movie => ({ id, title, mediaType: 'movie',
   posterPath: '/poster.jpg', overview: '', releaseDate: '2020-01-01', voteAverage: 7, originalLanguage: language });
 const fixtures = [movie(1, 'Comedy choice'), movie(2, 'Mystery choice'), movie(3, 'No provider', 'hi')];
-const state = vi.hoisted(() => ({ watchedKeys: new Set<string>(), watchlist: [], watchLater: [], customListItems: {}, addToWatchlist: vi.fn() }));
+const state = vi.hoisted(() => ({ watchedKeys: new Set<string>(), watchlist: [], watchLater: [], customListItems: {}, isAuthenticated: false, addToWatchlistAsync: vi.fn() }));
 vi.mock('@/contexts/WatchlistContext', () => ({ useWatchlistContext: () => state }));
-vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ isAuthenticated: false }) }));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ isAuthenticated: state.isAuthenticated }) }));
 vi.mock('@/lib/tmdb', () => ({ getTrending: vi.fn(), getPopularMovies: vi.fn(), getPopularTV: vi.fn(), getYouMayAlsoLike: vi.fn() }));
 vi.mock('@/lib/providers', async (importOriginal) => ({ ...await importOriginal<typeof import('@/lib/providers')>(), fetchProvidersBatch: vi.fn() }));
 import { getTrending, getPopularMovies, getPopularTV } from '@/lib/tmdb';
@@ -22,6 +22,8 @@ function renderPage() {
   return render(<QueryClientProvider client={client}><MemoryRouter><Tonight /></MemoryRouter></QueryClientProvider>);
 }
 beforeEach(() => {
+  state.isAuthenticated = false;
+  state.addToWatchlistAsync.mockReset();
   vi.mocked(getTrending).mockResolvedValue(fixtures);
   vi.mocked(getPopularMovies).mockResolvedValue([]);
   vi.mocked(getPopularTV).mockResolvedValue([]);
@@ -29,6 +31,23 @@ beforeEach(() => {
     availability: { 'movie:1': [{ provider: 'Netflix', type: 'subscription' }], 'movie:2': [{ provider: 'Netflix', type: 'rent' }], 'movie:3': [] },
     runtimes: { 'movie:1': 90, 'movie:2': 120, 'movie:3': 80 },
     genres: { 'movie:1': ['Comedy'], 'movie:2': ['Mystery'], 'movie:3': ['Drama'] } });
+});
+
+it('prevents repeated saves in flight and lets the user retry a failed save', async () => {
+  state.isAuthenticated = true;
+  let rejectSave!: (reason: Error) => void;
+  state.addToWatchlistAsync.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectSave = reject; })).mockResolvedValueOnce(true);
+  const user = userEvent.setup(); renderPage();
+  await user.click(await screen.findByRole('button', { name: 'Find something to watch' }));
+  const card = within(screen.getByRole('region', { name: 'Your options' })).getByText('Comedy choice').closest('article') as HTMLElement;
+  await user.click(within(card).getByRole('button', { name: 'Save' }));
+  expect(within(card).getByRole('button', { name: 'Saving…' })).toBeDisabled();
+  expect(state.addToWatchlistAsync).toHaveBeenCalledTimes(1);
+  rejectSave(new Error('unavailable'));
+  expect(await within(card).findByRole('alert')).toHaveTextContent('Could not save this title');
+  await user.click(within(card).getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(state.addToWatchlistAsync).toHaveBeenCalledTimes(2));
+  expect(within(card).queryByRole('alert')).not.toBeInTheDocument();
 });
 
 describe('Tonight flow', () => {
