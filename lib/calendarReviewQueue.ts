@@ -41,8 +41,11 @@ export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): Rev
       evidence.source_url === `https://www.themoviedb.org/tv/${row.tmdb_id}`;
     const region = review?.type === 'regional' ? review.region : row.event_region;
     if (!region) reasons.push(globalPremiere ? 'global_premiere_local_unknown' : 'region_unknown');
+    const tmdbClaim = typeof evidence?.date_source === 'string' && evidence.date_source.startsWith('tmdb_');
     if (evidence && (typeof evidence.date_source !== 'string' || !evidence.date_source ||
-        typeof evidence.source_url !== 'string' || !evidence.source_url.startsWith('https://'))) reasons.push('evidence_incomplete');
+        typeof evidence.source_url !== 'string' || !evidence.source_url.startsWith('https://') ||
+        (tmdbClaim && (row.tmdb_id == null || (row.media_type !== 'movie' && row.media_type !== 'tv') ||
+          (typeof evidence.source_url === 'string' && !evidence.source_url.startsWith('https://www.themoviedb.org/')))))) reasons.push('evidence_incomplete');
     if (evidence && row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
         typeof evidence.source_url === 'string' && evidence.source_url.startsWith('https://www.themoviedb.org/') &&
         evidence.source_url !== `https://www.themoviedb.org/${row.media_type}/${row.tmdb_id}`) reasons.push('identity_conflict');

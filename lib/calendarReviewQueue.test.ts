@@ -102,4 +102,16 @@ describe('calendar reconciliation queue', () => {
     const [item] = buildCalendarReviewQueue([row({ event_region: 'IN', evidence: { observed_at: '2026-12-09T00:00:00Z' } })], now);
     expect(item.reasons).toContain('evidence_incomplete');
   });
+  it('flags TMDB date evidence without a linked identity, media type, or TMDB source', () => {
+    const evidence = { date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/123', observed_at: '2026-12-09T00:00:00Z' };
+    const items = buildCalendarReviewQueue([
+      row({ id: 1, tmdb_id: null, media_type: null, event_region: 'IN', evidence }),
+      row({ id: 2, media_type: null, event_region: 'IN', evidence }),
+      row({ id: 3, event_region: 'IN', evidence: { ...evidence, source_url: 'https://example.org/movie/123' } }),
+      row({ id: 4, event_region: 'IN', evidence }),
+    ], now);
+    expect(items).toHaveLength(3);
+    for (const item of items) expect(item.reasons).toContain('evidence_incomplete');
+    expect(items.find(item => item.id === '1')?.reasons).toContain('identity_missing');
+  });
 });
