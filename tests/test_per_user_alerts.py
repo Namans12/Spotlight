@@ -126,6 +126,17 @@ def test_groups_matches_per_account():
     assert [m["title"] for m in by_user[9]["matches"]] == ["John Wick: Chapter 4"]
 
 
+def test_account_alert_combines_verified_providers_without_unverified_leaks():
+    first = FakeItem(1, 'movie', 'Film', ['Netflix'])
+    second = FakeItem(1, 'movie', 'Film', ['Prime Video', 'Netflix'])
+    unverified = FakeItem(1, 'movie', 'Film', ['Unverified'])
+    unverified.evidence = None
+    cursor = FakeCursor([(7, 'a@example.com', 'Ada', 1, 'movie')], set())
+    [result] = releasebot.find_watchlist_matches_by_user(digest_with(first, second, unverified), FakeConn(cursor))
+    assert len(result['matches']) == 1
+    assert result['matches'][0]['providers'] == ['Netflix', 'Prime Video']
+
+
 def test_ignores_saved_titles_that_did_not_drop():
     """A watchlist row only matters if the title is in this run's out_now."""
     cursor = FakeCursor([(7, "a@example.com", "Ada", 111111, "movie")], set())

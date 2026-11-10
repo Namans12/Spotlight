@@ -300,3 +300,13 @@ def test_alert_sender_deduplicates_identical_title_events_per_user():
     sent = []
     assert rb.send_watchlist_alerts(matches, delivery, telegram_sender=sent.append) == 1
     assert len(sent) == 1
+
+
+def test_owner_alert_combines_only_individually_verified_provider_observations():
+    from dataclasses import replace
+    current = item('Film', 42)
+    second = replace(current, providers=('Prime Video', 'Netflix'))
+    unverified = replace(current, providers=('Unverified',), evidence=None)
+    matches = rb.find_watchlist_matches(digest_with(current, second, unverified), FakeConn(rows=[(42, 'movie')]), ['owner@example.com'])
+    assert len(matches) == 1
+    assert matches[0]['providers'] == ['Netflix', 'Prime Video']

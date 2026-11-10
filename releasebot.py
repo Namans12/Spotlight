@@ -1426,6 +1426,21 @@ def eligible_watchlist_items(digest: dict[str, Any]) -> list[ReleaseItem]:
     return result
 
 
+def eligible_watchlist_notifications(digest: dict[str, Any]) -> dict[tuple[int, str], dict[str, Any]]:
+    """Combine current providers only from individually eligible observations."""
+    combined: dict[tuple[int, str], dict[str, Any]] = {}
+    for item in eligible_watchlist_items(digest):
+        key = (item.tmdb_id, item.media_type)
+        match = combined.setdefault(key, {
+            "tmdb_id": item.tmdb_id, "media_type": item.media_type,
+            "title": item.title, "providers": [],
+        })
+        for provider in item.providers:
+            if provider not in match["providers"]:
+                match["providers"].append(provider)
+    return combined
+
+
 def find_watchlist_matches(
     digest: dict[str, Any], conn: Any, owner_emails: list[str]
 ) -> list[dict[str, Any]]:
@@ -1433,8 +1448,8 @@ def find_watchlist_matches(
     watchlist/watchLater buckets (scoped by owner_emails — other users'
     watchlists must never trigger an alert to the owner). Returns matches
     worth alerting on."""
-    all_out_now_items = eligible_watchlist_items(digest)
-    if not all_out_now_items:
+    eligible = eligible_watchlist_notifications(digest)
+    if not eligible:
         return []
     with conn.cursor() as cur:
         cur.execute(
@@ -1447,18 +1462,7 @@ def find_watchlist_matches(
             (owner_emails,),
         )
         watched_keys = {(row[0], row[1]) for row in cur.fetchall()}
-    matches = []
-    for item in all_out_now_items:
-        if (item.tmdb_id, item.media_type) in watched_keys:
-            matches.append(
-                {
-                    "tmdb_id": item.tmdb_id,
-                    "media_type": item.media_type,
-                    "title": item.title,
-                    "providers": list(item.providers),
-                }
-            )
-    return matches
+    return [match for key, match in eligible.items() if key in watched_keys]
 
 
 def find_watchlist_matches_by_user(digest: dict[str, Any], conn: Any) -> list[dict[str, Any]]:
@@ -1474,12 +1478,9 @@ def find_watchlist_matches_by_user(digest: dict[str, Any], conn: Any) -> list[di
     other steps are already network-bound, and a per-user round trip would
     scale badly for no reason.
     """
-    all_out_now_items = eligible_watchlist_items(digest)
-    if not all_out_now_items:
+    out_now_by_key = eligible_watchlist_notifications(digest)
+    if not out_now_by_key:
         return []
-
-    # Keyed by (tmdb_id, media_type) so the join below is a lookup, not a scan.
-    out_now_by_key = {(item.tmdb_id, item.media_type): item for item in all_out_now_items}
 
     with conn.cursor() as cur:
         cur.execute(
@@ -1496,21 +1497,14 @@ def find_watchlist_matches_by_user(digest: dict[str, Any], conn: Any) -> list[di
 
     by_user: dict[int, dict[str, Any]] = {}
     for user_id, email, display_name, tmdb_id, media_type in rows:
-        item = out_now_by_key.get((tmdb_id, media_type))
-        if item is None:
+        match = out_now_by_key.get((tmdb_id, media_type))
+        if match is None:
             continue
         entry = by_user.setdefault(
             user_id,
             {"user_id": user_id, "email": email, "display_name": display_name, "matches": []},
         )
-        entry["matches"].append(
-            {
-                "tmdb_id": item.tmdb_id,
-                "media_type": item.media_type,
-                "title": item.title,
-                "providers": list(item.providers),
-            }
-        )
+        entry["matches"].append({**match, "providers": list(match["providers"])})
     return list(by_user.values())
 
 
