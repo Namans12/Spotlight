@@ -128,7 +128,8 @@ def tmdb_get(
                 timeout=REQUEST_TIMEOUT_SECONDS,
             )
         except requests.RequestException as err:
-            last_error = err
+            # Request exceptions can contain the full URL, including api_key.
+            last_error = type(err).__name__
         else:
             if response.status_code == 404:
                 return None
@@ -136,14 +137,14 @@ def tmdb_get(
                 try:
                     return response.json()
                 except ValueError as err:
-                    last_error = err
+                    last_error = type(err).__name__
             else:
                 last_error = f"HTTP {response.status_code}"
 
         if attempt < attempts - 1:
             time.sleep(RETRY_BACKOFF_SECONDS * (2**attempt))
 
-    raise TmdbUnavailable(f"{path}: {last_error}")
+    raise TmdbUnavailable(f"{path}: {last_error}") from None
 
 
 def _match_key(raw: str) -> str:

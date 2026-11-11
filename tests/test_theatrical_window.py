@@ -9,6 +9,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import sync_calendar_tmdb as sync  # noqa: E402
+import lib_relations  # noqa: E402
+import pytest  # noqa: E402
+import requests  # noqa: E402
 
 
 class FakeResponse:
@@ -28,6 +31,17 @@ class FakeSession:
 
     def get(self, url, params=None, timeout=None):
         return FakeResponse(self._payload)
+
+
+def test_tmdb_failure_does_not_expose_credentials_in_exception():
+    class FailedSession:
+        def get(self, *args, **kwargs):
+            raise requests.ConnectionError('request failed: https://example.invalid/?api_key=secret-value')
+    with pytest.raises(lib_relations.TmdbUnavailable) as caught:
+        lib_relations.tmdb_get(FailedSession(), '/movie/1', 'secret-value', attempts=1)
+    assert 'secret-value' not in str(caught.value)
+    assert 'ConnectionError' in str(caught.value)
+    assert caught.value.__cause__ is None
 
 
 def release_dates(production_country=None, **by_country):
