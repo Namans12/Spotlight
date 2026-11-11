@@ -21,6 +21,13 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('prioritizes the Nine to Six broadcaster date conflict without asserting India', () => {
+    const item = row({ origin: 'tmdb_upcoming', tmdb_id: 310209, media_type: 'tv', entry_type: 'Show', title: 'Nine to Six', language: 'ko',
+      release_date: '2026-11-11', source_url: 'https://www.themoviedb.org/tv/310209' });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-11T06:00:00Z'));
+    expect(review.reasons).toEqual(expect.arrayContaining(['date_conflict', 'region_unknown']));
+    expect(review.reviewSourceUrl).toContain('sbsstar.net');
+  });
   it('keeps the region unknown for an identity-only review of a US release', () => {
     const item = row({ origin: 'csv_seed', tmdb_id: 1170608, title: 'Dune: Part Three', language: 'en', release_date: '2026-12-18',
       source_url: 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026', platform_or_distributor: 'Warner Bros. Pictures / Legendary Pictures',

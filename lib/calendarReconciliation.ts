@@ -8,6 +8,13 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'tmdb_upcoming' && Number(row.tmdb_id) === 310209 && row.media_type === 'tv' &&
+      row.entry_type === 'Show' && row.language === 'ko' && row.title === 'Nine to Six' && row.release_date === '2026-11-11' &&
+      row.source_url === 'https://www.themoviedb.org/tv/310209') {
+    return { type: 'conflict' as const, checkedAt: '2026-11-11T05:18:34Z', source: 'SBS',
+      sourceUrl: 'https://sbsstar.net/article/N1008839649/nine-to-six-unveils-group-poster-featuring-park-minyoungyook-sungjaego-soo-as-office-aces',
+      message: 'Date needs review: SBS announces the Korean premiere for 25 November, while this older entry lists 11 November. India availability and its local date remain unconfirmed.' };
+  }
   if (row.origin === 'district_in' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.language === 'en') {
     if (Number(row.tmdb_id) === 1567605 && row.title === 'Ebenezer' && row.release_date === '2026-11-20' &&
         row.source_url === 'https://www.district.in/movies/ebenezer-movie-tickets-in-hyderabad-MV213946') {

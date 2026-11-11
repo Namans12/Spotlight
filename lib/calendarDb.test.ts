@@ -18,6 +18,15 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('shows the dated broadcaster warning for the exact Nine to Six observation', async () => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 310209, media_type: 'tv', entry_type: 'Show', title: 'Nine to Six',
+      language: 'ko', release_date: '2026-11-11', source_url: 'https://www.themoviedb.org/tv/310209', event_region: null, evidence: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry.dateConflict?.source).toBe('SBS');
+    expect(entry.dateConflict?.message).toContain('25 November');
+    expect(entry).toMatchObject({ releaseDate: '2026-11-11', region: null, evidenceStatus: 'unverified' });
+    expect(await getCalendarMonth(db([], [{ ...item, tmdb_id: 310210 }]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+  });
   it('shows the reviewed Ghost Soldier US theatrical announcement only in the US', async () => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 1562642, title: 'Ghost Soldier', language: 'en', release_date: '2026-11-11',
       source_url: 'https://www.themoviedb.org/movie/1562642', event_region: null, evidence: null, platform_or_distributor: null });
