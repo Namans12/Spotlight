@@ -481,11 +481,10 @@ def next_trigger_day(today: date) -> date:
 
 
 def compute_windows(today: date) -> dict[str, tuple[date, date]]:
-    """Out Now: today .. day before next run. Coming Up: next run .. +6 days."""
-    upcoming = next_trigger_day(today)
+    """Two non-overlapping rolling weeks, independent of the send schedule."""
     return {
-        "out_now": (today, upcoming - timedelta(days=1)),
-        "coming_up": (upcoming, upcoming + timedelta(days=6)),
+        "out_now": (today - timedelta(days=6), today),
+        "coming_up": (today + timedelta(days=1), today + timedelta(days=7)),
     }
 
 
@@ -779,6 +778,7 @@ def enrich_news_candidates(
     today: date,
     next_trigger: date,
     horizon_end: date,
+    out_start: date | None = None,
 ) -> dict[str, dict[str, list[ReleaseItem]]]:
     """Validate scraped titles against TMDB and bucket them into the two windows.
 
@@ -792,7 +792,7 @@ def enrich_news_candidates(
     under its theatrical date — that is how cinema-only releases (7 Dogs,
     Irumudi, Khalifa) were reaching the OTT digest.
     """
-    lo = today
+    lo = out_start or today
     hi = horizon_end
 
     def lookup(
@@ -1749,7 +1749,7 @@ def build_digest(now: datetime | None = None, diagnostics: bool = False) -> dict
                     extra_urls=extra_urls, index_urls=index_urls
                 )
                 buckets = enrich_news_candidates(
-                    tmdb, candidates, languages, now.date(), up_start, up_end
+                    tmdb, candidates, languages, now.date(), up_start, up_end, out_start=out_start
                 )
                 merge_sections(out_sections, buckets["out_now"])
                 merge_sections(up_sections, buckets["coming_up"])

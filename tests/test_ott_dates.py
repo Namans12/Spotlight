@@ -15,6 +15,33 @@ import releasebot as rb
 from news_sources import Candidate
 
 
+@pytest.mark.parametrize('today', [date(2026, 11, 10), date(2026, 11, 11), date(2027, 1, 1)])
+def test_release_windows_are_nonoverlapping_rolling_weeks(today):
+    from datetime import timedelta
+    windows = rb.compute_windows(today)
+    assert windows['out_now'] == (today - timedelta(days=6), today)
+    assert windows['coming_up'] == (today + timedelta(days=1), today + timedelta(days=7))
+
+
+def test_digest_populates_only_each_rolling_window(monkeypatch):
+    from datetime import datetime
+    from dataclasses import replace
+    monkeypatch.setenv('REGION', 'IN')
+    monkeypatch.setenv('TMDB_API_KEY', 'test-key')
+    monkeypatch.setenv('NEWS_ENABLED', 'false')
+    monkeypatch.setattr(rb, 'TmdbClient', lambda *_: object())
+    def candidate(id, day):
+        return rb.ReleaseItem(id, f'Film {id}', 'movie', 'en', day, None, 1, '', '', None, (),
+                              rb.ReleaseEvidence('IN', 'tmdb_regional_digital'))
+    all_items = [candidate(1, '2026-11-04'), candidate(2, '2026-11-05'), candidate(3, '2026-11-11'),
+                 candidate(4, '2026-11-12'), candidate(5, '2026-11-18'), candidate(6, '2026-11-19'),
+                 replace(candidate(7, '2026-11-10'), evidence=None)]
+    monkeypatch.setattr(rb, 'fetch_window_sections', lambda *_: {'english': all_items})
+    result = rb.build_digest(datetime.fromisoformat('2026-11-11T14:00:00+05:30'))
+    assert [x.tmdb_id for x in result['out_now']['sections']['english']] == [2, 3]
+    assert [x.tmdb_id for x in result['coming_up']['sections']['english']] == [4, 5]
+
+
 def movie_payload(
     *,
     movie_id: int = 1,

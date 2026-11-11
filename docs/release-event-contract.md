@@ -10,7 +10,7 @@ The current `release_items` table is a rolling digest snapshot, not an event his
 
 ## Window contract
 
-Out Now covers the inclusive `start` and `end` dates recorded in the digest; Coming Up covers its own inclusive bounds. Dates outside those windows are not members of either window. News augmentation is bounded to the combined horizon. The releases API also filters older stored rows against their recorded bounds during the transition. This can make the feed smaller and does not repair old database records. The window may include a future date; membership alone does not mean that date has arrived.
+Out Now covers the current local date and the preceding six days, inclusive. Coming Up covers the following seven days. These rolling windows are independent of the notification schedule and do not overlap, so future releases cannot appear in Out Now. Dates outside the recorded bounds are not members of either window; news augmentation is bounded to the combined horizon. The releases API also filters older stored rows against their recorded bounds during the transition. Provider availability remains separate from the reported regional digital date.
 
 ## Watchlist alert eligibility
 

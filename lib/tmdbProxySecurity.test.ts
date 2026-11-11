@@ -1,9 +1,9 @@
 import { expect, it, vi } from 'vitest';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
-vi.mock('../../lib/tmdbProxy.js', () => ({ tmdbTrending: vi.fn().mockRejectedValue(new Error('https://example.invalid/?api_key=secret-value')) }));
-vi.mock('../../lib/rateLimit.js', () => ({ isRateLimited: () => false }));
-import handler from './[...path]';
+vi.mock('./tmdbProxy.js', () => ({ tmdbTrending: vi.fn().mockRejectedValue(new Error('https://example.invalid/?api_key=secret-value')) }));
+vi.mock('./rateLimit.js', () => ({ isRateLimited: () => false }));
+import handler from '../api/tmdb/[...path]';
 
 it('does not log or return upstream exception details', async () => {
   const log = vi.spyOn(console, 'error').mockImplementation(() => {});
