@@ -124,6 +124,7 @@ export default function Tonight() {
         return <article key={providerKey(candidate.mediaType, candidate.id)} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
           <div className="flex gap-3">{poster && <img src={poster.src} alt="" className="w-16 rounded-lg object-cover self-start" />}<div><h3 className="font-semibold">{candidate.title}</h3><p className="text-xs text-muted-foreground">{candidate.mediaType === 'tv' ? 'Series' : 'Film'}</p></div></div>
           <ul className="space-y-1 text-xs text-muted-foreground">{reasons.map(reason => <li key={reason}>• {reason}</li>)}</ul>
+          {offers?.length && filters.services.length === 0 ? <p className="text-xs text-muted-foreground">Reported in India: {[...new Set(offers.map(offer => `${offer.provider} (${offer.type === 'ads' ? 'with ads' : offer.type})`))].join(' · ')}</p> : null}
           {!offers?.length && <p className="text-xs text-muted-foreground">Availability unknown in India</p>}
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground" aria-label={`Feedback for ${candidate.title}`}>
             <button type="button" className="underline" onClick={() => giveFeedback(candidate, 'not_interested')}>Not for me</button>

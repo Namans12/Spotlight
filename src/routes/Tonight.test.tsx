@@ -51,6 +51,17 @@ it('prevents repeated saves in flight and lets the user retry a failed save', as
 });
 
 describe('Tonight flow', () => {
+  it('shows offer types when no service filter is selected', async () => {
+    const user = userEvent.setup(); renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Find something to watch' }));
+    const results = screen.getByRole('region', { name: 'Your options' });
+    const subscription = within(results).getByText('Comedy choice').closest('article') as HTMLElement;
+    const rental = within(results).getByText('Mystery choice').closest('article') as HTMLElement;
+    const unknown = within(results).getByText('No provider').closest('article') as HTMLElement;
+    expect(within(subscription).getByText('Reported in India: Netflix (subscription)')).toBeInTheDocument();
+    expect(within(rental).getByText('Reported in India: Netflix (rent)')).toBeInTheDocument();
+    expect(within(unknown).getByText('Availability unknown in India')).toBeInTheDocument();
+  });
   it('works signed out and explains a mood, time and service match', async () => {
     const user = userEvent.setup(); renderPage();
     await user.selectOptions(await screen.findByLabelText('Mood'), 'light');
