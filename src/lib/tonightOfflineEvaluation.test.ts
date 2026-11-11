@@ -26,6 +26,18 @@ describe('offline recommendation evaluation', () => {
     expect(result.baselineMetrics.relevantCoverage).toBe(0);
     expect(result.updated).toEqual(result.baseline);
   });
+  it('compares a provided recommender order over the same eligible identities', () => {
+    const input = sample();
+    const withOrder = { ...input.cases[0], baselineOrder: ['movie:2', 'tv:1', 'movie:1'] };
+    const [result] = evaluateOfflineCases(parseOfflineCases({ cases: [withOrder] }));
+    expect(result.baselineKind).toBe('provided_order');
+    expect(result.baseline).toEqual(['tv:1', 'movie:1']);
+    expect(result.updated).toEqual(['tv:1', 'movie:1']);
+    expect(summarizeOfflineEvaluation([result]).baselineKind).toBe('provided_order');
+    expect(() => parseOfflineCases({ cases: [{ ...withOrder, baselineOrder: ['movie:1', 'movie:1', 'tv:1'] }] })).toThrow();
+    expect(() => parseOfflineCases({ cases: [{ ...withOrder, baselineOrder: ['movie:1', 'tv:1'] }] })).toThrow();
+    expect(() => parseOfflineCases({ cases: [withOrder, input.cases[0]] })).toThrow('baseline types');
+  });
   it('does not treat missing judgments as negative labels', () => {
     const input = sample(); delete (input.cases[0].judgments as Record<string, string>)['movie:1'];
     const [result] = evaluateOfflineCases(parseOfflineCases(input));

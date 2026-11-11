@@ -9,16 +9,17 @@ interface OfflineCase {
   name: string; filters: TonightFilters; candidates: DuelCandidate[];
   feedback: TonightFeedbackMap; duelWeights: Weights;
   offers: Record<string, ProviderOffer[]>; judgments: Record<string, Judgment>;
+  baselineOrder?: string[];
 }
 const keyOf = (candidate: DuelCandidate) => `${candidate.mediaType}:${candidate.id}`;
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
 const keyPattern = /^(movie|tv):[1-9]\d*$/;
-const stringArray = (value: unknown) => Array.isArray(value) && value.every(item => typeof item === 'string');
+const stringArray = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === 'string');
 
 /** Reject malformed fixtures rather than silently changing eligibility. */
 export function parseOfflineCases(input: unknown): OfflineCase[] {
   if (!object(input) || !Array.isArray(input.cases) || !input.cases.length) throw new Error('Expected a non-empty cases array');
-  return input.cases.map((item: unknown, index: number) => {
+  const cases = input.cases.map((item: unknown, index: number) => {
     const fail = () => { throw new Error(`Invalid evaluation case at index ${index}`); };
     if (!object(item) || typeof item.name !== 'string' || !item.name.trim() || !object(item.filters) || !Array.isArray(item.candidates) || !item.candidates.length ||
         !object(item.feedback) || !object(item.duelWeights) || !object(item.offers) || !object(item.judgments)) return fail();
@@ -46,8 +47,13 @@ export function parseOfflineCases(input: unknown): OfflineCase[] {
     }
     for (const value of Object.values(item.duelWeights)) if (typeof value !== 'number' || !Number.isFinite(value)) return fail();
     for (const [key, value] of Object.entries(item.judgments)) if (!keys.has(key) || !['relevant', 'not_relevant'].includes(String(value))) return fail();
+    if (item.baselineOrder !== undefined && (!stringArray(item.baselineOrder) || item.baselineOrder.length !== keys.size ||
+        new Set(item.baselineOrder).size !== keys.size || item.baselineOrder.some((key: string) => !keys.has(key)))) return fail();
     return item as unknown as OfflineCase;
   });
+  if (cases.some(item => (item.baselineOrder !== undefined) !== (cases[0].baselineOrder !== undefined)))
+    throw new Error('Do not mix baseline types in one evaluation');
+  return cases;
 }
 
 function judgedTopThree(ranking: string[], judgments: Record<string, Judgment>) {
@@ -61,12 +67,14 @@ export function evaluateOfflineCases(cases: OfflineCase[]) {
     const remaining = test.candidates.filter(candidate => !test.feedback[keyOf(candidate)]);
     const offersFor = (type: string, id: number) => test.offers[`${type}:${id}`];
     const relevant = Object.keys(test.judgments).filter(key => test.judgments[key] === 'relevant' && !test.feedback[key]);
-    const baseline = rankTonight(remaining, test.filters, test.duelWeights, offersFor).map(choice => keyOf(choice.candidate));
+    const noFeedback = rankTonight(remaining, test.filters, test.duelWeights, offersFor).map(choice => keyOf(choice.candidate));
+    const eligible = new Set(noFeedback);
+    const baseline = test.baselineOrder ? test.baselineOrder.filter(key => eligible.has(key)) : noFeedback;
     const updated = rankTonight(remaining, test.filters, test.duelWeights, offersFor, feedbackWeights(test.feedback)).map(choice => keyOf(choice.candidate));
     const metrics = compareRankings(baseline, updated, relevant);
     // Overall precision treats unjudged titles as irrelevant; suppress it for partial labels.
     const partial = baseline.some(key => test.judgments[key] === undefined);
-    return { name: test.name, baseline, updated, labelCoverage: baseline.length ? baseline.filter(key => test.judgments[key] !== undefined).length / baseline.length : null,
+    return { name: test.name, baselineKind: test.baselineOrder ? 'provided_order' as const : 'tonight_without_feedback' as const, baseline, updated, labelCoverage: baseline.length ? baseline.filter(key => test.judgments[key] !== undefined).length / baseline.length : null,
       baselineMetrics: { ...metrics.baseline, reciprocalRank: relevant.length ? metrics.baseline.reciprocalRank : null, precisionAtCutoff: partial || !baseline.length ? null : metrics.baseline.precisionAtCutoff, topThree: judgedTopThree(baseline, test.judgments) },
       updatedMetrics: { ...metrics.updated, reciprocalRank: relevant.length ? metrics.updated.reciprocalRank : null, precisionAtCutoff: partial || !updated.length ? null : metrics.updated.precisionAtCutoff, topThree: judgedTopThree(updated, test.judgments) } };
   });
@@ -81,7 +89,7 @@ export function summarizeOfflineEvaluation(results: ReturnType<typeof evaluateOf
     const updated = values.reduce((sum, pair) => sum + pair[1], 0) / values.length;
     return { cases: values.length, baseline, updated, delta: updated - baseline };
   };
-  return { totalCases: results.length,
+  return { totalCases: results.length, baselineKind: results[0]?.baselineKind ?? null,
     reciprocalRank: paired(row => [row.baselineMetrics.reciprocalRank, row.updatedMetrics.reciprocalRank]),
     precisionAtCutoff: paired(row => [row.baselineMetrics.precisionAtCutoff, row.updatedMetrics.precisionAtCutoff]),
     relevantCoverage: paired(row => [row.baselineMetrics.relevantCoverage, row.updatedMetrics.relevantCoverage]) };
