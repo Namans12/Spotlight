@@ -226,8 +226,8 @@ class TmdbClient:
                 if media_type == "movie"
                 else self.tv_details(item_id)
             )
-        except Exception as exc:  # pragma: no cover - network resilience
-            print(f"  TMDB details failed for {media_type}/{item_id}: {exc}", file=sys.stderr)
+        except Exception:  # network errors may contain the API key in the URL
+            print(f"  TMDB details failed for {media_type}/{item_id}.", file=sys.stderr)
             return {}
 
 
@@ -967,7 +967,7 @@ def _diag_query(tmdb: TmdbClient, label: str, media_type: str, **params: Any) ->
         )
         print(f"DIAG {label}: total={total} | {top}", file=sys.stderr)
     except Exception as exc:
-        print(f"DIAG {label}: ERROR {exc}", file=sys.stderr)
+        print(f"DIAG {label}: ERROR {type(exc).__name__}", file=sys.stderr)
 
 
 def run_diagnostics(tmdb: TmdbClient, start: date, end: date) -> None:
@@ -1450,20 +1450,29 @@ def eligible_watchlist_notifications(digest: dict[str, Any]) -> dict[tuple[int, 
 
 
 def build_watchlist_alert_digest(digest: dict[str, Any], tmdb: TmdbClient,
-                                 languages: list[str], min_popularity: float) -> dict[str, Any]:
+                                 languages: list[str], min_popularity: float,
+                                 completed_at: datetime | None = None) -> dict[str, Any]:
     """Fresh, bounded catch-up for alerts only; the published digest is unchanged."""
     run_at = datetime.fromisoformat(digest['generated_at'].replace('Z', '+00:00'))
     if run_at.tzinfo is None or not digest.get('region'):
         raise ValueError('Alert catch-up requires a region and timezone-aware run time')
     today = run_at.date()
     start = today - timedelta(days=6)
-    recent = fetch_window_sections(tmdb, languages, start, today - timedelta(days=1), min_popularity)
+    cached_digest = bool(os.getenv('TMDB_CACHE_DIR', '').strip())
+    # Cached responses have no observation timestamp of their own. Never
+    # relabel an old provider response as a fresh catch-up observation.
+    tmdb.cache_dir = None
+    recent = fetch_window_sections(tmdb, languages, start, today if cached_digest else today - timedelta(days=1), min_popularity)
     # Keep all candidate observations: eligible_watchlist_items independently
     # checks date, region, provenance and freshness, then notifications combine
     # providers and existing per-user delivery records prevent repeat sends.
-    sections = {f'current:{name}': list(items) for name, items in digest['out_now']['sections'].items()}
+    sections = {f'current:{name}': list(items) for name, items in digest['out_now']['sections'].items()} if not cached_digest else {}
     sections.update({f'catchup:{name}': list(items) for name, items in recent.items()})
-    return {**digest, 'out_now': {'start': start.isoformat(), 'end': today.isoformat(), 'sections': sections}}
+    checked_at = completed_at or datetime.now(run_at.tzinfo)
+    if checked_at.tzinfo is None or checked_at < run_at:
+        raise ValueError('Alert check time must be timezone-aware and not precede the digest')
+    return {**digest, 'generated_at': checked_at.isoformat(timespec='seconds'),
+            'out_now': {'start': start.isoformat(), 'end': today.isoformat(), 'sections': sections}}
 
 
 def alert_provider_text(match: dict[str, Any]) -> str:
@@ -1635,7 +1644,7 @@ def send_user_watchlist_alerts(
             except Exception as exc:  # pragma: no cover - depends on live SMTP
                 # One bad address must not stop the rest of the run, and
                 # nothing is recorded as sent, so the next run retries it.
-                print(f"  alert to user {user_id} failed: {exc}", file=sys.stderr)
+                print(f"  alert to user {user_id} failed: {type(exc).__name__}", file=sys.stderr)
                 continue
 
             accounts += 1
@@ -1753,7 +1762,7 @@ def build_digest(now: datetime | None = None, diagnostics: bool = False) -> dict
                 for sections in (out_sections, up_sections):
                     sections["popular"] = sections["popular"][:30]
             except Exception as exc:  # pragma: no cover - never fail the digest on news
-                print(f"  news augmentation skipped: {exc}", file=sys.stderr)
+                print(f"  news augmentation skipped: {type(exc).__name__}", file=sys.stderr)
 
     # Enforce the published window for every source, including discovery and
     # sample data, before the snapshot is stored or notifications are built.
@@ -1838,8 +1847,8 @@ def main() -> int:
             print(f"Wrote {n} rows to Postgres release_items")
             sent_channels.append("Postgres")
         except Exception as exc:  # pragma: no cover
-            print(f"Postgres write failed: {exc}", file=sys.stderr)
-            failures.append(f"Postgres write failed: {exc}")
+            print(f"Postgres write failed: {type(exc).__name__}", file=sys.stderr)
+            failures.append(f"Postgres write failed: {type(exc).__name__}")
 
     if telegram_enabled and send_broadcast_digest:
         send_telegram_message(env_required("TELEGRAM_BOT_TOKEN"), env_required("TELEGRAM_CHAT_ID"), message)
@@ -1860,7 +1869,9 @@ def main() -> int:
         )
         sent_channels.append("Email")
 
-    alert_digest = digest
+    # A cache timestamp is not source observation evidence; don't send cached
+    # digest candidates even if fresh catch-up fails.
+    alert_digest = {**digest, 'out_now': {**digest['out_now'], 'sections': {}}} if os.getenv('TMDB_CACHE_DIR', '').strip() else digest
     if db_conn is not None and not dry_run and (telegram_enabled or email_enabled or os.getenv('SMTP_HOST')) and not env_bool('USE_SAMPLE_DATA', False):
         try:
             alert_digest = build_watchlist_alert_digest(
@@ -1868,7 +1879,7 @@ def main() -> int:
                 env_list('LANGUAGES', 'hi,en'), float(os.getenv('POPULAR_MIN_POPULARITY', '25')))
         except Exception:
             # Upstream errors can include request URLs or credentials.
-            print('Watchlist catch-up unavailable; using current digest only.', file=sys.stderr)
+            print('Watchlist catch-up unavailable; continuing with available uncached alerts.', file=sys.stderr)
 
     # Watchlist-drop alerts only make sense alongside the real digest send
     # (not the nightly DB-only refresh, which runs with DRY_RUN=true and
@@ -1881,8 +1892,8 @@ def main() -> int:
             # send failure — with the broadcast off, missed alerts are the
             # only symptom, so this must be loud (see the Postgres-failure
             # `failures` list above) rather than swallowed as non-fatal.
-            print(f"Watchlist-alert step failed: {exc}", file=sys.stderr)
-            failures.append(f"Watchlist-alert step failed: {exc}")
+            print(f"Watchlist-alert step failed: {type(exc).__name__}", file=sys.stderr)
+            failures.append(f"Watchlist-alert step failed: {type(exc).__name__}")
         else:
             try:
                 matches = find_watchlist_matches(alert_digest, db_conn, owner_emails)
@@ -1923,7 +1934,7 @@ def main() -> int:
                 else:
                     print(f"Watchlist check: 0 matches for {len(owner_emails)} owner email(s)")
             except Exception as exc:  # pragma: no cover
-                print(f"Watchlist-alert step failed (non-fatal): {exc}", file=sys.stderr)
+                print(f"Watchlist-alert step failed (non-fatal): {type(exc).__name__}", file=sys.stderr)
 
     # Per-account alerts. Separate from the owner block above on purpose: that
     # one is env-configured and fires through whichever channels the
@@ -1962,7 +1973,7 @@ def main() -> int:
             # Non-fatal for the same reason the owner block is: the digest and
             # the database refresh are the job's real output, and a mail
             # failure must not fail the run or block the next one.
-            print(f"Per-user watchlist alerts failed (non-fatal): {exc}", file=sys.stderr)
+            print(f"Per-user watchlist alerts failed (non-fatal): {type(exc).__name__}", file=sys.stderr)
 
     if db_conn is not None:
         db_conn.close()
@@ -1992,5 +2003,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as exc:
-        print(f"OTT Radar failed: {exc}", file=sys.stderr)
+        print(f"OTT Radar failed: {type(exc).__name__}", file=sys.stderr)
         raise SystemExit(1)

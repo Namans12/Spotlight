@@ -257,11 +257,43 @@ def test_alert_catchup_is_bounded_fresh_and_does_not_change_public_digest(monkey
         return {'english': [recent, too_old, foreign, stale]}
     monkeypatch.setattr(rb, 'fetch_window_sections', fetch)
     public = digest_with(current)
-    alert_digest = rb.build_watchlist_alert_digest(public, object(), ['en'], 25)
+    from datetime import datetime
+    class Client:
+        cache_dir = 'old-cache'
+    client = Client()
+    alert_digest = rb.build_watchlist_alert_digest(public, client, ['en'], 25, datetime.fromisoformat('2026-09-02T14:00:00+05:30'))
+    assert client.cache_dir is None
     assert observed == [(['en'], date(2026, 8, 27), date(2026, 9, 1), 25)]
     assert public['out_now']['start'] == '2026-09-02'
     assert [x.tmdb_id for x in rb.eligible_watchlist_items(alert_digest)] == [1, 2]
     assert len(rb.find_watchlist_matches(alert_digest, FakeConn([(1, 'movie'), (2, 'movie')]), ['owner@example.com'])) == 2
+
+
+def test_alert_catchup_uses_check_completion_time_and_excludes_cached_digest(monkeypatch):
+    from dataclasses import replace
+    from datetime import datetime
+    run = digest_with(item('Cached current', 1))
+    fresh = replace(item('Recent', 2), release_date='2026-09-01', evidence=replace(item('Recent', 2).evidence, observed_at='2026-09-02T08:40:00+00:00'))
+    monkeypatch.setenv('TMDB_CACHE_DIR', 'cache')
+    observed = []
+    def fetch(_tmdb, _languages, start, end, _popularity):
+        observed.append((start, end))
+        return {'english': [fresh]}
+    monkeypatch.setattr(rb, 'fetch_window_sections', fetch)
+    class Client: cache_dir = 'cache'
+    result = rb.build_watchlist_alert_digest(run, Client(), ['en'], 25, datetime.fromisoformat('2026-09-02T14:15:00+05:30'))
+    assert observed == [(date(2026, 8, 27), date(2026, 9, 2))]
+    assert [x.tmdb_id for x in rb.eligible_watchlist_items(result)] == [2]
+    assert run['generated_at'] == '2026-09-02T14:00:00+05:30'
+
+
+def test_tmdb_detail_failure_does_not_log_exception_credentials(monkeypatch, capsys):
+    client = rb.TmdbClient('secret-value', 'IN')
+    def fail(_item_id):
+        raise RuntimeError('https://example.invalid/?api_key=secret-value')
+    monkeypatch.setattr(client, 'movie_details', fail)
+    assert client.details_or_empty('movie', 42) == {}
+    assert 'secret-value' not in capsys.readouterr().err
 
 
 def test_both_matchers_reject_unknown_evidence_before_querying_watchlists():
