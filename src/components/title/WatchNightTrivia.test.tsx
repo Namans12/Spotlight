@@ -61,6 +61,7 @@ describe('watch-night trivia', () => {
   });
   it.each([
     ['movie', 2062, 'Paris'], ['tv', 2316, 'Pretzels'], ['movie', 673, 'The Three Broomsticks'],
+    ['tv', 66732, 'Waffles'], ['movie', 10198, 'Beignets'], ['movie', 10340, 'Spaghetti and meatballs'], ['movie', 116149, 'Marmalade'],
   ] as const)('checks the sourced answer for %s:%i', async (mediaType, id, answer) => {
     render(<WatchNightTrivia mediaType={mediaType} id={id} />);
     await userEvent.click(screen.getByRole('button', { name: 'Try trivia' }));

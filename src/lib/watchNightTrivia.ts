@@ -12,6 +12,14 @@ const questions: Record<string, TriviaQuestion> = {
     source: 'The Office official channel', sourceUrl: 'https://www.youtube.com/watch?v=FldGxkUFuuQ' },
   'movie:673': { prompt: 'Where does Harry enjoy Butterbeer in the official guide to Prisoner of Azkaban?', choices: ['The Three Broomsticks', 'The Leaky Cauldron', 'Hogwarts Express'], answer: 'The Three Broomsticks',
     source: 'Harry Potter', sourceUrl: 'https://www.harrypotter.com/features/delicious-harry-potter-moments-that-will-make-you-hungry' },
+  'tv:66732': { prompt: 'Which breakfast food does Eleven enjoy in Stranger Things?', choices: ['Waffles', 'Croissants', 'Porridge'], answer: 'Waffles',
+    source: 'Netflix Tudum', sourceUrl: 'https://www.netflix.com/tudum/features/stranger-things-props-archive' },
+  'movie:10198': { prompt: 'Which New Orleans treat appears in Tiana’s cookbook?', choices: ['Beignets', 'Scones', 'Churros'], answer: 'Beignets',
+    source: 'Disney Books', sourceUrl: 'https://books.disney.com/book/tianas-cookbook/' },
+  'movie:10340': { prompt: 'Which dish inspired Disney’s Lady and the Tramp cooking video?', choices: ['Spaghetti and meatballs', 'Macaroni and cheese', 'Vegetable soup'], answer: 'Spaghetti and meatballs',
+    source: 'Disney', sourceUrl: 'https://video.disney.com/watch/the-lady-and-the-tramp-cooking-show-with-alexys-oh-my-disney-show-by-oh-my-disney-56559b61741f0b10d7a04129' },
+  'movie:116149': { prompt: 'What filling does Paddington keep in an emergency sandwich?', choices: ['Marmalade', 'Peanut butter', 'Honey'], answer: 'Marmalade',
+    source: 'Paddington', sourceUrl: 'https://store.paddington.com/blogs/news/its-marmalade-may-paddingtons-favourite-marmalade-gifts-treats' },
 };
 
 export function watchNightTrivia(mediaType: 'movie' | 'tv', id: number): TriviaQuestion | null {
