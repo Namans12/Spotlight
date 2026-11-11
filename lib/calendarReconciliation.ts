@@ -118,7 +118,7 @@ export function reviewedCalendarEntry(row: {
     if (Number(row.tmdb_id) === 1635803 && row.media_type === 'movie' && row.language === 'en' &&
         row.title === 'Romeo Juliet' && row.release_date === '2026-11-13' &&
         row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') {
-      return { type: 'regional' as const, region: 'IN', suppressTitleLink: true, correctedLanguage: 'te', checkedAt: '2026-11-10T18:49:55Z', source: 'Telugu Film Producers Council',
+      return { type: 'regional' as const, region: 'IN', suppressTitleLink: true, identityMismatch: true, correctedLanguage: 'te', checkedAt: '2026-11-10T18:49:55Z', source: 'Telugu Film Producers Council',
         sourceUrl: 'https://photos.tfpc.in/2026/10/25/song-launch-event-from-harshits-romeo-juliet/',
         message: 'The producers’ council reports a 13 November theatrical release, including Andhra Pradesh and Telangana. The stored TMDB link belongs to a different film; the correct title identity and showtimes are unconfirmed.' };
     }

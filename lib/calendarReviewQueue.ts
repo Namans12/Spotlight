@@ -52,9 +52,9 @@ export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): Rev
         typeof evidence.source_url !== 'string' || !evidence.source_url.startsWith('https://') ||
         (tmdbClaim && (row.tmdb_id == null || (row.media_type !== 'movie' && row.media_type !== 'tv') ||
           (typeof evidence.source_url === 'string' && !evidence.source_url.startsWith('https://www.themoviedb.org/')))))) reasons.push('evidence_incomplete');
-    if (evidence && row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
+    if ((review && 'identityMismatch' in review && review.identityMismatch) || (evidence && row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
         typeof evidence.source_url === 'string' && evidence.source_url.startsWith('https://www.themoviedb.org/') &&
-        evidence.source_url !== `https://www.themoviedb.org/${row.media_type}/${row.tmdb_id}`) reasons.push('identity_conflict');
+        evidence.source_url !== `https://www.themoviedb.org/${row.media_type}/${row.tmdb_id}`)) reasons.push('identity_conflict');
     const evidenceObservedAt = typeof evidence?.observed_at === 'string' ? evidence.observed_at : null;
     const checked = review?.checkedAt ?? evidenceObservedAt;
     if (evidence) {

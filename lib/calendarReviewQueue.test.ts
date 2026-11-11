@@ -118,7 +118,7 @@ describe('calendar reconciliation queue', () => {
     expect(items).toHaveLength(2);
     for (const review of items) {
       expect(review.region).toBe('IN');
-      expect(review.reasons).toEqual(expect.arrayContaining(['duplicate_observation', 'identity_unverified']));
+      expect(review.reasons).toEqual(expect.arrayContaining(['duplicate_observation', 'identity_unverified', 'identity_conflict']));
       expect(review.reasons).not.toContain('unreviewed');
     }
   });
