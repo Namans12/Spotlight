@@ -117,6 +117,7 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
       title: row.title, release_date: String(row.release_date), source_url: row.source_url,
       event_region: row.event_region, evidence: row.evidence, platform_or_distributor: row.platform_or_distributor, entry_type: row.entry_type, language: row.language };
     const review = reviewedCalendarEntry(reviewRow) ?? reviewedTmdbConflictAfterEvidence(reviewRow);
+    if (review && 'suppressEvent' in review && review.suppressEvent) continue;
     // The SQL includes unverified TMDB candidates so exact manual reviews can
     // be applied. Never expose the rest merely because they were fetched.
     if (row.origin === 'tmdb_upcoming' && row.evidence == null && !review) continue;

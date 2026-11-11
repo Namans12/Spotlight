@@ -51,6 +51,12 @@ export function reviewedCalendarEntry(row: {
       message: 'Date needs review: local reporting says the announced 12 November release has been postponed; no replacement date is confirmed here.' };
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie') {
+    if (Number(row.tmdb_id) === 1805816 && row.language === 'kn' && row.title === 'Lambodhara 2.0' && row.platform_or_distributor == null &&
+        row.release_date === '2026-11-20' && row.source_url === 'https://www.themoviedb.org/movie/1805816') {
+      return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-11T11:48:00Z', source: 'SouthSide Studio',
+        sourceUrl: 'https://southsidestudio.in/news/2026-10/lambodhara-2-0-trailer-2026-10-31/',
+        message: 'The film’s marketing agency reports the makers moved the theatrical release from 20 November to 13 November. This older observation remains hidden; verify current local showtimes separately.' };
+    }
     if (Number(row.tmdb_id) === 1641520 && row.language === 'te' && row.title === 'DNK' && row.platform_or_distributor == null &&
         row.release_date === '2026-11-13' && row.source_url === 'https://www.themoviedb.org/movie/1641520') {
       return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-11T11:44:00Z', source: 'BookMyShow',

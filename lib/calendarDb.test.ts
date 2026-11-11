@@ -310,6 +310,13 @@ describe('calendar event identity', () => {
       evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1505644' } });
     expect(await getCalendarMonth(db([], [item, wikipedia]) as unknown as postgres.Sql, '2026-11', 'IN')).toHaveLength(1);
   });
+  it('keeps the superseded Lambodhara date out of the public calendar', async () => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 1805816, title: 'Lambodhara 2.0', language: 'kn', release_date: '2026-11-20',
+      source_url: 'https://www.themoviedb.org/movie/1805816', platform_or_distributor: null, event_region: null, evidence: null });
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+    const refreshed = { ...item, event_region: 'IN', evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1805816' } };
+    expect(await getCalendarMonth(db([], [refreshed]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+  });
   it.each(['Talcum Powder', 'Itlu Arjuna', 'Chandrayan', 'Donga Naa Koduku'])('uses a scoped Indian ticketing announcement for %s only for the exact Telugu record and region', async (title) => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: null, media_type: title === 'Donga Naa Koduku' ? null : 'movie', title, language: 'te', release_date: '2026-11-13',
       source: 'wikipedia', source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', platform_or_distributor: title === 'Donga Naa Koduku' ? null : 'Netflix', event_region: null, evidence: null });

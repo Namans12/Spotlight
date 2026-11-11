@@ -164,6 +164,15 @@ describe('calendar reconciliation queue', () => {
     expect(review.reasons).not.toContain('unreviewed');
     expect(review.reasons).toContain('region_unknown');
   });
+  it('flags the older Lambodhara date as a conflict without applying it to other dates', () => {
+    const item = row({ origin: 'tmdb_upcoming', tmdb_id: 1805816, title: 'Lambodhara 2.0', language: 'kn', release_date: '2026-11-20',
+      platform_or_distributor: null, source_url: 'https://www.themoviedb.org/movie/1805816' });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-11T12:00:00Z'));
+    expect(review.reasons).toContain('date_conflict');
+    expect(review.reviewSourceUrl).toContain('southsidestudio.in');
+    const [different] = buildCalendarReviewQueue([{ ...item, release_date: '2026-11-21' }], new Date('2026-11-11T12:00:00Z'));
+    expect(different.reasons).not.toContain('date_conflict');
+  });
   it('uses the reviewed India announcement only for the exact ENE Repeat observation', () => {
     const item = row({ origin: 'tmdb_upcoming', tmdb_id: 1505644, title: 'ENE Repeat', language: 'te', release_date: '2026-11-19',
       source_url: 'https://www.themoviedb.org/movie/1505644' });
