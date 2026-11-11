@@ -18,6 +18,15 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('shows the reviewed Ghost Soldier US theatrical announcement only in the US', async () => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 1562642, title: 'Ghost Soldier', language: 'en', release_date: '2026-11-11',
+      source_url: 'https://www.themoviedb.org/movie/1562642', event_region: null, evidence: null, platform_or_distributor: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US');
+    expect(entry).toMatchObject({ tmdbId: 1562642, region: 'US', evidenceStatus: 'regional' });
+    expect(entry.dateCorroboration?.source).toBe('Harkins Theatres');
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+    expect(await getCalendarMonth(db([], [{ ...item, release_date: '2026-11-10' }]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
+  });
   it('merges the two reviewed Bouma observations while retaining both explanations', async () => {
     const review = editorial({ origin: 'tmdb_upcoming', tmdb_id: 1733518, title: 'Bouma', language: 'ml', release_date: '2026-11-12',
       source: 'TMDB', source_url: 'https://www.themoviedb.org/movie/1733518', event_region: null, evidence: null, platform_or_distributor: null });

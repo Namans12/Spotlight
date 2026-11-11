@@ -44,6 +44,12 @@ export function reviewedCalendarEntry(row: {
       message: 'Date needs review: local reporting says the announced 12 November release has been postponed; no replacement date is confirmed here.' };
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie') {
+    if (Number(row.tmdb_id) === 1562642 && row.language === 'en' && row.title === 'Ghost Soldier' &&
+        row.release_date === '2026-11-11' && row.source_url === 'https://www.themoviedb.org/movie/1562642') {
+      return { type: 'regional' as const, region: 'US', checkedAt: '2026-11-11T05:17:05Z', source: 'Harkins Theatres',
+        sourceUrl: 'https://harkins.com/movies/ghost-soldier/2026-11-10',
+        message: 'Harkins lists a US theatrical opening on 11 November, matching Sony’s announcement and the film’s cast. Availability outside the US is unconfirmed.' };
+    }
     if (Number(row.tmdb_id) === 1733518 && row.language === 'ml' && row.title === 'Bouma' &&
         row.release_date === '2026-11-12' && row.source_url === 'https://www.themoviedb.org/movie/1733518') {
       return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-10T18:47:38Z', source: 'Cinema Express',
