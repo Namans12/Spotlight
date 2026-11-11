@@ -1449,6 +1449,23 @@ def eligible_watchlist_notifications(digest: dict[str, Any]) -> dict[tuple[int, 
     return combined
 
 
+def build_watchlist_alert_digest(digest: dict[str, Any], tmdb: TmdbClient,
+                                 languages: list[str], min_popularity: float) -> dict[str, Any]:
+    """Fresh, bounded catch-up for alerts only; the published digest is unchanged."""
+    run_at = datetime.fromisoformat(digest['generated_at'].replace('Z', '+00:00'))
+    if run_at.tzinfo is None or not digest.get('region'):
+        raise ValueError('Alert catch-up requires a region and timezone-aware run time')
+    today = run_at.date()
+    start = today - timedelta(days=6)
+    recent = fetch_window_sections(tmdb, languages, start, today - timedelta(days=1), min_popularity)
+    # Keep all candidate observations: eligible_watchlist_items independently
+    # checks date, region, provenance and freshness, then notifications combine
+    # providers and existing per-user delivery records prevent repeat sends.
+    sections = {f'current:{name}': list(items) for name, items in digest['out_now']['sections'].items()}
+    sections.update({f'catchup:{name}': list(items) for name, items in recent.items()})
+    return {**digest, 'out_now': {'start': start.isoformat(), 'end': today.isoformat(), 'sections': sections}}
+
+
 def alert_provider_text(match: dict[str, Any]) -> str:
     """Describe current listings without assuming that a service is included."""
     labels = {'subscription': 'subscription', 'ad-supported': 'with ads', 'free': 'free', 'rent': 'rent', 'buy': 'buy'}
@@ -1843,6 +1860,16 @@ def main() -> int:
         )
         sent_channels.append("Email")
 
+    alert_digest = digest
+    if db_conn is not None and not dry_run and (telegram_enabled or email_enabled or os.getenv('SMTP_HOST')) and not env_bool('USE_SAMPLE_DATA', False):
+        try:
+            alert_digest = build_watchlist_alert_digest(
+                digest, TmdbClient(env_required('TMDB_API_KEY'), digest['region']),
+                env_list('LANGUAGES', 'hi,en'), float(os.getenv('POPULAR_MIN_POPULARITY', '25')))
+        except Exception:
+            # Upstream errors can include request URLs or credentials.
+            print('Watchlist catch-up unavailable; using current digest only.', file=sys.stderr)
+
     # Watchlist-drop alerts only make sense alongside the real digest send
     # (not the nightly DB-only refresh, which runs with DRY_RUN=true and
     # neither channel enabled).
@@ -1858,7 +1885,7 @@ def main() -> int:
             failures.append(f"Watchlist-alert step failed: {exc}")
         else:
             try:
-                matches = find_watchlist_matches(digest, db_conn, owner_emails)
+                matches = find_watchlist_matches(alert_digest, db_conn, owner_emails)
                 if matches:
                     telegram_sender = (
                         (lambda text: send_telegram_message(env_required("TELEGRAM_BOT_TOKEN"), env_required("TELEGRAM_CHAT_ID"), text))
@@ -1908,7 +1935,7 @@ def main() -> int:
     # broadcast, and that is in fact this deployment's configuration.
     if db_conn is not None and not dry_run and os.getenv("SMTP_HOST"):
         try:
-            per_user = find_watchlist_matches_by_user(digest, db_conn)
+            per_user = find_watchlist_matches_by_user(alert_digest, db_conn)
             if per_user:
 
                 def _send_user_email(to_address: str, subject: str, text: str) -> None:

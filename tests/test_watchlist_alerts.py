@@ -244,6 +244,26 @@ def test_alerts_require_arrived_date_and_local_evidence():
     assert rb.eligible_watchlist_items({"out_now": {"sections": {"english": candidates}}}) == []
 
 
+def test_alert_catchup_is_bounded_fresh_and_does_not_change_public_digest(monkeypatch):
+    from dataclasses import replace
+    current = item('Today', 1)
+    recent = replace(item('Yesterday', 2), release_date='2026-09-01')
+    too_old = replace(item('Too old', 3), release_date='2026-08-26')
+    foreign = replace(item('Foreign', 4), release_date='2026-09-01', evidence=replace(item('Foreign', 4).evidence, region='US'))
+    stale = replace(item('Stale', 5), release_date='2026-09-01', evidence=replace(item('Stale', 5).evidence, observed_at='2026-08-30T08:00:00+00:00'))
+    observed = []
+    def fetch(_tmdb, languages, start, end, popularity):
+        observed.append((languages, start, end, popularity))
+        return {'english': [recent, too_old, foreign, stale]}
+    monkeypatch.setattr(rb, 'fetch_window_sections', fetch)
+    public = digest_with(current)
+    alert_digest = rb.build_watchlist_alert_digest(public, object(), ['en'], 25)
+    assert observed == [(['en'], date(2026, 8, 27), date(2026, 9, 1), 25)]
+    assert public['out_now']['start'] == '2026-09-02'
+    assert [x.tmdb_id for x in rb.eligible_watchlist_items(alert_digest)] == [1, 2]
+    assert len(rb.find_watchlist_matches(alert_digest, FakeConn([(1, 'movie'), (2, 'movie')]), ['owner@example.com'])) == 2
+
+
 def test_both_matchers_reject_unknown_evidence_before_querying_watchlists():
     from dataclasses import replace
 
