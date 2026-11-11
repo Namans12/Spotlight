@@ -67,8 +67,8 @@ export function evaluateOfflineCases(cases: OfflineCase[]) {
     // Overall precision treats unjudged titles as irrelevant; suppress it for partial labels.
     const partial = baseline.some(key => test.judgments[key] === undefined);
     return { name: test.name, baseline, updated, labelCoverage: baseline.length ? baseline.filter(key => test.judgments[key] !== undefined).length / baseline.length : null,
-      baselineMetrics: { ...metrics.baseline, reciprocalRank: relevant.length ? metrics.baseline.reciprocalRank : null, precisionAtCutoff: partial ? null : metrics.baseline.precisionAtCutoff, topThree: judgedTopThree(baseline, test.judgments) },
-      updatedMetrics: { ...metrics.updated, reciprocalRank: relevant.length ? metrics.updated.reciprocalRank : null, precisionAtCutoff: partial ? null : metrics.updated.precisionAtCutoff, topThree: judgedTopThree(updated, test.judgments) } };
+      baselineMetrics: { ...metrics.baseline, reciprocalRank: relevant.length ? metrics.baseline.reciprocalRank : null, precisionAtCutoff: partial || !baseline.length ? null : metrics.baseline.precisionAtCutoff, topThree: judgedTopThree(baseline, test.judgments) },
+      updatedMetrics: { ...metrics.updated, reciprocalRank: relevant.length ? metrics.updated.reciprocalRank : null, precisionAtCutoff: partial || !updated.length ? null : metrics.updated.precisionAtCutoff, topThree: judgedTopThree(updated, test.judgments) } };
   });
 }
 

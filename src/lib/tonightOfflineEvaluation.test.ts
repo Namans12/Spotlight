@@ -33,6 +33,15 @@ describe('offline recommendation evaluation', () => {
     expect(result.baselineMetrics.precisionAtCutoff).toBeNull();
     expect(result.baselineMetrics.topThree).toEqual({ shown: 2, judged: 1, judgedPrecision: 1 });
   });
+  it('does not report zero precision when no candidate is eligible', () => {
+    const input = sample(); input.cases[0].filters.services = ['Unavailable service'];
+    const [result] = evaluateOfflineCases(parseOfflineCases(input));
+    expect(result.baseline).toEqual([]);
+    expect(result.baselineMetrics.precisionAtCutoff).toBeNull();
+    expect(result.updatedMetrics.precisionAtCutoff).toBeNull();
+    expect(result.baselineMetrics.relevantCoverage).toBe(0);
+    expect(summarizeOfflineEvaluation([result]).precisionAtCutoff.cases).toBe(0);
+  });
   it('summarizes paired eligible cases without treating missing metrics as zero', () => {
     const complete = sample();
     const partial = sample(); delete (partial.cases[0].judgments as Record<string, string>)['movie:1'];
