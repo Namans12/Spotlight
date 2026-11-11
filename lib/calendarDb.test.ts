@@ -18,6 +18,15 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('shows the reviewed November 13 Melcow announcement for India only', async () => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 1434462, title: 'Melcow Pondicherry', language: 'ml', release_date: '2026-11-13',
+      source_url: 'https://www.themoviedb.org/movie/1434462', event_region: null, evidence: null, platform_or_distributor: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry).toMatchObject({ tmdbId: 1434462, region: 'IN', evidenceStatus: 'regional', releaseDate: '2026-11-13' });
+    expect(entry.dateCorroboration?.message).toContain('Kerala distributor');
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
+    expect(await getCalendarMonth(db([], [{ ...item, release_date: '2026-11-12' }]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+  });
   it('shows the dated broadcaster warning for the exact Nine to Six observation', async () => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 310209, media_type: 'tv', entry_type: 'Show', title: 'Nine to Six',
       language: 'ko', release_date: '2026-11-11', source_url: 'https://www.themoviedb.org/tv/310209', event_region: null, evidence: null });

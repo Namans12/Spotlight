@@ -51,6 +51,12 @@ export function reviewedCalendarEntry(row: {
       message: 'Date needs review: local reporting says the announced 12 November release has been postponed; no replacement date is confirmed here.' };
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie') {
+    if (Number(row.tmdb_id) === 1434462 && row.language === 'ml' && row.title === 'Melcow Pondicherry' &&
+        row.release_date === '2026-11-13' && row.source_url === 'https://www.themoviedb.org/movie/1434462') {
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-11T05:21:13Z', source: 'Simply Mollywood',
+        sourceUrl: 'https://simplymollywood.com/movies/malayalam-releases-this-week-bouma-melcow-gondhal-itllu-november-12-13',
+        message: 'Regional reporting cites the makers’ 13 November theatrical announcement and a Kerala distributor. Showtimes and streaming availability are not confirmed by this announcement.' };
+    }
     if (Number(row.tmdb_id) === 1562642 && row.language === 'en' && row.title === 'Ghost Soldier' &&
         row.release_date === '2026-11-11' && row.source_url === 'https://www.themoviedb.org/movie/1562642') {
       return { type: 'regional' as const, region: 'US', checkedAt: '2026-11-11T05:17:05Z', source: 'Harkins Theatres',
