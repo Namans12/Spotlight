@@ -18,6 +18,20 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('merges the two reviewed Bouma observations while retaining both explanations', async () => {
+    const review = editorial({ origin: 'tmdb_upcoming', tmdb_id: 1733518, title: 'Bouma', language: 'ml', release_date: '2026-11-12',
+      source: 'TMDB', source_url: 'https://www.themoviedb.org/movie/1733518', event_region: null, evidence: null, platform_or_distributor: null });
+    const wiki = editorial({ ...review, id: 2, origin: 'wikipedia', source: 'wikipedia', event_region: 'IN',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Malayalam_films_of_2026',
+      evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1733518' } });
+    for (const rows of [[review, wiki], [wiki, review]]) {
+      const entries = await getCalendarMonth(db([], rows) as unknown as postgres.Sql, '2026-11', 'IN');
+      expect(entries).toHaveLength(1);
+      expect(entries[0].dateCorroboration?.message).toContain('Kerala distributor');
+      expect(entries[0].dateCorroboration?.message).toContain('Rejin S Babu');
+      expect(entries[0].additionalSources).toHaveLength(1);
+    }
+  });
   it('restores Anna from Mexico only for the reviewed regional ticketing observation', async () => {
     const item = editorial({ origin: 'district_in', tmdb_id: 1739918, title: 'Anna from Mexico', language: 'kn', release_date: '2026-12-24',
       source_url: 'https://www.district.in/movies/anna-from-mexico-movie-tickets-in-hyderabad-MV220211', event_region: 'IN',
@@ -136,7 +150,15 @@ describe('calendar event identity', () => {
     const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, language: 'en' }]) as unknown as postgres.Sql, '2026-11', 'IN');
     expect(entries.find(entry => entry.dateCorroboration?.source === source)?.region).toBe('IN');
     expect(entries.filter(entry => entry.dateCorroboration?.source === source)).toHaveLength(1);
+    expect(entries).toHaveLength(1);
     expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
+  });
+  it('includes unverified TMDB rows for review but suppresses unmatched candidates', async () => {
+    const sql = db([], [editorial({ origin: 'tmdb_upcoming', tmdb_id: 99, title: 'Unreviewed', language: 'en',
+      source_url: 'https://www.themoviedb.org/movie/99', event_region: null, evidence: null })]);
+    expect(await getCalendarMonth(sql as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+    const calendarQuery = sql.mock.calls[1][0] as TemplateStringsArray;
+    expect(calendarQuery.join('?')).toContain("origin = 'tmdb_upcoming' AND evidence IS NULL");
   });
   it('scopes the exact Telugu High announcement to India while leaving its identity unresolved', async () => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: null, title: 'High', language: 'te', release_date: '2026-11-27',

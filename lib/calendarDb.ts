@@ -37,6 +37,7 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
       AND (evidence->>'region' IS NULL OR evidence->>'region' = ${region} OR
            (origin IN ('wikipedia','csv_seed','district_in') AND evidence->>'date_source' IN ('tmdb_regional_theatrical','tmdb_global_first_air')))
       AND (origin <> 'tmdb_upcoming' OR
+           (origin = 'tmdb_upcoming' AND evidence IS NULL) OR
            (media_type = 'movie' AND tmdb_id IS NOT NULL AND evidence->>'source_url' = 'https://www.themoviedb.org/movie/' || tmdb_id::text
              AND evidence->>'region' = ${region} AND evidence->>'date_source' = 'tmdb_regional_theatrical') OR
            (media_type = 'tv' AND tmdb_id IS NOT NULL AND evidence->>'source_url' = 'https://www.themoviedb.org/tv/' || tmdb_id::text
@@ -56,7 +57,8 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
     }
     // Preserve distinct review annotations instead of silently dropping one.
     if ((existing.dateCorroboration && entry.dateCorroboration &&
-         JSON.stringify(existing.dateCorroboration) !== JSON.stringify(entry.dateCorroboration)) ||
+         JSON.stringify(existing.dateCorroboration) !== JSON.stringify(entry.dateCorroboration) &&
+         existing.dateCorroboration.sourceUrl !== entry.dateCorroboration.sourceUrl) ||
         (existing.dateConflict && entry.dateConflict && JSON.stringify(existing.dateConflict) !== JSON.stringify(entry.dateConflict)) ||
         (existing.seasonPremiere && entry.seasonPremiere && JSON.stringify(existing.seasonPremiere) !== JSON.stringify(entry.seasonPremiere))) {
       entries.push(entry);
@@ -69,7 +71,12 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
         !(existing.additionalSources ?? []).some(source => source.source === extraSource.source && source.sourceUrl === extraSource.sourceUrl)) {
       existing.additionalSources = [...(existing.additionalSources ?? []), extraSource];
     }
-    existing.dateCorroboration ??= entry.dateCorroboration;
+    if (existing.dateCorroboration && entry.dateCorroboration &&
+        existing.dateCorroboration.sourceUrl === entry.dateCorroboration.sourceUrl &&
+        existing.dateCorroboration.message !== entry.dateCorroboration.message) {
+      existing.dateCorroboration = { ...existing.dateCorroboration,
+        message: `${existing.dateCorroboration.message} ${entry.dateCorroboration.message}` };
+    } else existing.dateCorroboration ??= entry.dateCorroboration;
     existing.dateConflict ??= entry.dateConflict;
     existing.seasonPremiere ??= entry.seasonPremiere;
     if (entry.reviewFreshness === 'stale' || (entry.reviewFreshness === 'unknown' && existing.reviewFreshness !== 'stale') || !existing.reviewFreshness)
@@ -110,6 +117,9 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
     const review = reviewedCalendarEntry({ origin: row.origin, tmdb_id: row.tmdb_id, media_type: row.media_type,
       title: row.title, release_date: String(row.release_date), source_url: row.source_url,
       event_region: row.event_region, evidence: row.evidence, platform_or_distributor: row.platform_or_distributor, entry_type: row.entry_type, language: row.language });
+    // The SQL includes unverified TMDB candidates so exact manual reviews can
+    // be applied. Never expose the rest merely because they were fetched.
+    if (row.origin === 'tmdb_upcoming' && row.evidence == null && !review) continue;
     if (review?.type === 'regional' && review.region !== region) continue;
     const reviewInput = { origin: row.origin, tmdb_id: row.tmdb_id, media_type: row.media_type,
       title: row.title, language: row.language, release_date: String(row.release_date), source_url: row.source_url,
