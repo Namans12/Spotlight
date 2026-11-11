@@ -33,6 +33,22 @@ describe('watch-night ideas', () => {
     expect(screen.getByText('Lemon cakes')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Source: George R. R. Martin' })).toHaveAttribute('href', 'https://georgerrmartin.com/dining-in-westeros-a-feast-of-ice-and-fire/');
   });
+  it('uses general adaptable ideas when dietary or budget preferences are selected', async () => {
+    const user = userEvent.setup();
+    render(<WatchNightIdeas mediaType="tv" id={1668} />);
+    await user.click(screen.getByRole('button', { name: 'Show food ideas' }));
+    await user.selectOptions(screen.getByLabelText('Pick a vibe for more ideas'), 'cosy');
+    await user.selectOptions(screen.getByLabelText('Dietary preference'), 'vegan');
+    expect(screen.queryByText('A trifle')).not.toBeInTheDocument();
+    expect(screen.getByText('Toast with plant-based spread')).toBeInTheDocument();
+    expect(screen.getByText(/Check ingredients and allergens/)).toBeInTheDocument();
+    await user.click(screen.getByLabelText('Prefer simple, budget-conscious ideas'));
+    expect(screen.getByText('Tea')).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Dietary preference'), '');
+    expect(screen.getByText('Toast with a suitable spread')).toBeInTheDocument();
+    await user.click(screen.getByLabelText('Prefer simple, budget-conscious ideas'));
+    expect(screen.getByText('A trifle')).toBeInTheDocument();
+  });
   it.each([
     ['movie', 2062, 'Ratatouille'], ['tv', 2316, 'Soft pretzels'], ['movie', 673, 'Butterbeer-inspired drink'],
     ['tv', 66732, 'Waffles'], ['movie', 10198, 'Beignets'], ['movie', 10340, 'Spaghetti and meatballs'], ['movie', 116149, 'Marmalade sandwich'],

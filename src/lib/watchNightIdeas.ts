@@ -36,3 +36,15 @@ export const VIBE_IDEAS = {
   crunchy: { label: 'Crunchy', foods: ['Popcorn or pretzels', 'Iced tea or water'] },
 } as const;
 export type WatchNightVibe = keyof typeof VIBE_IDEAS;
+
+export type WatchNightDiet = '' | 'vegetarian' | 'vegan';
+/** General suggestions only: ingredients and local prices must still be checked. */
+export function filteredVibeIdeas(vibe: WatchNightVibe, diet: WatchNightDiet, budget: boolean): readonly string[] {
+  if (!diet && !budget) return VIBE_IDEAS[vibe].foods;
+  const ideas: Record<WatchNightVibe, readonly string[]> = {
+    cosy: diet === 'vegan' ? ['Toast with plant-based spread', 'Tea'] : ['Toast with a suitable spread', 'Tea'],
+    fresh: ['Fruit or vegetable sticks', 'Water'],
+    crunchy: ['Plain popcorn', 'Water'],
+  };
+  return ideas[vibe];
+}
