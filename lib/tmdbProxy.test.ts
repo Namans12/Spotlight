@@ -348,6 +348,15 @@ describe('tmdbPerson', () => {
 // ---------------------------------------------------------------------------
 
 describe('tmdbDetail certification', () => {
+  it('returns separate local offer types and a title-matched watch link', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, { id: 1, title: 'A Film',
+      'watch/providers': { results: { IN: { link: 'https://www.themoviedb.org/movie/1/watch?locale=IN',
+        flatrate: [{ provider_name: 'Netflix' }], rent: [{ provider_name: 'Netflix' }] },
+        US: { flatrate: [{ provider_name: 'Hulu' }] } } } }));
+    const detail = await tmdbDetail('movie', 1, 'IN');
+    expect(detail.availability).toEqual([{ provider: 'Netflix', type: 'subscription' }, { provider: 'Netflix', type: 'rent' }]);
+    expect(detail.watchUrl).toBe('https://www.themoviedb.org/movie/1/watch?locale=IN');
+  });
   function movieWithCertificates(results: TmdbRow[]) {
     return {
       id: 1,

@@ -522,6 +522,8 @@ export interface TitleDetailResult {
   /** Needed by /discover, which filters on ids rather than names. */
   genreIds: number[];
   providers: string[];
+  availability: ProviderOffer[];
+  watchUrl: string | null;
   tmdbUrl: string;
   originalLanguage: string;
   /** TV only; null for movies and for a show TMDB has no season count for.
@@ -699,6 +701,8 @@ export async function tmdbDetail(mediaType: "movie" | "tv", id: number, region =
     genres: (r.genres ?? []).map((g: any) => g.name),
     genreIds: (r.genres ?? []).map((g: any) => g.id).filter((id: any) => typeof id === "number"),
     providers,
+    availability: resolveProviderOffers(r, region),
+    watchUrl: regionalWatchLink(r, region, { mediaType, id }),
     tmdbUrl: `https://www.themoviedb.org/${path}/${id}`,
     originalLanguage: r.original_language || "",
     numberOfSeasons:

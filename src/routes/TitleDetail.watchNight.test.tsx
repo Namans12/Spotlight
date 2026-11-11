@@ -18,8 +18,22 @@ vi.mock('@/lib/tmdb', () => ({ getYouMayAlsoLike: vi.fn().mockResolvedValue([]),
 vi.mock('@/components/title/FactsPanel', () => ({ FactsPanel: () => null }));
 
 import TitleDetail from './TitleDetail';
+import { fetchTitleDetail } from '@/lib/tmdbDetail';
 
 describe('title watch-night sections', () => {
+  it('shows local offer types and credits the provider source', async () => {
+    vi.mocked(fetchTitleDetail).mockResolvedValueOnce({ id: 1399, mediaType: 'tv', title: 'Game of Thrones', overview: '', posterUrl: null, backdropUrl: null,
+      releaseDate: '2011-01-01', rating: null, runtime: null, genres: [], providers: ['Netflix'], tmdbUrl: 'https://example.com',
+      availability: [{ provider: 'Netflix', type: 'subscription' }, { provider: 'Netflix', type: 'rent' }], watchUrl: 'https://www.themoviedb.org/tv/1399/watch?locale=IN',
+      originalLanguage: 'en', numberOfSeasons: null, numberOfEpisodes: null, seasons: [], tagline: null, status: null,
+      certification: null, budget: null, revenue: null, logoPath: null, trailer: null } as never);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/title/tv/1399']}><Routes><Route path="/title/:type/:id" element={<TitleDetail />} /></Routes></MemoryRouter></QueryClientProvider>);
+    expect(await screen.findByText('Netflix (subscription) · Netflix (rent)')).toBeInTheDocument();
+    expect(screen.getByText(/Source: JustWatch via TMDB/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open TMDB watch options' })).toHaveAttribute('href', 'https://www.themoviedb.org/tv/1399/watch?locale=IN');
+    client.clear();
+  });
   it('keeps exactly one of each card when the title page rerenders', async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const app = (tick: number) => <QueryClientProvider client={client}><MemoryRouter initialEntries={['/title/tv/1399']}>

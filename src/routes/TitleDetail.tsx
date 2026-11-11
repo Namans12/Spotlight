@@ -300,17 +300,13 @@ export default function TitleDetail() {
         </div>
       )}
 
-      {data.providers.length > 0 && (
-        <div className="px-1">
-          {/* Not "Streaming on" — resolveProviders' fallback tiers (see
-              lib/tmdbProxy.ts) can return purchase-only entries tagged
-              "(Buy/Rent)", or a bare "Buy/Rent" when no store name survived
-              normalization. "Streaming on Buy/Rent" would be a label that's
-              simply false; "Where to watch" is accurate for every tier. */}
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Where to watch</p>
-          <p className="text-sm text-accent font-medium">{data.providers.join(', ')}</p>
-        </div>
-      )}
+      <div className="px-1">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Where to watch in India</p>
+        <p className="text-sm text-accent font-medium">{data.availability === undefined
+          ? data.providers.length ? data.providers.map(name => `${name} (type unknown)`).join(' · ') : 'Availability unknown'
+          : data.availability.length ? data.availability.map(offer => `${offer.provider} (${offer.type === 'ads' ? 'with ads' : offer.type})`).join(' · ') : 'Availability unknown'}</p>
+        <p className="mt-1 text-xs text-muted-foreground">Source: JustWatch via TMDB. Availability may change.{data.watchUrl && <> <a href={data.watchUrl} target="_blank" rel="noopener noreferrer" className="underline">Open TMDB watch options</a></>}</p>
+      </div>
 
       {data.tagline && (
         <p className="px-1 text-sm italic text-muted-foreground">&ldquo;{data.tagline}&rdquo;</p>

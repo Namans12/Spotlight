@@ -1,4 +1,5 @@
 import type { SeasonSummary } from '@/lib/progress';
+import type { ProviderOffer } from '../../shared/types/availability';
 
 export interface TitleDetail {
   id: number;
@@ -14,6 +15,8 @@ export interface TitleDetail {
   runtime: number | null;
   genres: string[];
   providers: string[];
+  availability?: ProviderOffer[];
+  watchUrl?: string | null;
   tmdbUrl: string;
   originalLanguage: string;
   /** TV only; null for movies and for a show TMDB has no season count for. */
