@@ -423,6 +423,8 @@ describe('calendar event identity', () => {
     expect(entry.dateConflict?.message).toContain('Date needs review');
     expect(entry.releaseDate).toBe(release_date);
     expect(entry.region).toBeNull();
+    expect(entry.kind).toBe('unknown');
+    expect(entry.isTheatrical).toBe(false);
   });
 
   it('limits a warning for an unmatched title to the named distributor', async () => {
