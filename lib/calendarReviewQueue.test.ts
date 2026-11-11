@@ -93,7 +93,8 @@ describe('calendar reconciliation queue', () => {
     const item = row({ origin: 'district_in', tmdb_id: 1381273, title: 'Paper Tiger', language: 'en', release_date: '2026-11-20',
       source_url: 'https://www.district.in/movies/paper-tiger-movie-tickets-in-hyderabad-MV227340' });
     const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T12:00:00Z'));
-    expect(review.reasons).toEqual(expect.arrayContaining(['date_conflict', 'identity_unverified', 'region_unknown']));
+    expect(review.reasons).toEqual(expect.arrayContaining(['date_conflict', 'region_unknown']));
+    expect(review.reasons).not.toContain('identity_unverified');
   });
   it('flags the legacy NBK111 date while retaining missing identity and region', () => {
     const item = row({ origin: 'district_in', tmdb_id: null, media_type: null, title: 'NBK111', language: 'te', release_date: '2026-12-31',
@@ -101,11 +102,12 @@ describe('calendar reconciliation queue', () => {
     const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T12:00:00Z'));
     expect(review.reasons).toEqual(expect.arrayContaining(['date_conflict', 'identity_missing', 'region_unknown']));
   });
-  it('flags the legacy Vrushakarma date and unverified title link', () => {
+  it('flags the legacy Vrushakarma date with a reviewed title link', () => {
     const item = row({ origin: 'district_in', tmdb_id: 1395627, title: 'Vrushakarma', language: 'te', release_date: '2026-12-31',
       source_url: 'https://www.district.in/movies/vrushakarma-movie-tickets-in-hyderabad-MV210428' });
     const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T12:00:00Z'));
-    expect(review.reasons).toEqual(expect.arrayContaining(['date_conflict', 'identity_unverified', 'region_unknown']));
+    expect(review.reasons).toEqual(expect.arrayContaining(['date_conflict', 'region_unknown']));
+    expect(review.reasons).not.toContain('identity_unverified');
   });
   it('retains the Jayannth date conflict and missing identity for review', () => {
     const item = row({ origin: 'wikipedia', tmdb_id: null, title: 'Jayannth And The Jingo Pen', language: 'te', release_date: '2026-11-12',

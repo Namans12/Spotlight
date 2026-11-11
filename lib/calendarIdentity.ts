@@ -28,6 +28,15 @@ export function reviewedEditorialTmdbIdentity(row: {
       (item.type === 'movie' ? evidence.date_source === 'tmdb_regional_theatrical' && evidence.region === 'IN' : evidence.date_source === 'tmdb_global_first_air' && evidence.region == null));
     if (match) return { source: match.referenceName, sourceUrl: match.reference, checkedAt: '2026-11-10T19:19:12Z', message: match.message, identityOnly: true };
   }
+  if (row.origin === 'district_in' && Number(row.tmdb_id) === 1739918 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.title === 'Anna from Mexico' && row.language === 'kn' && row.release_date === '2026-12-24' &&
+      row.source_url === 'https://www.district.in/movies/anna-from-mexico-movie-tickets-in-hyderabad-MV220211' &&
+      row.evidence && typeof row.evidence === 'object' && !Array.isArray(row.evidence)) {
+    const evidence = row.evidence as Record<string, unknown>;
+    if (evidence.date_source === 'tmdb_regional_theatrical' && evidence.region === 'IN' && evidence.source_url === 'https://www.themoviedb.org/movie/1739918')
+      return { source: 'District / Cinema Express', sourceUrl: 'https://www.cinemaexpress.com/kannada/news/2026/Jul/30/dhananjayas-anna-from-mexico-locks-christmas-release',
+        checkedAt: '2026-11-10T19:22:03Z', message: 'The Hyderabad listing and TMDB agree on director Shankar Guru and lead Dhananjaya. The listing announces 24 December; showtimes are unconfirmed.' };
+  }
   if (row.origin !== 'wikipedia' || row.media_type !== 'movie' || row.entry_type !== 'Movie' ||
       !row.evidence || typeof row.evidence !== 'object' || Array.isArray(row.evidence)) return null;
   const evidence = row.evidence as Record<string, unknown>;

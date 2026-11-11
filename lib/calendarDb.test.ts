@@ -18,6 +18,17 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('restores Anna from Mexico only for the reviewed regional ticketing observation', async () => {
+    const item = editorial({ origin: 'district_in', tmdb_id: 1739918, title: 'Anna from Mexico', language: 'kn', release_date: '2026-12-24',
+      source_url: 'https://www.district.in/movies/anna-from-mexico-movie-tickets-in-hyderabad-MV220211', event_region: 'IN',
+      evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1739918' } });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-12', 'IN');
+    expect(entry).toMatchObject({ tmdbId: 1739918, region: 'IN', evidenceStatus: 'regional' });
+    expect(entry.dateCorroboration?.message).toContain('showtimes are unconfirmed');
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-12', 'US')).toEqual([]);
+    const [changed] = await getCalendarMonth(db([], [{ ...item, source_url: 'https://example.org' }]) as unknown as postgres.Sql, '2026-12', 'IN');
+    expect(changed.tmdbId).toBeNull();
+  });
   it.each([
     [1170608, 'movie', 'Movie', 'Dune: Part Three', 'en', '2026-12-18', 'American', 'Warner Bros. Pictures / Legendary Pictures', 'Warner Bros.'],
     [1145110, 'movie', 'Movie', 'King', 'hi', '2026-12-24', 'Hindi', 'Red Chillies Entertainment, Marflix Pictures', 'Red Chillies Entertainment'],
@@ -165,7 +176,7 @@ describe('calendar event identity', () => {
       source_url: 'https://www.district.in/movies/paper-tiger-movie-tickets-in-hyderabad-MV227340', event_region: null, evidence: null });
     const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, language: 'te' }]) as unknown as postgres.Sql, '2026-11', 'IN');
     expect(entries.filter(entry => entry.dateConflict)).toHaveLength(1);
-    expect(entries.find(entry => entry.dateConflict)?.tmdbId).toBeNull();
+    expect(entries.find(entry => entry.dateConflict)?.tmdbId).toBe(1381273);
     expect(entries.find(entry => entry.dateConflict)?.dateConflict?.message).toContain('27 November');
   });
   it('flags the exact legacy NBK111 date without creating a title link', async () => {
@@ -176,13 +187,13 @@ describe('calendar event identity', () => {
     expect(entries.find(entry => entry.dateConflict)?.dateConflict?.message).toContain('24 December');
     expect(entries.find(entry => entry.dateConflict)?.tmdbId).toBeNull();
   });
-  it('flags the legacy Vrushakarma date without asserting the linked title identity', async () => {
+  it('flags the legacy Vrushakarma date while retaining the reviewed title identity', async () => {
     const item = editorial({ origin: 'district_in', tmdb_id: 1395627, title: 'Vrushakarma', language: 'te', release_date: '2026-12-31',
       source_url: 'https://www.district.in/movies/vrushakarma-movie-tickets-in-hyderabad-MV210428', event_region: null, evidence: null });
     const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, release_date: '2026-12-30' }]) as unknown as postgres.Sql, '2026-12', 'IN');
     const warning = entries.find(entry => entry.dateConflict);
     expect(warning?.dateConflict?.message).toContain('4 December');
-    expect(warning?.tmdbId).toBeNull();
+    expect(warning?.tmdbId).toBe(1395627);
     expect(warning?.region).toBeNull();
     expect(entries.filter(entry => entry.dateConflict)).toHaveLength(1);
   });

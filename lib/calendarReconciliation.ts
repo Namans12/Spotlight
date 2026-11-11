@@ -17,9 +17,9 @@ export function reviewedCalendarEntry(row: {
     }
     if (Number(row.tmdb_id) === 1381273 && row.title === 'Paper Tiger' && row.release_date === '2026-11-20' &&
         row.source_url === 'https://www.district.in/movies/paper-tiger-movie-tickets-in-hyderabad-MV227340') {
-      return { type: 'conflict' as const, checkedAt: '2026-11-10', suppressTitleLink: true, source: 'BookMyShow',
+      return { type: 'conflict' as const, checkedAt: '2026-11-10T19:22:03Z', source: 'BookMyShow',
         sourceUrl: 'https://in.bookmyshow.com/movies/kolkata/paper-tiger/ET00522380',
-        message: 'Date needs review: BookMyShow lists the film for 27 November in India; this legacy entry lists 20 November without verified territory. The event and linked title identity remain unconfirmed.' };
+        message: 'Date needs review: BookMyShow and the original District listing now list 27 November in India; this legacy entry lists 20 November without verified territory. District and TMDB agree on director James Gray and leads Adam Driver, Scarlett Johansson and Miles Teller.' };
     }
   }
   if (row.origin === 'district_in' && row.tmdb_id == null && row.media_type == null && row.entry_type === 'Movie' &&
@@ -32,9 +32,9 @@ export function reviewedCalendarEntry(row: {
   if (row.origin === 'district_in' && Number(row.tmdb_id) === 1395627 && row.media_type === 'movie' &&
       row.entry_type === 'Movie' && row.language === 'te' && row.title === 'Vrushakarma' && row.release_date === '2026-12-31' &&
       row.source_url === 'https://www.district.in/movies/vrushakarma-movie-tickets-in-hyderabad-MV210428') {
-    return { type: 'conflict' as const, checkedAt: '2026-11-10', suppressTitleLink: true, source: 'BookMyShow',
+    return { type: 'conflict' as const, checkedAt: '2026-11-10T19:22:03Z', source: 'BookMyShow',
       sourceUrl: 'https://in.bookmyshow.com/movies/dehradun/vrushakarma/ET00472260',
-      message: 'Date needs review: BookMyShow lists the Telugu film for 4 December in India, while this legacy entry lists 31 December. The linked TMDB identity and this event remain unconfirmed.' };
+      message: 'Date needs review: BookMyShow and the original District listing now list 4 December in India, while this legacy entry lists 31 December. District and TMDB agree on director Karthik Varma Dandu and leads Naga Chaitanya and Meenakshi Chaudhary.' };
   }
   if (row.origin === 'tmdb_upcoming' && Number(row.tmdb_id) === 1450342 && row.media_type === 'movie' &&
       row.entry_type === 'Movie' && row.language === 'te' && row.title === 'Bhogi' && row.release_date === '2026-11-12' &&
