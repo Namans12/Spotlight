@@ -19,6 +19,18 @@ function db(releases: unknown[], calendar: unknown[]) {
 
 describe('calendar event identity', () => {
   it.each([
+    [310209, 'Nine to Six', 'tv', 'Show', 'ko', '2026-11-11', 'tmdb_global_first_air', null, 'SBS'],
+    [1450342, 'Bhogi', 'movie', 'Movie', 'te', '2026-11-12', 'tmdb_regional_theatrical', 'IN', '123telugu'],
+  ])('retains an independent conflict after a matching TMDB refresh for %s', async (id, title, media_type, entry_type, language, release_date, date_source, event_region, source) => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, media_type, entry_type, title, language, release_date, event_region,
+      source_url: `https://www.themoviedb.org/${media_type}/${id}`,
+      evidence: { region: event_region, date_source, source_url: `https://www.themoviedb.org/${media_type}/${id}` } });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry.dateConflict?.source).toBe(source);
+    const [mismatch] = await getCalendarMonth(db([], [{ ...item, source_url: 'https://example.org' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(mismatch.dateConflict).toBeNull();
+  });
+  it.each([
     [1531050, 'Black Gold', 'ta', 'Cinema Express'],
     [1655020, 'John Doe', 'ta', 'Cinema Express'],
     [1805816, 'Lambodhara 2.0', 'kn', 'BookMyShow'],

@@ -21,6 +21,16 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('retains a broadcaster conflict after a TMDB first-air observation', () => {
+    const item = row({ origin: 'tmdb_upcoming', tmdb_id: 310209, media_type: 'tv', entry_type: 'Show', title: 'Nine to Six', language: 'ko',
+      release_date: '2026-11-11', source_url: 'https://www.themoviedb.org/tv/310209', event_region: null,
+      evidence: { region: null, date_source: 'tmdb_global_first_air', source_url: 'https://www.themoviedb.org/tv/310209', observed_at: '2026-11-11T05:30:00Z' } });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-11T06:00:00Z'));
+    expect(review.reasons).toContain('date_conflict');
+    expect(review.reviewSourceUrl).toContain('sbsstar.net');
+    const [other] = buildCalendarReviewQueue([{ ...item, evidence: { ...item.evidence as object, source_url: 'https://www.themoviedb.org/tv/999' } }], new Date('2026-11-11T06:00:00Z'));
+    expect(other.reasons).not.toContain('date_conflict');
+  });
   it('prioritizes the Nine to Six broadcaster date conflict without asserting India', () => {
     const item = row({ origin: 'tmdb_upcoming', tmdb_id: 310209, media_type: 'tv', entry_type: 'Show', title: 'Nine to Six', language: 'ko',
       release_date: '2026-11-11', source_url: 'https://www.themoviedb.org/tv/310209' });

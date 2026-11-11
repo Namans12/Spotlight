@@ -1,4 +1,4 @@
-import { reviewedCalendarEntry } from './calendarReconciliation.js';
+import { reviewedCalendarEntry, reviewedTmdbConflictAfterEvidence } from './calendarReconciliation.js';
 import { reviewFreshness } from '../shared/calendarFreshness.js';
 import { hasUnverifiedEditorialTmdbIdentity, reviewedEditorialDateConflict, reviewedEditorialTmdbIdentity } from './calendarIdentity.js';
 
@@ -26,7 +26,7 @@ export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): Rev
     observations.set(row.observation_fingerprint, ids);
   }
   for (const row of rows) {
-    const review = reviewedCalendarEntry(row);
+    const review = reviewedCalendarEntry(row) ?? reviewedTmdbConflictAfterEvidence(row);
     const identityDateConflict = reviewedEditorialDateConflict(row);
     const evidence = row.evidence && typeof row.evidence === 'object' && !Array.isArray(row.evidence)
       ? row.evidence as Record<string, unknown> : null;

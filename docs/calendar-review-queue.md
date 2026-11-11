@@ -6,6 +6,8 @@ The queue prioritizes date and identity conflicts, then unreviewed entries, then
 
 Freshness uses the source observation time (or a curated review's checked date), with 30 days as the review threshold. Invalid, future or absent timestamps have unknown freshness. A fresh observation is not a guarantee of correctness. Reviewed dates can remain disputed even while fresh. Recheck source identity, event type, territory, date and terms before adding or changing an evidence decision; do not change production data based solely on a queue item. Existing manual annotations are matched to their original record identity and must be reviewed if that identity changes.
 
+An independent conflict warning remains attached if the same TMDB-origin event later receives compatible TMDB date evidence. A refresh alone does not settle competing sources; mismatched identities or territories do not inherit the warning.
+
 TMDB date evidence without a linked title ID, movie/TV media type, or a TMDB source URL is marked `evidence_incomplete`. A region in the queue is the stored or reviewed claim, not by itself proof that the evidence is complete or that the row is eligible for public display.
 
 Automated evidence rechecks only write evidence for records originating from the exact TMDB title URL. A matching name and date alone cannot establish that an editorial record refers to the same title. Older editorial records may already have TMDB date evidence from earlier rechecks; the queue flags these as `identity_unverified`, and the calendar withholds the title link, poster and claimed region until identity is independently reviewed. Stored records are not modified.

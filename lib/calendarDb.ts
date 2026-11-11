@@ -1,7 +1,7 @@
 import type postgres from "postgres";
 import type { CalendarEntryDTO } from "../shared/types/calendar.js";
 import { classifyPlatform, isKnownStreamer, mediaTypeFromEntryType, normalizePlatforms, splitPlatformField } from "../shared/platforms.js";
-import { reviewedCalendarEntry } from "./calendarReconciliation.js";
+import { reviewedCalendarEntry, reviewedTmdbConflictAfterEvidence } from "./calendarReconciliation.js";
 import { reviewFreshness } from "../shared/calendarFreshness.js";
 import { hasUnverifiedEditorialTmdbIdentity, reviewedEditorialDateConflict, reviewedEditorialTmdbIdentity } from "./calendarIdentity.js";
 
@@ -112,9 +112,10 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
       if (seenEditorialObservations.has(row.observation_fingerprint)) continue;
       seenEditorialObservations.add(row.observation_fingerprint);
     }
-    const review = reviewedCalendarEntry({ origin: row.origin, tmdb_id: row.tmdb_id, media_type: row.media_type,
+    const reviewRow = { origin: row.origin, tmdb_id: row.tmdb_id, media_type: row.media_type,
       title: row.title, release_date: String(row.release_date), source_url: row.source_url,
-      event_region: row.event_region, evidence: row.evidence, platform_or_distributor: row.platform_or_distributor, entry_type: row.entry_type, language: row.language });
+      event_region: row.event_region, evidence: row.evidence, platform_or_distributor: row.platform_or_distributor, entry_type: row.entry_type, language: row.language };
+    const review = reviewedCalendarEntry(reviewRow) ?? reviewedTmdbConflictAfterEvidence(reviewRow);
     // The SQL includes unverified TMDB candidates so exact manual reviews can
     // be applied. Never expose the rest merely because they were fetched.
     if (row.origin === 'tmdb_upcoming' && row.evidence == null && !review) continue;

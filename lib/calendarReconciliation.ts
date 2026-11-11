@@ -316,3 +316,19 @@ export function reviewedCalendarEntry(row: {
   }
   return null;
 }
+
+/** A later matching TMDB observation does not resolve independent conflicting
+ * reporting. Preserve the warning only for the same original event identity
+ * and compatible TMDB evidence; another territory remains a separate claim. */
+export function reviewedTmdbConflictAfterEvidence(row: Parameters<typeof reviewedCalendarEntry>[0]) {
+  if (row.origin !== 'tmdb_upcoming' || row.tmdb_id == null || !row.evidence ||
+      typeof row.evidence !== 'object' || Array.isArray(row.evidence)) return null;
+  const evidence = row.evidence as Record<string, unknown>;
+  if (evidence.source_url !== `https://www.themoviedb.org/${row.media_type}/${row.tmdb_id}`) return null;
+  const sameEvent = row.media_type === 'movie'
+    ? row.event_region === 'IN' && evidence.region === 'IN' && evidence.date_source === 'tmdb_regional_theatrical'
+    : row.media_type === 'tv' && row.event_region == null && evidence.region == null && evidence.date_source === 'tmdb_global_first_air';
+  if (!sameEvent) return null;
+  const review = reviewedCalendarEntry({ ...row, event_region: null, evidence: null });
+  return review?.type === 'conflict' ? review : null;
+}
