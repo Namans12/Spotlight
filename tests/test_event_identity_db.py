@@ -21,6 +21,15 @@ def test_migration_and_writers_keep_distinct_events(monkeypatch, tmp_path):
 
     with psycopg.connect(DSN, client_encoding='UTF8') as conn:
         with conn.cursor() as cur:
+            # Legacy Wikipedia imports asserted theatrical by default; the new
+            # importer does not. That flag alone must not split a duplicate,
+            # but an actual difference in evidence must remain distinct.
+            cur.execute("""SELECT
+                ('{"title":"Film","is_theatrical":true,"evidence":null}'::jsonb - 'is_theatrical') =
+                ('{"title":"Film","is_theatrical":false,"evidence":null}'::jsonb - 'is_theatrical'),
+                ('{"title":"Film","is_theatrical":true,"evidence":null}'::jsonb - 'is_theatrical') =
+                ('{"title":"Film","is_theatrical":false,"evidence":{"region":"IN"}}'::jsonb - 'is_theatrical')""")
+            assert cur.fetchone() == (True, False)
             cur.execute('''CREATE TEMP TABLE calendar_entries (
                 id BIGSERIAL PRIMARY KEY, release_date DATE NOT NULL, title TEXT NOT NULL,
                 language TEXT, entry_type TEXT NOT NULL, is_theatrical BOOLEAN NOT NULL DEFAULT false,

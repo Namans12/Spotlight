@@ -29,7 +29,7 @@ async function main() {
     const result = await sql.begin('read only', async tx => tx`
       SELECT id, origin, tmdb_id, media_type, title, language, release_date::text AS release_date, source_url,
         entry_type, platform_or_distributor, evidence->>'region' AS event_region, evidence,
-        (to_jsonb(calendar_entries) - 'id' - 'created_at' - 'source_key')::text AS observation_fingerprint
+        (to_jsonb(calendar_entries) - 'id' - 'created_at' - 'source_key' - 'is_theatrical')::text AS observation_fingerprint
       FROM calendar_entries
       WHERE release_date >= ${start}::date AND release_date < ${start}::date + ${days}::int
       ORDER BY release_date, id LIMIT ${limit + 1}`);

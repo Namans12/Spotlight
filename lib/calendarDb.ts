@@ -31,7 +31,7 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
     SELECT id, origin, release_date::text AS release_date, title, language, entry_type, platform_or_distributor,
       tmdb_id, media_type, details, poster_url, origin_region, origin_release_date::text AS origin_release_date,
       evidence->>'region' AS event_region, evidence, source, source_url,
-      (to_jsonb(calendar_entries) - 'id' - 'created_at' - 'source_key')::text AS observation_fingerprint
+      (to_jsonb(calendar_entries) - 'id' - 'created_at' - 'source_key' - 'is_theatrical')::text AS observation_fingerprint
     FROM calendar_entries
     WHERE date_trunc('month', release_date::timestamp) = date_trunc('month', ${monthStart}::date)
       AND (evidence->>'region' IS NULL OR evidence->>'region' = ${region} OR
@@ -106,8 +106,9 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
   }
   const seenEditorialObservations = new Set<string>();
   for (const row of calendarRows) {
-    // Identical copies from the same Wikipedia observation are not separate
-    // releases. Never merge based only on a title/date or unknown region.
+    // Copies from the same Wikipedia observation are not separate releases.
+    // Ignore only storage metadata and the unsupported legacy theatrical flag;
+    // never merge based only on a title/date or unknown region.
     if (row.origin === 'wikipedia' && typeof row.observation_fingerprint === 'string') {
       if (seenEditorialObservations.has(row.observation_fingerprint)) continue;
       seenEditorialObservations.add(row.observation_fingerprint);

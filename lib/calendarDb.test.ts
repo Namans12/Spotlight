@@ -330,7 +330,7 @@ describe('calendar event identity', () => {
     expect(entry.dateCorroboration).toBeNull();
     expect(entry.region).toBeNull();
   });
-  it('collapses only byte-identical Wikipedia observations and preserves different evidence', async () => {
+  it('collapses matching Wikipedia observations and preserves different evidence', async () => {
     const item = editorial({ origin: 'wikipedia', event_region: null, evidence: null, observation_fingerprint: 'same observation' });
     const entries = await getCalendarMonth(db([], [item, { ...item, id: 2 },
       { ...item, id: 3, observation_fingerprint: 'different source or evidence' },
