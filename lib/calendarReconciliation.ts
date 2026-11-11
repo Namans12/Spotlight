@@ -51,6 +51,18 @@ export function reviewedCalendarEntry(row: {
       message: 'Date needs review: local reporting says the announced 12 November release has been postponed; no replacement date is confirmed here.' };
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie') {
+    if (Number(row.tmdb_id) === 1445172 && row.language === 'te' && row.title === 'Dark Chocolate' &&
+        row.release_date === '2026-11-13' && row.source_url === 'https://www.themoviedb.org/movie/1445172') {
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-11T05:23:11Z', source: 'BookMyShow',
+        sourceUrl: 'https://in.bookmyshow.com/movies/vijayawada/dark-chocolate/ET00522245',
+        message: 'BookMyShow lists the Telugu film for 13 November in India; bookings were not yet open when checked.' };
+    }
+    if (Number(row.tmdb_id) === 1808841 && row.language === 'te' && row.title === 'Maya lady' &&
+        row.release_date === '2026-11-13' && row.source_url === 'https://www.themoviedb.org/movie/1808841') {
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-11T05:23:11Z', source: 'BookMyShow',
+        sourceUrl: 'https://in.bookmyshow.com/movies/hyderabad/maya-lady/ET00524575',
+        message: 'BookMyShow lists the Telugu film for 13 November in India; bookings were not yet open when checked.' };
+    }
     if (Number(row.tmdb_id) === 1434462 && row.language === 'ml' && row.title === 'Melcow Pondicherry' &&
         row.release_date === '2026-11-13' && row.source_url === 'https://www.themoviedb.org/movie/1434462') {
       return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-11T05:21:13Z', source: 'Simply Mollywood',

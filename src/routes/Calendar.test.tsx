@@ -231,6 +231,17 @@ describe('Calendar release-kind tabs', () => {
 });
 
 describe('Calendar event details', () => {
+  it('shows each independent corroboration with its own source and check time', async () => {
+    vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({ title: 'Corroborated event',
+      dateCorroboration: { message: 'Identity reviewed.', source: 'Editorial', sourceUrl: 'https://example.com/editorial', checkedAt: '2026-08-01' },
+      additionalCorroborations: [{ message: 'Cinema date announced.', source: 'Cinema', sourceUrl: 'https://example.com/cinema', checkedAt: '2026-08-02' },
+        { message: 'Untrusted review.', source: 'Untrusted review source', sourceUrl: 'javascript:alert(1)', checkedAt: '2026-08-03' }] })] });
+    renderCalendar();
+    expect(await screen.findByText(/Cinema date announced/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cinema' })).toHaveAttribute('href', 'https://example.com/cinema');
+    expect(screen.getByText(/Checked 2026-08-02/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Untrusted review source' })).not.toBeInTheDocument();
+  });
   it('warns when a source review is stale', async () => {
     vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({ title: 'Old review', reviewFreshness: 'stale' })] });
     renderCalendar();

@@ -170,6 +170,10 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
     {(entry.reviewFreshness === 'stale' || entry.reviewFreshness === 'unknown') && <p className="px-3 pb-2 text-xs text-muted-foreground">{entry.reviewFreshness === 'stale' ? 'Source review may be stale; check the linked source.' : 'Source review age is unknown; check the linked source.'}</p>}
     {entry.seasonPremiere && <p className="px-3 pb-2 text-xs text-muted-foreground">Announcement checked {entry.seasonPremiere.checkedAt}: <a className="underline" href={entry.seasonPremiere.sourceUrl} target="_blank" rel="noopener noreferrer">{entry.seasonPremiere.source}</a></p>}
     {entry.dateCorroboration && <p className="px-3 pb-2 text-xs text-muted-foreground">{entry.dateCorroboration.message} <a className="underline" href={entry.dateCorroboration.sourceUrl} target="_blank" rel="noopener noreferrer">{entry.dateCorroboration.source}</a> · Checked {entry.dateCorroboration.checkedAt}</p>}
+    {entry.additionalCorroborations?.map((review, index) => {
+      const url = httpsSource(review.sourceUrl);
+      return <p key={`${review.sourceUrl}:${review.checkedAt}:${index}`} className="px-3 pb-2 text-xs text-muted-foreground">{review.message} {url ? <a className="underline" href={url} target="_blank" rel="noopener noreferrer">{review.source}</a> : review.source} · Checked {review.checkedAt}</p>;
+    })}
     {entry.dateConflict && <p className="px-3 pb-2 text-xs text-muted-foreground">{entry.dateConflict.message} <a className="underline" href={entry.dateConflict.sourceUrl} target="_blank" rel="noopener noreferrer">{entry.dateConflict.source}</a> · Checked {entry.dateConflict.checkedAt}</p>}
     {entry.mediaType === 'tv' && entry.tmdbId != null && <div className="px-3 pb-2 text-xs text-muted-foreground">
       <button type="button" className="underline" onClick={() => { if (checkAvailability) void query.refetch(); else setCheckAvailability(true); }}>

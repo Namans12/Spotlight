@@ -26,6 +26,8 @@ export interface CalendarEntryDTO {
   reviewFreshness?: "fresh" | "stale" | "unknown" | null;
   seasonPremiere?: { season: number; coverage: string; source: string; sourceUrl: string; checkedAt: string } | null;
   dateCorroboration?: { message: string; source: string; sourceUrl: string; checkedAt: string } | null;
+  /** Other independent reviews of the same identified event. */
+  additionalCorroborations?: { message: string; source: string; sourceUrl: string; checkedAt: string }[];
   dateConflict?: { message: string; source: string; sourceUrl: string; checkedAt: string } | null;
   tmdbId: number | null;
   posterUrl: string | null;

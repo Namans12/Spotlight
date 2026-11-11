@@ -18,6 +18,21 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it.each([[1445172, 'Dark Chocolate', 'Dark Chocolate'], [1808841, 'Maya lady', 'Maya Lady']])('merges independently reviewed sources for %s without losing their explanations', async (id, title, wikiTitle) => {
+    const tmdb = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language: 'te', release_date: '2026-11-13',
+      source: 'TMDB', source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });
+    const wiki = editorial({ ...tmdb, id: 2, title: wikiTitle, origin: 'wikipedia', source: 'wikipedia', event_region: 'IN',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026',
+      evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: `https://www.themoviedb.org/movie/${id}` } });
+    for (const rows of [[tmdb, wiki], [wiki, tmdb]]) {
+      const entries = await getCalendarMonth(db([], rows) as unknown as postgres.Sql, '2026-11', 'IN');
+      expect(entries).toHaveLength(1);
+      const reviews = [entries[0].dateCorroboration, ...(entries[0].additionalCorroborations ?? [])];
+      expect(reviews.map(x => x?.source)).toEqual(expect.arrayContaining(['BookMyShow', 'Cinema Express']));
+      expect(reviews.map(x => x?.message).join(' ')).toContain('bookings were not yet open');
+      expect(await getCalendarMonth(db([], [tmdb]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
+    }
+  });
   it('shows the reviewed November 13 Melcow announcement for India only', async () => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 1434462, title: 'Melcow Pondicherry', language: 'ml', release_date: '2026-11-13',
       source_url: 'https://www.themoviedb.org/movie/1434462', event_region: null, evidence: null, platform_or_distributor: null });
@@ -54,8 +69,9 @@ describe('calendar event identity', () => {
     for (const rows of [[review, wiki], [wiki, review]]) {
       const entries = await getCalendarMonth(db([], rows) as unknown as postgres.Sql, '2026-11', 'IN');
       expect(entries).toHaveLength(1);
-      expect(entries[0].dateCorroboration?.message).toContain('Kerala distributor');
-      expect(entries[0].dateCorroboration?.message).toContain('Rejin S Babu');
+      const messages = [entries[0].dateCorroboration, ...(entries[0].additionalCorroborations ?? [])].map(x => x?.message).join(' ');
+      expect(messages).toContain('Kerala distributor');
+      expect(messages).toContain('Rejin S Babu');
       expect(entries[0].additionalSources).toHaveLength(1);
     }
   });

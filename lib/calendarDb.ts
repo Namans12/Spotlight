@@ -56,10 +56,7 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
       return;
     }
     // Preserve distinct review annotations instead of silently dropping one.
-    if ((existing.dateCorroboration && entry.dateCorroboration &&
-         JSON.stringify(existing.dateCorroboration) !== JSON.stringify(entry.dateCorroboration) &&
-         existing.dateCorroboration.sourceUrl !== entry.dateCorroboration.sourceUrl) ||
-        (existing.dateConflict && entry.dateConflict && JSON.stringify(existing.dateConflict) !== JSON.stringify(entry.dateConflict)) ||
+    if ((existing.dateConflict && entry.dateConflict && JSON.stringify(existing.dateConflict) !== JSON.stringify(entry.dateConflict)) ||
         (existing.seasonPremiere && entry.seasonPremiere && JSON.stringify(existing.seasonPremiere) !== JSON.stringify(entry.seasonPremiere))) {
       entries.push(entry);
       return;
@@ -71,12 +68,13 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
         !(existing.additionalSources ?? []).some(source => source.source === extraSource.source && source.sourceUrl === extraSource.sourceUrl)) {
       existing.additionalSources = [...(existing.additionalSources ?? []), extraSource];
     }
-    if (existing.dateCorroboration && entry.dateCorroboration &&
-        existing.dateCorroboration.sourceUrl === entry.dateCorroboration.sourceUrl &&
-        existing.dateCorroboration.message !== entry.dateCorroboration.message) {
-      existing.dateCorroboration = { ...existing.dateCorroboration,
-        message: `${existing.dateCorroboration.message} ${entry.dateCorroboration.message}` };
-    } else existing.dateCorroboration ??= entry.dateCorroboration;
+    for (const corroboration of [entry.dateCorroboration, ...(entry.additionalCorroborations ?? [])]) {
+      if (!corroboration) continue;
+      if (!existing.dateCorroboration) existing.dateCorroboration = corroboration;
+      else if (JSON.stringify(existing.dateCorroboration) !== JSON.stringify(corroboration) &&
+          !(existing.additionalCorroborations ?? []).some(item => JSON.stringify(item) === JSON.stringify(corroboration)))
+        existing.additionalCorroborations = [...(existing.additionalCorroborations ?? []), corroboration];
+    }
     existing.dateConflict ??= entry.dateConflict;
     existing.seasonPremiere ??= entry.seasonPremiere;
     if (entry.reviewFreshness === 'stale' || (entry.reviewFreshness === 'unknown' && existing.reviewFreshness !== 'stale') || !existing.reviewFreshness)
