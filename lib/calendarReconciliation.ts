@@ -51,6 +51,12 @@ export function reviewedCalendarEntry(row: {
       message: 'Date needs review: local reporting says the announced 12 November release has been postponed; no replacement date is confirmed here.' };
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie') {
+    if (Number(row.tmdb_id) === 1505644 && row.language === 'te' && row.title === 'ENE Repeat' &&
+        row.release_date === '2026-11-19' && row.source_url === 'https://www.themoviedb.org/movie/1505644') {
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-11T11:42:00Z', source: 'BookMyShow',
+        sourceUrl: 'https://in.bookmyshow.com/movies/national-capital-region-ncr/ene-repeat/ET00506990',
+        message: 'BookMyShow lists the Telugu film for 19 November in India. Its director and cast match the TMDB title; showtimes and streaming availability remain unconfirmed.' };
+    }
     if (Number(row.tmdb_id) === 1531050 && row.language === 'ta' && row.title === 'Black Gold' &&
         row.release_date === '2026-11-13' && row.source_url === 'https://www.themoviedb.org/movie/1531050') {
       return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-11T05:26:27Z', source: 'Cinema Express',

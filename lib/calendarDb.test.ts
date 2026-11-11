@@ -296,6 +296,20 @@ describe('calendar event identity', () => {
     expect(entries.find(entry => entry.dateConflict)?.dateConflict?.source).toBe('123telugu');
     expect(entries.filter(entry => entry.dateConflict)).toHaveLength(1);
   });
+  it('shows the reviewed ENE Repeat announcement only in India and only for the exact date', async () => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 1505644, title: 'ENE Repeat', language: 'te', release_date: '2026-11-19',
+      source_url: 'https://www.themoviedb.org/movie/1505644', event_region: null, evidence: null });
+    const rows = [item, { ...item, id: 2, release_date: '2026-11-20' }];
+    const inEntries = await getCalendarMonth(db([], rows) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(inEntries).toHaveLength(1);
+    expect(inEntries[0]).toMatchObject({ region: 'IN', tmdbId: 1505644, evidenceStatus: 'regional' });
+    expect(inEntries[0].dateCorroboration?.sourceUrl).toContain('bookmyshow.com');
+    expect(await getCalendarMonth(db([], rows) as unknown as postgres.Sql, '2026-11', 'US')).toHaveLength(0);
+    const wikipedia = editorial({ origin: 'wikipedia', tmdb_id: 1505644, title: 'ENE Repeat', language: 'te', release_date: '2026-11-19',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', event_region: 'IN',
+      evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1505644' } });
+    expect(await getCalendarMonth(db([], [item, wikipedia]) as unknown as postgres.Sql, '2026-11', 'IN')).toHaveLength(1);
+  });
   it.each(['Talcum Powder', 'Itlu Arjuna', 'Chandrayan', 'Donga Naa Koduku'])('uses a scoped Indian ticketing announcement for %s only for the exact Telugu record and region', async (title) => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: null, media_type: title === 'Donga Naa Koduku' ? null : 'movie', title, language: 'te', release_date: '2026-11-13',
       source: 'wikipedia', source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', event_region: null, evidence: null });

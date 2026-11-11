@@ -164,6 +164,14 @@ describe('calendar reconciliation queue', () => {
     expect(review.reasons).not.toContain('unreviewed');
     expect(review.reasons).toContain('region_unknown');
   });
+  it('uses the reviewed India announcement only for the exact ENE Repeat observation', () => {
+    const item = row({ origin: 'tmdb_upcoming', tmdb_id: 1505644, title: 'ENE Repeat', language: 'te', release_date: '2026-11-19',
+      source_url: 'https://www.themoviedb.org/movie/1505644' });
+    const items = buildCalendarReviewQueue([item, { ...item, id: 2, release_date: '2026-11-20' }], new Date('2026-11-11T12:00:00Z'));
+    expect(items).toHaveLength(1);
+    expect(items[0].id).toBe('2');
+    expect(items[0].reasons).toEqual(expect.arrayContaining(['unreviewed', 'region_unknown']));
+  });
   it.each(['Talcum Powder', 'Itlu Arjuna', 'Chandrayan', 'Donga Naa Koduku'])('recognizes the reviewed regional observation for %s without inventing a TMDB identity', (title) => {
     const item = row({ origin: 'wikipedia', tmdb_id: null, media_type: title === 'Donga Naa Koduku' ? null : 'movie', title, language: 'te', release_date: '2026-11-13',
       source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026' });
