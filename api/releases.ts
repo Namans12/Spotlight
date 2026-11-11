@@ -89,13 +89,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=1800");
     res.end(JSON.stringify(payload));
-  } catch (err) {
-    console.error("[releases] lookup failed", err);
+  } catch {
+    console.error("[releases] lookup failed");
     res.statusCode = 500;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
-    // Generic message to the client — the real error (which can include raw
-    // Postgres driver detail) is logged server-side, never shipped to the browser.
+    // Database errors can include connection details; keep them out of logs.
     res.end(JSON.stringify({ error: "could not load releases" }));
   }
 }

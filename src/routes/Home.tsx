@@ -155,7 +155,9 @@ export default function Home() {
               viewed on this page. */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
             <span className="tabular-nums">
-              {formatDayMonthYear(win.start)} → {formatDayMonthYear(win.end)}
+              {formatDayMonthYear(win.start) && formatDayMonthYear(win.end)
+                ? `${formatDayMonthYear(win.start)} → ${formatDayMonthYear(win.end)}`
+                : 'Release window dates unavailable'}
             </span>
           </div>
 

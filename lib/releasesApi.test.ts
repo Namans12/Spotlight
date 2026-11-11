@@ -6,6 +6,17 @@ const db = vi.hoisted(() => ({ query: vi.fn() }));
 vi.mock('./db.js', () => ({ getDb: () => db.query }));
 
 describe('release digest window', () => {
+  it('does not expose database exception details', async () => {
+    db.query.mockReset().mockRejectedValueOnce(new Error('postgresql://user:secret-value@example.invalid/db'));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const response = { statusCode: 0, setHeader: vi.fn(), end: vi.fn() };
+    try {
+      await handler({ url: '/api/releases?region=IN' } as IncomingMessage, response as unknown as ServerResponse);
+      expect(response.statusCode).toBe(500);
+      expect(log).toHaveBeenCalledWith('[releases] lookup failed');
+      expect(JSON.stringify(log.mock.calls)).not.toContain('secret-value');
+    } finally { log.mockRestore(); }
+  });
   it('omits stale and undated records while retaining the window metadata', async () => {
     const row = {
       tmdb_id: '1', media_type: 'movie', title: 'Title', language: 'en',

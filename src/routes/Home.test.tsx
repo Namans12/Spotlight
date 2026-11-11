@@ -76,6 +76,15 @@ beforeEach(() => {
 });
 
 describe('Home platform filter', () => {
+  it('explains when the release window has no stored dates', async () => {
+    const empty = digest([]);
+    empty.out_now.start = '';
+    empty.out_now.end = '';
+    vi.mocked(fetchDigest).mockResolvedValue(empty);
+    renderHome();
+    expect(await screen.findByText('Release window dates unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Nothing found for this window yet.')).toBeInTheDocument();
+  });
   const items = [
     release({ tmdb_id: 1, title: 'Netflix Show', providers: ['Netflix'] }),
     release({ tmdb_id: 2, title: 'Hulu Show', providers: ['Hulu'] }),
