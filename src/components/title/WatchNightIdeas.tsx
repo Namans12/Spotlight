@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { VIBE_IDEAS, filteredVibeIdeas, watchNightIdeas, type WatchNightDiet, type WatchNightVibe } from '@/lib/watchNightIdeas';
+import { ShareWatchNight } from './ShareWatchNight';
 
-export function WatchNightIdeas({ mediaType, id }: { mediaType: 'movie' | 'tv'; id: number }) {
+export function WatchNightIdeas({ mediaType, id, title = 'Watch night' }: { mediaType: 'movie' | 'tv'; id: number; title?: string }) {
   const [open, setOpen] = useState(false);
   const [vibe, setVibe] = useState<WatchNightVibe | ''>('');
   const [diet, setDiet] = useState<WatchNightDiet>('');
   const [budget, setBudget] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const ideas = watchNightIdeas(mediaType, id);
+  const availableFoods = [...new Set([...(diet || budget ? [] : ideas.map(idea => idea.food)), ...(vibe ? filteredVibeIdeas(vibe, diet, budget) : [])])];
   return <section className="rounded-xl border border-border bg-card p-4 space-y-3" aria-label="Watch-night ideas">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div><h2 className="font-semibold">Make a night of it</h2><p className="text-xs text-muted-foreground">A little inspiration for your watch.</p></div>
@@ -36,6 +39,8 @@ export function WatchNightIdeas({ mediaType, id }: { mediaType: 'movie' | 'tv'; 
           <ul className="list-disc pl-4">{filteredVibeIdeas(vibe, diet, budget).map(food => <li key={food}>{food}</li>)}</ul>
         </div>}
       </div>
+      <button type="button" aria-expanded={sharing} onClick={() => setSharing(value => !value)} className="rounded-lg border border-border px-3 py-2 text-xs">{sharing ? 'Hide sharing' : 'Make a shareable plan'}</button>
+      {sharing && <ShareWatchNight title={title} mediaType={mediaType} id={id} foods={availableFoods} />}
     </div>}
   </section>;
 }
