@@ -174,7 +174,7 @@ describe('calendar reconciliation queue', () => {
   });
   it.each(['Talcum Powder', 'Itlu Arjuna', 'Chandrayan', 'Donga Naa Koduku'])('recognizes the reviewed regional observation for %s without inventing a TMDB identity', (title) => {
     const item = row({ origin: 'wikipedia', tmdb_id: null, media_type: title === 'Donga Naa Koduku' ? null : 'movie', title, language: 'te', release_date: '2026-11-13',
-      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026' });
+      platform_or_distributor: title === 'Donga Naa Koduku' ? null : 'Studio', source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026' });
     const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T12:00:00Z'));
     expect(review.region).toBe('IN');
     expect(review.reasons).toContain('identity_missing');

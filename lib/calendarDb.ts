@@ -146,8 +146,10 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
     add({ releaseDate: String(row.release_date), title: row.title, language: review && 'correctedLanguage' in review ? review.correctedLanguage : row.language,
       mediaType: row.media_type ?? mediaTypeFromEntryType(row.entry_type), kind,
       isTheatrical: kind === "theatrical", platform: platforms[0] ?? null, platforms,
-      region: review?.type === 'regional' ? review.region : regionalEvidence ? row.event_region : null, tmdbId: !suppressTitleLink && row.tmdb_id !== null ? Number(row.tmdb_id) : null,
-      posterUrl: suppressTitleLink ? null : row.poster_url ?? null, rating: null, overview: row.details,
+      region: review?.type === 'regional' ? review.region : regionalEvidence ? row.event_region : null,
+      tmdbId: !suppressTitleLink ? (review && 'reviewedTmdbId' in review && review.reviewedTmdbId != null ? review.reviewedTmdbId : row.tmdb_id !== null ? Number(row.tmdb_id) : null) : null,
+      // A restored identity does not verify a poster left on the unlinked row.
+      posterUrl: suppressTitleLink || (row.tmdb_id == null && review && 'reviewedTmdbId' in review) ? null : row.poster_url ?? null, rating: null, overview: row.details,
       origin: "csv_seed", originRegion: row.origin_region ?? null, originReleaseDate: row.origin_release_date ?? null,
       source: review?.type === 'regional' ? [row.source, review.source].filter(Boolean).join(' / ') : (regionalEvidence || globalPremiere) && row.source && row.source.toLowerCase() !== 'tmdb' ? `${row.source} / TMDB` : row.source ?? null, sourceUrl: row.source_url ?? null,
       observedAt: review?.type === 'regional' ? review.checkedAt : regionalEvidence || globalPremiere ? row.evidence?.observed_at ?? null : null, availabilityTypes: null,

@@ -312,16 +312,29 @@ describe('calendar event identity', () => {
   });
   it.each(['Talcum Powder', 'Itlu Arjuna', 'Chandrayan', 'Donga Naa Koduku'])('uses a scoped Indian ticketing announcement for %s only for the exact Telugu record and region', async (title) => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: null, media_type: title === 'Donga Naa Koduku' ? null : 'movie', title, language: 'te', release_date: '2026-11-13',
-      source: 'wikipedia', source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', event_region: null, evidence: null });
+      source: 'wikipedia', source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', platform_or_distributor: title === 'Donga Naa Koduku' ? null : 'Netflix', event_region: null, evidence: null });
     const [entry, mismatch] = await getCalendarMonth(db([], [item, { ...item, id: 2, language: 'en' }]) as unknown as postgres.Sql, '2026-11', 'IN');
     expect(entry.region).toBe('IN');
     expect(entry.evidenceStatus).toBe('regional');
-    expect(entry.tmdbId).toBeNull();
+    expect(entry.tmdbId).toBe(title === 'Donga Naa Koduku' ? 1641520 : null);
     expect(entry.source).toBe('wikipedia / BookMyShow');
-    expect(entry.dateCorroboration?.message).toContain('bookings were not yet open');
+    expect(entry.dateCorroboration?.message).toContain(title === 'Donga Naa Koduku' ? 'retitled DNK' : 'bookings were not yet open');
     expect(mismatch.region).toBeNull();
     expect(mismatch.evidenceStatus).toBe('unverified');
     expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
+  });
+  it('merges the independently matched DNK and Donga Naa Koduku event without changing unrelated observations', async () => {
+    const wiki = editorial({ id: 1, origin: 'wikipedia', tmdb_id: null, media_type: null, title: 'Donga Naa Koduku', language: 'te', release_date: '2026-11-13',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', platform_or_distributor: null, poster_url: 'https://example.invalid/old-poster.jpg', event_region: null, evidence: null });
+    const tmdb = editorial({ id: 2, origin: 'tmdb_upcoming', tmdb_id: 1641520, title: 'DNK', language: 'te', release_date: '2026-11-13',
+      source_url: 'https://www.themoviedb.org/movie/1641520', platform_or_distributor: null, event_region: null, evidence: null });
+    const entries = await getCalendarMonth(db([], [wiki, tmdb]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ region: 'IN', tmdbId: 1641520, kind: 'theatrical' });
+    expect(entries[0].posterUrl).toBeNull();
+    const unrelated = await getCalendarMonth(db([], [{ ...wiki, language: 'en' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(unrelated[0].tmdbId).toBeNull();
+    expect(unrelated[0].region).toBeNull();
   });
 
   it.each([

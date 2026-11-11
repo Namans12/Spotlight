@@ -51,6 +51,12 @@ export function reviewedCalendarEntry(row: {
       message: 'Date needs review: local reporting says the announced 12 November release has been postponed; no replacement date is confirmed here.' };
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie') {
+    if (Number(row.tmdb_id) === 1641520 && row.language === 'te' && row.title === 'DNK' && row.platform_or_distributor == null &&
+        row.release_date === '2026-11-13' && row.source_url === 'https://www.themoviedb.org/movie/1641520') {
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-11T11:44:00Z', source: 'BookMyShow',
+        sourceUrl: 'https://in.bookmyshow.com/movies/bengaluru/donga-naa-koduku/ET00521157',
+        message: 'BookMyShow lists the film for 13 November in India. DNK was previously titled Donga Naa Koduku; its director and cast match TMDB. Showtimes and streaming availability are unconfirmed.' };
+    }
     if (Number(row.tmdb_id) === 1505644 && row.language === 'te' && row.title === 'ENE Repeat' &&
         row.release_date === '2026-11-19' && row.source_url === 'https://www.themoviedb.org/movie/1505644') {
       return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-11T11:42:00Z', source: 'BookMyShow',
@@ -134,10 +140,14 @@ export function reviewedCalendarEntry(row: {
           sourceUrl: 'https://ticketnew.com/movies/high-movie-detail-238606',
           message: 'Ticketnew lists the Telugu film for 27 November in India. Showtimes and the TMDB identity remain unverified.' };
       }
-      if (row.release_date === '2026-11-13' && (row.title === 'Chandrayan' || row.title === 'Donga Naa Koduku')) {
+      if (row.release_date === '2026-11-13' && (row.title === 'Chandrayan' || (row.title === 'Donga Naa Koduku' && row.platform_or_distributor == null))) {
+        // The producer identifies DNK as Donga Naa Koduku; cast and director
+        // match TMDB 1641520. https://www.youtube.com/watch?v=8p0CE54v5UE
         return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-10', source: 'BookMyShow',
           sourceUrl: row.title === 'Chandrayan' ? 'https://in.bookmyshow.com/movies/bengaluru/chandrayan/ET00522567' : 'https://in.bookmyshow.com/movies/bengaluru/donga-naa-koduku/ET00521157',
-          message: 'BookMyShow lists the Telugu film for 13 November in India; bookings were not yet open when checked. The TMDB identity remains unverified.' };
+          ...(row.title === 'Donga Naa Koduku' ? { reviewedTmdbId: 1641520, checkedAt: '2026-11-11T11:44:00Z' } : {}),
+          message: row.title === 'Donga Naa Koduku' ? 'BookMyShow lists the film for 13 November in India. The film was retitled DNK; its director and cast match TMDB. Showtimes and streaming availability are unconfirmed.' :
+            'BookMyShow lists the Telugu film for 13 November in India; bookings were not yet open when checked. The TMDB identity remains unverified.' };
       }
       if (row.title === 'Itlu Arjuna' && row.release_date === '2026-11-13') {
         return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-10', source: 'BookMyShow',
