@@ -1,4 +1,4 @@
-export interface TriviaQuestion { prompt: string; choices: string[]; answer: string; source: string; sourceUrl: string }
+export interface TriviaQuestion { prompt: string; choices: string[]; answer: string; source: string; sourceUrl: string; storyDetail?: boolean }
 
 /** Facts are individually sourced; unavailable titles have no inferred trivia. */
 const questions: Record<string, TriviaQuestion> = {
@@ -6,19 +6,19 @@ const questions: Record<string, TriviaQuestion> = {
     source: 'Warner Bros. Discovery', sourceUrl: 'https://press.wbd.com/na/media-release/hbo-max/max-watch-lists/whats-new-max-december-0' },
   'tv:1399': { prompt: 'Which setting is paired with lemon cakes in George R. R. Martin’s feast guide?', choices: ['The Wall', 'The North', 'King’s Landing'], answer: 'King’s Landing',
     source: 'George R. R. Martin', sourceUrl: 'https://georgerrmartin.com/dining-in-westeros-a-feast-of-ice-and-fire/' },
-  'movie:2062': { prompt: 'Which city does Remy dream of cooking in?', choices: ['Paris', 'Rome', 'Lisbon'], answer: 'Paris',
+  'movie:2062': { prompt: 'Which city does Remy dream of cooking in?', choices: ['Paris', 'Rome', 'Lisbon'], answer: 'Paris', storyDetail: true,
     source: 'Pixar', sourceUrl: 'https://www.pixar.com/ratatouille' },
-  'tv:2316': { prompt: 'Which snack has its own day in The Office US?', choices: ['Pretzels', 'Popcorn', 'Waffles'], answer: 'Pretzels',
+  'tv:2316': { prompt: 'Which snack has its own day in The Office US?', choices: ['Pretzels', 'Popcorn', 'Waffles'], answer: 'Pretzels', storyDetail: true,
     source: 'The Office official channel', sourceUrl: 'https://www.youtube.com/watch?v=FldGxkUFuuQ' },
-  'movie:673': { prompt: 'Where does Harry enjoy Butterbeer in the official guide to Prisoner of Azkaban?', choices: ['The Three Broomsticks', 'The Leaky Cauldron', 'Hogwarts Express'], answer: 'The Three Broomsticks',
+  'movie:673': { prompt: 'Where does Harry enjoy Butterbeer in the official guide to Prisoner of Azkaban?', choices: ['The Three Broomsticks', 'The Leaky Cauldron', 'Hogwarts Express'], answer: 'The Three Broomsticks', storyDetail: true,
     source: 'Harry Potter', sourceUrl: 'https://www.harrypotter.com/features/delicious-harry-potter-moments-that-will-make-you-hungry' },
-  'tv:66732': { prompt: 'Which breakfast food does Eleven enjoy in Stranger Things?', choices: ['Waffles', 'Croissants', 'Porridge'], answer: 'Waffles',
+  'tv:66732': { prompt: 'Which breakfast food does Eleven enjoy in Stranger Things?', choices: ['Waffles', 'Croissants', 'Porridge'], answer: 'Waffles', storyDetail: true,
     source: 'Netflix Tudum', sourceUrl: 'https://www.netflix.com/tudum/features/stranger-things-props-archive' },
   'movie:10198': { prompt: 'Which New Orleans treat appears in Tiana’s cookbook?', choices: ['Beignets', 'Scones', 'Churros'], answer: 'Beignets',
     source: 'Disney Books', sourceUrl: 'https://books.disney.com/book/tianas-cookbook/' },
   'movie:10340': { prompt: 'Which dish inspired Disney’s Lady and the Tramp cooking video?', choices: ['Spaghetti and meatballs', 'Macaroni and cheese', 'Vegetable soup'], answer: 'Spaghetti and meatballs',
     source: 'Disney', sourceUrl: 'https://video.disney.com/watch/the-lady-and-the-tramp-cooking-show-with-alexys-oh-my-disney-show-by-oh-my-disney-56559b61741f0b10d7a04129' },
-  'movie:116149': { prompt: 'What filling does Paddington keep in an emergency sandwich?', choices: ['Marmalade', 'Peanut butter', 'Honey'], answer: 'Marmalade',
+  'movie:116149': { prompt: 'What filling does Paddington keep in an emergency sandwich?', choices: ['Marmalade', 'Peanut butter', 'Honey'], answer: 'Marmalade', storyDetail: true,
     source: 'Paddington', sourceUrl: 'https://store.paddington.com/blogs/news/its-marmalade-may-paddingtons-favourite-marmalade-gifts-treats' },
 };
 

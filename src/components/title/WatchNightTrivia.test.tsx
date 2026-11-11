@@ -46,7 +46,7 @@ describe('watch-night trivia', () => {
     expect(screen.getByRole('button', { name: 'Try trivia' })).toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Try trivia' }));
-    expect(screen.getByText('Question 1 of 2')).toBeInTheDocument();
+    expect(screen.getByText('What is the title of Gusteau’s cookbook?')).toBeInTheDocument();
   });
   it('offers a clearly attributed catalogue-year question only for a valid date', async () => {
     const user = userEvent.setup();
@@ -65,8 +65,23 @@ describe('watch-night trivia', () => {
   ] as const)('checks the sourced answer for %s:%i', async (mediaType, id, answer) => {
     render(<WatchNightTrivia mediaType={mediaType} id={id} />);
     await userEvent.click(screen.getByRole('button', { name: 'Try trivia' }));
+    const includeStory = screen.queryByLabelText('Include story-detail questions');
+    if (includeStory) await userEvent.click(includeStory);
     await userEvent.click(screen.getByRole('button', { name: answer }));
     expect(screen.getByRole('status')).toHaveTextContent('Correct!');
     expect(screen.getByRole('link', { name: /^Source:/ })).toHaveAttribute('href', expect.stringMatching(/^https:\/\//));
+  });
+  it('hides story-detail questions until requested and clears answers when disabled', async () => {
+    const user = userEvent.setup();
+    render(<WatchNightTrivia mediaType="movie" id={673} />);
+    await user.click(screen.getByRole('button', { name: 'Try trivia' }));
+    expect(screen.queryByText(/Where does Harry/)).not.toBeInTheDocument();
+    expect(screen.getByText('No general questions for this title yet.')).toBeInTheDocument();
+    await user.click(screen.getByLabelText('Include story-detail questions'));
+    await user.click(screen.getByRole('button', { name: 'The Three Broomsticks' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Correct!');
+    await user.click(screen.getByLabelText('Include story-detail questions'));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Where does Harry/)).not.toBeInTheDocument();
   });
 });
