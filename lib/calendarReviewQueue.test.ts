@@ -30,12 +30,13 @@ describe('calendar reconciliation queue', () => {
     expect(review.reasons).not.toContain('identity_unverified');
     expect(review.region).toBeNull();
   });
-  it('queues the reported Kaaka delay as unresolved alongside its unverified identity', () => {
+  it('queues the reported Kaaka delay while recognizing its reviewed identity', () => {
     const item = row({ origin: 'wikipedia', tmdb_id: 1533741, title: 'Kaaka', language: 'te', release_date: '2027-01-13',
       source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2027', event_region: 'IN',
       evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1533741', observed_at: '2026-11-10T19:00:00Z' } });
-    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-10T20:00:00Z'));
-    expect(review.reasons).toEqual(expect.arrayContaining(['date_conflict', 'identity_unverified', 'region_unknown']));
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-11T06:00:00Z'));
+    expect(review.reasons).toEqual(expect.arrayContaining(['date_conflict', 'region_unknown']));
+    expect(review.reasons).not.toContain('identity_unverified');
     expect(review.reviewSourceUrl).toContain('deccanchronicle.com');
   });
   it('records a scoped identity review without refreshing the underlying date observation', () => {

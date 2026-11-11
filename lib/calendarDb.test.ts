@@ -51,14 +51,15 @@ describe('calendar event identity', () => {
     expect(entry).toMatchObject({ tmdbId: 249565, region: null, evidenceStatus: 'unverified' });
     expect(entry.dateCorroboration?.source).toBe('Peacock');
   });
-  it('warns about the Kaaka report without asserting a replacement date or title identity', async () => {
+  it('warns about the Kaaka report while retaining the independently reviewed identity', async () => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: 1533741, title: 'Kaaka', language: 'te', release_date: '2027-01-13',
       source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2027', event_region: 'IN',
       evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1533741' } });
     const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2027-01', 'IN');
     expect(entry.dateConflict?.source).toBe('Deccan Chronicle');
     expect(entry.dateConflict?.message).toContain('reportedly put on hold');
-    expect(entry).toMatchObject({ tmdbId: null, region: null, releaseDate: '2027-01-13' });
+    expect(entry).toMatchObject({ tmdbId: 1533741, region: null, releaseDate: '2027-01-13' });
+    expect(entry.dateCorroboration?.source).toBe('India Today');
     const [changed] = await getCalendarMonth(db([], [{ ...item, source_url: 'https://example.org' }]) as unknown as postgres.Sql, '2027-01', 'IN');
     expect(changed.dateConflict).toBeNull();
   });

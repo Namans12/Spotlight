@@ -100,10 +100,14 @@ export function reviewedEditorialTmdbIdentity(row: {
     { id: 1511403, title: 'King 100', language: 'te', date: '2026-12-24', checkedAt: '2026-11-10T19:16:51Z',
       sourceUrl: 'https://www.cinemaexpress.com/telugu/news/2026/Aug/29/king100-glimpse-features-nagarjuna-chasing-identity-release-date-out',
       message: 'The editorial listing and TMDB agree on director Ra Karthik and cast Nagarjuna and Tabu.' },
+    { id: 1533741, title: 'Kaaka', language: 'te', date: '2027-01-13', source: 'India Today', checkedAt: '2026-11-11T05:08:30Z', identityOnly: true,
+      sourceUrl: 'https://www.indiatoday.in/movies/regional-cinema/story/chiranjeevi-next-titled-kaaka-first-glimpse-out-sankranthi-2027-release-set-2977286-2026-08-22',
+      message: 'The editorial listing and TMDB agree on lead Chiranjeevi and director Bobby Kolli (K. S. Ravindra). The local date remains disputed.' },
   ];
   const match = matches.find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language &&
     row.release_date === item.date && row.source_url === `https://en.wikipedia.org/wiki/List_of_${item.language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_${item.date.slice(0, 4)}`);
-  return match ? { source: match.source ?? 'Cinema Express', sourceUrl: match.sourceUrl, checkedAt: match.checkedAt ?? '2026-11-10T19:01:57Z', message: match.message } : null;
+  return match ? { source: match.source ?? 'Cinema Express', sourceUrl: match.sourceUrl, checkedAt: match.checkedAt ?? '2026-11-10T19:01:57Z', message: match.message,
+    identityOnly: 'identityOnly' in match && match.identityOnly === true } : null;
 }
 
 /** Later reporting can cast doubt on a scheduled event without confirming a
@@ -122,5 +126,5 @@ export function reviewedEditorialDateConflict(row: {
       evidence.source_url !== 'https://www.themoviedb.org/movie/1533741') return null;
   return { source: 'Deccan Chronicle', checkedAt: '2026-11-10T19:12:41Z',
     sourceUrl: 'https://www.deccanchronicle.com/tabloid/hyderabad-chronicle/chiranjeevi-puts-kaaka-on-hold-2001788',
-    message: 'Date needs review: later reporting says the film was reportedly put on hold. The makers have not confirmed a replacement date here, and the linked title identity remains unverified.' };
+    message: 'Date needs review: later reporting says the film was reportedly put on hold. The makers have not confirmed a replacement date here; the local release event remains unverified.' };
 }
