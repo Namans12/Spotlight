@@ -35,6 +35,7 @@ describe('watch-night ideas', () => {
   });
   it.each([
     ['movie', 2062, 'Ratatouille'], ['tv', 2316, 'Soft pretzels'], ['movie', 673, 'Butterbeer-inspired drink'],
+    ['tv', 66732, 'Waffles'], ['movie', 10198, 'Beignets'], ['movie', 10340, 'Spaghetti and meatballs'], ['movie', 116149, 'Marmalade sandwich'],
   ] as const)('shows a curated idea for %s:%i', async (mediaType, id, food) => {
     render(<WatchNightIdeas mediaType={mediaType} id={id} />);
     await userEvent.click(screen.getByRole('button', { name: 'Show food ideas' }));

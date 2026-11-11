@@ -16,6 +16,14 @@ const ideas: Record<string, WatchNightIdea[]> = {
     source: 'The Office official channel', sourceUrl: 'https://www.youtube.com/watch?v=FldGxkUFuuQ' }],
   'movie:673': [{ food: 'Butterbeer-inspired drink', reason: 'The official Harry Potter guide associates Butterbeer with a visit to Hogsmeade in Prisoner of Azkaban.',
     source: 'Harry Potter', sourceUrl: 'https://www.harrypotter.com/features/delicious-harry-potter-moments-that-will-make-you-hungry' }],
+  'tv:66732': [{ food: 'Waffles', reason: 'A nod to Eleven’s favourite breakfast in Stranger Things.',
+    source: 'Netflix Tudum', sourceUrl: 'https://www.netflix.com/tudum/features/stranger-things-props-archive' }],
+  'movie:10198': [{ food: 'Beignets', reason: 'Disney’s Tiana cookbook includes a beignet recipe inspired by The Princess and the Frog.',
+    source: 'Disney Books', sourceUrl: 'https://books.disney.com/book/tianas-cookbook/' }],
+  'movie:10340': [{ food: 'Spaghetti and meatballs', reason: 'Disney shares a cooking video inspired by Lady and the Tramp.',
+    source: 'Disney', sourceUrl: 'https://video.disney.com/watch/the-lady-and-the-tramp-cooking-show-with-alexys-oh-my-disney-show-by-oh-my-disney-56559b61741f0b10d7a04129' }],
+  'movie:116149': [{ food: 'Marmalade sandwich', reason: 'A nod to Paddington’s favourite emergency snack.',
+    source: 'Paddington', sourceUrl: 'https://store.paddington.com/blogs/news/its-marmalade-may-paddingtons-favourite-marmalade-gifts-treats' }],
 };
 export function watchNightIdeas(mediaType: 'movie' | 'tv', id: number): readonly WatchNightIdea[] {
   return ideas[`${mediaType}:${id}`] ?? [];
