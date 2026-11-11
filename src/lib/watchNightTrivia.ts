@@ -3,7 +3,7 @@ export interface TriviaQuestion { prompt: string; choices: string[]; answer: str
 /** Facts are individually sourced; unavailable titles have no inferred trivia. */
 const questions: Record<string, TriviaQuestion> = {
   'tv:1668': { prompt: 'Which café is associated with Friends?', choices: ['Central Perk', 'Central Park', 'The Daily Brew'], answer: 'Central Perk',
-    source: 'Warner Bros. Studio Tour', sourceUrl: 'https://www.wbstudiotour.com/' },
+    source: 'Warner Bros. Discovery', sourceUrl: 'https://press.wbd.com/na/media-release/hbo-max/max-watch-lists/whats-new-max-december-0' },
   'tv:1399': { prompt: 'Which setting is paired with lemon cakes in George R. R. Martin’s feast guide?', choices: ['The Wall', 'The North', 'King’s Landing'], answer: 'King’s Landing',
     source: 'George R. R. Martin', sourceUrl: 'https://georgerrmartin.com/dining-in-westeros-a-feast-of-ice-and-fire/' },
   'movie:2062': { prompt: 'Which city does Remy dream of cooking in?', choices: ['Paris', 'Rome', 'Lisbon'], answer: 'Paris',
@@ -20,7 +20,7 @@ export function watchNightTrivia(mediaType: 'movie' | 'tv', id: number): TriviaQ
 
 const extraQuestions: Record<string, TriviaQuestion[]> = {
   'tv:1668': [{ prompt: 'Whose apartment is featured in the Friends experience?', choices: ['Rachel and Monica', 'Joey and Ross', 'Phoebe and Gunther'], answer: 'Rachel and Monica',
-    source: 'Warner Bros. Discovery', sourceUrl: 'https://press.wbd.com/ca/property/fast-friends/videos' }],
+    source: 'Warner Bros. Discovery', sourceUrl: 'https://press.wbd.com/na/media-release/hbo-max/max-watch-lists/whats-new-max-december-0' }],
   'movie:2062': [{ prompt: 'What is the title of Gusteau’s cookbook?', choices: ['Anyone Can Cook', 'The Paris Kitchen', 'A Chef’s Secret'], answer: 'Anyone Can Cook',
     source: 'Pixar', sourceUrl: 'https://www.pixar.com/ratatouille' }],
 };

@@ -9,7 +9,9 @@ describe('watch-night ideas', () => {
     expect(screen.queryByText('Pizza')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Show food ideas' }));
     expect(screen.getByText('Pizza')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Source: Warner Bros. Studio Tour' })).toHaveAttribute('href', 'https://www.wbstudiotour.com/');
+    expect(screen.getByText('A trifle')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Source: Warner Bros. Studio Tour' })).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: 'Source: Warner Bros. Studio Tour' })[0]).toHaveAttribute('href', 'https://www.wbstudiotour.com/it/info/dining/');
     expect(screen.getByRole('button', { name: 'Hide food ideas' })).toHaveAttribute('aria-expanded', 'true');
   });
   it('offers creative vibe ideas without claiming an unsupported title association', async () => {

@@ -2,8 +2,12 @@
  * These are inspiration, not claims about diet, recipes or current ordering. */
 export interface WatchNightIdea { food: string; reason: string; source: string; sourceUrl: string }
 const ideas: Record<string, WatchNightIdea[]> = {
-  'tv:1668': [{ food: 'Pizza', reason: 'A New York-style choice: the Warner Bros. Studio Tour includes pizza on its Friends-inspired menu.',
-    source: 'Warner Bros. Studio Tour', sourceUrl: 'https://www.wbstudiotour.com/' }],
+  'tv:1668': [
+    { food: 'Pizza', reason: 'A New York-style choice: the Warner Bros. Studio Tour includes pizza on its Friends-inspired menu.',
+      source: 'Warner Bros. Studio Tour', sourceUrl: 'https://www.wbstudiotour.com/it/info/dining/' },
+    { food: 'A trifle', reason: 'The tour’s Central Perk Café offers a meat-free version inspired by Rachel’s Thanksgiving trifle.',
+      source: 'Warner Bros. Studio Tour', sourceUrl: 'https://www.wbstudiotour.com/it/info/dining/' },
+  ],
   'tv:1399': [{ food: 'Lemon cakes', reason: 'A King’s Landing-inspired treat listed in George R. R. Martin’s guide to a feast of ice and fire.',
     source: 'George R. R. Martin', sourceUrl: 'https://georgerrmartin.com/dining-in-westeros-a-feast-of-ice-and-fire/' }],
   'movie:2062': [{ food: 'Ratatouille', reason: 'Disney’s official Pixar cookbook includes a ratatouille inspired by the film.',

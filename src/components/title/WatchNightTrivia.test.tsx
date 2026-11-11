@@ -10,7 +10,7 @@ describe('watch-night trivia', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Try trivia' }));
     await userEvent.click(screen.getByRole('button', { name: 'Central Park' }));
     expect(screen.getByRole('status')).toHaveTextContent('The answer is Central Perk.');
-    expect(screen.getByRole('link', { name: 'Source: Warner Bros. Studio Tour' })).toHaveAttribute('href', 'https://www.wbstudiotour.com/');
+    expect(screen.getByRole('link', { name: 'Source: Warner Bros. Discovery' })).toHaveAttribute('href', 'https://press.wbd.com/na/media-release/hbo-max/max-watch-lists/whats-new-max-december-0');
     await userEvent.click(screen.getByRole('button', { name: 'Central Perk' }));
     expect(screen.getByRole('status')).toHaveTextContent('Correct!');
   });
@@ -33,7 +33,7 @@ describe('watch-night trivia', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Rachel and Monica' }));
     expect(screen.getByRole('status')).toHaveTextContent('Correct!');
-    expect(screen.getByRole('link', { name: 'Source: Warner Bros. Discovery' })).toHaveAttribute('href', 'https://press.wbd.com/ca/property/fast-friends/videos');
+    expect(screen.getByRole('link', { name: 'Source: Warner Bros. Discovery' })).toHaveAttribute('href', 'https://press.wbd.com/na/media-release/hbo-max/max-watch-lists/whats-new-max-december-0');
     expect(screen.queryByRole('button', { name: 'Next question' })).not.toBeInTheDocument();
   });
   it('resets the quiz when the title changes', async () => {
