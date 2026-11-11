@@ -311,7 +311,6 @@ describe('calendar event identity', () => {
   });
 
   it.each([
-    ['Aakasamlo Oka Tara', '2026-11-20', 'Telangana Today'],
     ['Dear Astronaut', '2026-11-20', 'Cinema Express'],
   ])('adds reporting for the exact Telugu record without assigning a region', async (title, release_date, source) => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: null, title, language: 'te', release_date,
@@ -342,6 +341,14 @@ describe('calendar event identity', () => {
     const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
     expect(entry.kind).toBe('unknown');
     expect(entry.isTheatrical).toBe(false);
+  });
+  it('scopes the reported Aakasamlo Oka Tara cinema release to India without inventing a title link', async () => {
+    const item = editorial({ origin: 'wikipedia', tmdb_id: null, title: 'Aakasamlo Oka Tara', language: 'te',
+      release_date: '2026-11-20', source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', event_region: null, evidence: null, platform_or_distributor: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry).toMatchObject({ region: 'IN', kind: 'theatrical', tmdbId: null, evidenceStatus: 'regional' });
+    expect(entry.dateCorroboration?.sourceUrl).toContain('simplymollywood.com');
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
   });
   it.each([
     [1450342, 'Bhogi', '2026-11-12', 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', 'conflict'],

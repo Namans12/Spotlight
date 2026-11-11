@@ -21,6 +21,14 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('retains the missing identity for the reported India release of Aakasamlo Oka Tara', () => {
+    const item = row({ origin: 'wikipedia', tmdb_id: null, title: 'Aakasamlo Oka Tara', language: 'te', release_date: '2026-11-20',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', platform_or_distributor: null });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-11T11:00:00Z'));
+    expect(review.region).toBe('IN');
+    expect(review.reasons).toContain('identity_missing');
+    expect(review.reasons).not.toContain('region_unknown');
+  });
   it('tracks the observation and manual review freshness independently', () => {
     const item = row({ origin: 'tmdb_upcoming', tmdb_id: 310209, media_type: 'tv', entry_type: 'Show', title: 'Nine to Six', language: 'ko',
       release_date: '2026-11-11', source_url: 'https://www.themoviedb.org/tv/310209', event_region: null,

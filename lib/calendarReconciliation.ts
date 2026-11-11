@@ -143,10 +143,10 @@ export function reviewedCalendarEntry(row: {
           sourceUrl: 'https://in.bookmyshow.com/movies/balurghat/talcum-powder/ET00521922',
           message: 'BookMyShow lists the Telugu film for 13 November in India; bookings were not yet open when checked. The TMDB identity remains unverified.' };
       }
-      if (row.title === 'Aakasamlo Oka Tara' && row.release_date === '2026-11-20') {
-        return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Telangana Today',
-          sourceUrl: 'https://telanganatoday.com/dulquer-salmaans-aakasamlo-oka-tara-gets-november-20-release-date',
-          message: 'Reporting cites the producers’ 20 November theatrical announcement. The TMDB identity and local release event remain unconfirmed.' };
+      if (row.title === 'Aakasamlo Oka Tara' && row.release_date === '2026-11-20' && row.platform_or_distributor == null) {
+        return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-11T10:31:35Z', source: 'Simply Mollywood',
+          sourceUrl: 'https://simplymollywood.com/movies/november-malayalam-movie-releases',
+          message: 'Kerala release reporting lists the film for 20 November in cinemas, citing the makers’ announcement. Showtimes and the TMDB identity remain unverified.' };
       }
       if (row.title === 'Dear Astronaut' && row.release_date === '2026-11-20') {
         return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Cinema Express',
