@@ -21,6 +21,21 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('tracks the observation and manual review freshness independently', () => {
+    const item = row({ origin: 'tmdb_upcoming', tmdb_id: 310209, media_type: 'tv', entry_type: 'Show', title: 'Nine to Six', language: 'ko',
+      release_date: '2026-11-11', source_url: 'https://www.themoviedb.org/tv/310209', event_region: null,
+      evidence: { date_source: 'tmdb_global_first_air', source_url: 'https://www.themoviedb.org/tv/310209', observed_at: '2026-10-01T00:00:00Z' } });
+    const [oldEvidence] = buildCalendarReviewQueue([item], new Date('2026-11-11T06:00:00Z'));
+    expect(oldEvidence.reasons).toContain('evidence_stale');
+    expect(oldEvidence.reasons).not.toContain('review_stale');
+    expect(oldEvidence.evidenceObservedAt).toBe('2026-10-01T00:00:00Z');
+    expect(oldEvidence.reviewCheckedAt).toBeTruthy();
+    const [oldReview] = buildCalendarReviewQueue([{ ...item, evidence: { ...item.evidence as object, observed_at: '2026-12-11T00:00:00Z' } }], new Date('2026-12-12T00:00:00Z'));
+    expect(oldReview.reasons).toContain('review_stale');
+    expect(oldReview.reasons).not.toContain('evidence_stale');
+    const [missingEvidenceTime] = buildCalendarReviewQueue([{ ...item, evidence: { ...item.evidence as object, observed_at: null } }], new Date('2026-11-11T06:00:00Z'));
+    expect(missingEvidenceTime.reasons).toContain('freshness_unknown');
+  });
   it('retains a broadcaster conflict after a TMDB first-air observation', () => {
     const item = row({ origin: 'tmdb_upcoming', tmdb_id: 310209, media_type: 'tv', entry_type: 'Show', title: 'Nine to Six', language: 'ko',
       release_date: '2026-11-11', source_url: 'https://www.themoviedb.org/tv/310209', event_region: null,
@@ -183,7 +198,7 @@ describe('calendar reconciliation queue', () => {
       source_url: 'https://en.wikipedia.org/wiki/List_of_Hindi_films_of_2026', platform_or_distributor: 'Sri Venkateswara Creations, Cape of Good Films' });
     const items = buildCalendarReviewQueue([row(), conflict], new Date('2026-12-12T00:00:00Z'));
     expect(items[0].id).toBe('3');
-    expect(items[0].reasons).toEqual(['date_conflict', 'identity_unverified', 'region_unknown', 'evidence_stale']);
+    expect(items[0].reasons).toEqual(['date_conflict', 'identity_unverified', 'region_unknown', 'review_stale']);
     expect(items[0].reviewSourceUrl).toContain('timesofindia.indiatimes.com');
     expect(items[1].reasons).toEqual(['unreviewed', 'region_unknown']);
   });

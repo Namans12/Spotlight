@@ -13,6 +13,7 @@ export interface ReviewQueueItem {
   id: string; title: string; releaseDate: string; origin: string; region: string | null;
   tmdbId: number | null; sourceUrl: string | null; reviewSourceUrl: string | null;
   checkedAt: string | null; reasons: string[]; duplicateObservationIds: string[];
+  evidenceObservedAt: string | null; reviewCheckedAt: string | null;
 }
 
 /** Read-only triage: a fresh observation does not verify identity or region. */
@@ -54,18 +55,25 @@ export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): Rev
     if (evidence && row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
         typeof evidence.source_url === 'string' && evidence.source_url.startsWith('https://www.themoviedb.org/') &&
         evidence.source_url !== `https://www.themoviedb.org/${row.media_type}/${row.tmdb_id}`) reasons.push('identity_conflict');
-    const checked = review?.checkedAt ?? (typeof evidence?.observed_at === 'string' ? evidence.observed_at : null);
-    if (review || evidence) {
-      const freshness = reviewFreshness(checked, now);
+    const evidenceObservedAt = typeof evidence?.observed_at === 'string' ? evidence.observed_at : null;
+    const checked = review?.checkedAt ?? evidenceObservedAt;
+    if (evidence) {
+      const freshness = reviewFreshness(evidenceObservedAt, now);
       if (freshness === 'unknown') reasons.push('freshness_unknown');
       else if (freshness === 'stale') reasons.push('evidence_stale');
+    }
+    if (review) {
+      const freshness = reviewFreshness(review.checkedAt, now);
+      if (freshness === 'unknown') reasons.push('review_freshness_unknown');
+      else if (freshness === 'stale') reasons.push('review_stale');
     }
     if (identityReview && reviewFreshness(identityReview.checkedAt, now) !== 'fresh') reasons.push('identity_review_stale');
     if (identityDateConflict && reviewFreshness(identityDateConflict.checkedAt, now) !== 'fresh') reasons.push('date_review_stale');
     if (!reasons.length) continue;
     queue.push({ id: String(row.id), title: row.title, releaseDate: row.release_date, origin: row.origin,
       region, tmdbId: row.tmdb_id == null ? null : Number(row.tmdb_id), sourceUrl: row.source_url,
-      reviewSourceUrl: review?.sourceUrl ?? identityDateConflict?.sourceUrl ?? identityReview?.sourceUrl ?? null, checkedAt: identityDateConflict?.checkedAt ?? checked, reasons, duplicateObservationIds });
+      reviewSourceUrl: review?.sourceUrl ?? identityDateConflict?.sourceUrl ?? identityReview?.sourceUrl ?? null, checkedAt: identityDateConflict?.checkedAt ?? checked,
+      evidenceObservedAt, reviewCheckedAt: review?.checkedAt ?? identityDateConflict?.checkedAt ?? identityReview?.checkedAt ?? null, reasons, duplicateObservationIds });
   }
   const rank = (x: ReviewQueueItem) => x.reasons.includes('date_conflict') || x.reasons.includes('identity_conflict') ? 0 : x.reasons.includes('unreviewed') ? 1 : 2;
   return queue.sort((a, b) => rank(a) - rank(b) || a.releaseDate.localeCompare(b.releaseDate) || a.id.localeCompare(b.id, 'en', { numeric: true }));
