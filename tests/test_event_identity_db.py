@@ -64,6 +64,8 @@ def test_migration_and_writers_keep_distinct_events(monkeypatch, tmp_path):
             w = dict(base, source_key='wiki-1')
             for row in (w, w, dict(w, source_key='wiki-2')):
                 cur.execute(wiki.UPSERT_SQL, row); cur.fetchone()
+            cur.execute("SELECT bool_or(is_theatrical) FROM calendar_entries WHERE origin='wikipedia'")
+            assert cur.fetchone()[0] is False
             cur.execute('SELECT origin, count(*) FROM calendar_entries GROUP BY origin ORDER BY origin')
             assert dict(cur.fetchall()) == {'csv_seed': 1, 'district_in': 2, 'tmdb_upcoming': 3, 'wikipedia': 2}
             cur.execute("SELECT source_key FROM calendar_entries WHERE origin='csv_seed'")

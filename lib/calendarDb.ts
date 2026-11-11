@@ -133,7 +133,11 @@ export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, re
     const globalPremiere = matchingTmdbEvidence && row.evidence?.date_source === 'tmdb_global_first_air' && !row.event_region && row.media_type === 'tv';
     const regionalEvidence = matchingTmdbEvidence && row.media_type === 'movie' && row.event_region &&
       row.evidence?.date_source === 'tmdb_regional_theatrical';
-    const kind = globalPremiere || review?.type === 'season' ? 'global_premiere' : review?.type === 'event' ? review.kind : classifyPlatform(row.entry_type, row.platform_or_distributor);
+    // Wikipedia's film lists mix cinema and streaming releases; a Movie label
+    // alone does not establish the release type. Independent regional
+    // theatrical evidence or a scoped regional review can establish it.
+    const kind = globalPremiere || review?.type === 'season' ? 'global_premiere' : review?.type === 'event' ? review.kind :
+      row.origin === 'wikipedia' && !regionalEvidence && review?.type !== 'regional' ? 'unknown' : classifyPlatform(row.entry_type, row.platform_or_distributor);
     const parts = splitPlatformField(row.platform_or_distributor);
     const platforms = globalPremiere || review?.type === 'season' || review?.type === 'event' ? [] : kind === "streaming" ? normalizePlatforms(parts.filter(isKnownStreamer)) : parts;
     add({ releaseDate: String(row.release_date), title: row.title, language: review && 'correctedLanguage' in review ? review.correctedLanguage : row.language,

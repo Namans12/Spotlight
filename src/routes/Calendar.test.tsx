@@ -65,6 +65,14 @@ beforeEach(() => {
 });
 
 describe('Calendar language display and filter', () => {
+  it('shows unconfirmed release types separately from cinema releases', async () => {
+    vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({ title: 'Unconfirmed film', kind: 'unknown', isTheatrical: false, region: null })] });
+    renderCalendar();
+    expect(await screen.findByText('Unconfirmed film')).toBeInTheDocument();
+    expect(screen.getByText(/Release type unknown/)).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('tab', { name: 'In Cinemas' }));
+    expect(screen.queryByText('Unconfirmed film')).not.toBeInTheDocument();
+  });
   const entries = [
     entry({ title: 'Judaa', language: 'pa', tmdbId: 1 }),
     entry({ title: 'Brahmakamala', language: 'kn', tmdbId: 2 }),

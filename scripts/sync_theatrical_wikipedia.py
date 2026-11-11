@@ -17,10 +17,10 @@ Kolkata (Bengali) and Punjabi coverage has no replacement here.
 
 These per-language lists mix theatrical and straight-to-OTT titles in the
 same table with no column marking which is which. A row whose production
-company names a known streaming platform is skipped outright rather than
-guessed at — see OTT_PRODUCTION_MARKERS — since wrongly marking a
-streaming-only release as theatrical is a worse error than missing a
-theatrical one.
+company names a known streaming platform is skipped outright — see
+OTT_PRODUCTION_MARKERS. Other rows still have an unknown release type unless
+independent evidence establishes it; a missing streaming marker is not proof
+of a theatrical release.
 
     python scripts/sync_theatrical_wikipedia.py --dry-run
     python scripts/sync_theatrical_wikipedia.py --languages te,ta
@@ -88,7 +88,7 @@ INSERT INTO calendar_entries
     (release_date, title, language, entry_type, is_theatrical,
      platform_or_distributor, details, source, source_url, origin,
      media_type, poster_url, source_key)
-VALUES (%(release_date)s, %(title)s, %(language)s, 'Movie', true,
+VALUES (%(release_date)s, %(title)s, %(language)s, 'Movie', false,
         NULL, NULL, 'wikipedia', %(source_url)s, 'wikipedia',
         'movie', NULL, %(source_key)s)
 ON CONFLICT (origin, source_key) DO UPDATE SET

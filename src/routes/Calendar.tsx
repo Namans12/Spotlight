@@ -77,6 +77,7 @@ const SECTIONS: { kind: CalendarKind; label: string; icon: React.ReactNode }[] =
   { kind: 'streaming', label: 'Streaming', icon: <MonitorPlay size={14} /> },
   { kind: 'tv_network', label: 'On TV', icon: <Tv size={14} /> },
   { kind: 'global_premiere', label: 'Global premieres', icon: <Tv size={14} /> },
+  { kind: 'unknown', label: 'Release type unconfirmed', icon: <Film size={14} /> },
 ];
 
 /** Tabs, not filter chips: theatrical and OTT are two different questions
@@ -88,6 +89,7 @@ const TABS: { id: KindFilter; label: string }[] = [
   { id: 'streaming', label: 'Streaming' },
   { id: 'tv_network', label: 'On TV' },
   { id: 'global_premiere', label: 'Global premieres' },
+  { id: 'unknown', label: 'Unconfirmed type' },
 ];
 
 function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number | null }) {
@@ -145,7 +147,7 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
           Source: {entry.source || 'unknown'} · Region: {entry.region || 'unknown'} · {evidenceDate(entry.observedAt)}
         </p>
         <p className="text-[10px] text-muted-foreground leading-snug">
-          {entry.seasonPremiere ? `${entry.seasonPremiere.coverage} · Local date and availability unknown` : entry.kind === 'streaming' ? providerDetails(entry.platforms ?? [], entry.availabilityTypes) : entry.kind === 'theatrical' ? 'Theatrical' : entry.kind === 'global_premiere' ? 'Global first-air date · Local availability unknown' : 'TV network'}
+          {entry.seasonPremiere ? `${entry.seasonPremiere.coverage} · Local date and availability unknown` : entry.kind === 'streaming' ? providerDetails(entry.platforms ?? [], entry.availabilityTypes) : entry.kind === 'theatrical' ? 'Theatrical' : entry.kind === 'global_premiere' ? 'Global first-air date · Local availability unknown' : entry.kind === 'unknown' ? 'Release type unknown' : 'TV network'}
           {' · '}{entry.seasonPremiere || entry.evidenceStatus === 'regional' || entry.evidenceStatus === 'global' ? 'Date reported by source; may change' : entry.dateCorroboration ? 'Regional date and release type unverified' : 'Date and release type unverified'}
         </p>
       </div>
@@ -281,7 +283,7 @@ export default function Calendar() {
     selectedLanguageNames.size > 0
       ? scopedEntries.filter((e) => e.language && selectedLanguageNames.has(languageName(e.language)))
       : scopedEntries;
-  const counts: Record<CalendarKind, number> = { theatrical: 0, streaming: 0, tv_network: 0, global_premiere: 0 };
+  const counts: Record<CalendarKind, number> = { theatrical: 0, streaming: 0, tv_network: 0, global_premiere: 0, unknown: 0 };
   for (const entry of entries) counts[entry.kind] = (counts[entry.kind] ?? 0) + 1;
 
   // CalendarEntryDTO carries tmdbId/mediaType rather than Movie's id/mediaType

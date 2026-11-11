@@ -337,6 +337,12 @@ describe('calendar event identity', () => {
       { ...item, id: 4, origin: 'csv_seed' }]) as unknown as postgres.Sql, '2026-11', 'IN');
     expect(entries).toHaveLength(3);
   });
+  it('does not classify an unverified Wikipedia film as a cinema release', async () => {
+    const item = editorial({ origin: 'wikipedia', event_region: null, evidence: null, tmdb_id: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry.kind).toBe('unknown');
+    expect(entry.isTheatrical).toBe(false);
+  });
   it.each([
     [1450342, 'Bhogi', '2026-11-12', 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', 'conflict'],
     [1434462, 'Melcow Pondicherry', '2026-11-12', 'https://en.wikipedia.org/wiki/List_of_Malayalam_films_of_2026', 'conflict'],
