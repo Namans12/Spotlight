@@ -51,6 +51,24 @@ export function reviewedCalendarEntry(row: {
       message: 'Date needs review: local reporting says the announced 12 November release has been postponed; no replacement date is confirmed here.' };
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie') {
+    if (Number(row.tmdb_id) === 1531050 && row.language === 'ta' && row.title === 'Black Gold' &&
+        row.release_date === '2026-11-13' && row.source_url === 'https://www.themoviedb.org/movie/1531050') {
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-11T05:26:27Z', source: 'Cinema Express',
+        sourceUrl: 'https://www.cinemaexpress.com/tamil/news/2026/Oct/04/vetris-black-gold-gets-november-release',
+        message: 'The makers announced a 13 November theatrical release; an India ticketing listing identifies the same Tamil film. Showtimes and streaming availability are unconfirmed.' };
+    }
+    if (Number(row.tmdb_id) === 1655020 && row.language === 'ta' && row.title === 'John Doe' &&
+        row.release_date === '2026-11-13' && row.source_url === 'https://www.themoviedb.org/movie/1655020') {
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-11T05:26:27Z', source: 'Cinema Express',
+        sourceUrl: 'https://www.cinemaexpress.com/tamil/news/2026/Nov/03/john-doe-trailer-shows-arjun-das-hunting-a-child-serial-killer-release-date-out',
+        message: 'Reporting cites the makers’ 13 November theatrical announcement and names a Tamil Nadu distributor. Showtimes and streaming availability are unconfirmed.' };
+    }
+    if (Number(row.tmdb_id) === 1805816 && row.language === 'kn' && row.title === 'Lambodhara 2.0' &&
+        row.release_date === '2026-11-13' && row.source_url === 'https://www.themoviedb.org/movie/1805816') {
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-11T05:26:27Z', source: 'BookMyShow',
+        sourceUrl: 'https://in.bookmyshow.com/movies/bengaluru/lambodhara-20/et00524873',
+        message: 'BookMyShow lists the film for 13 November in India; showtimes and streaming availability should be checked with the relevant service.' };
+    }
     if (Number(row.tmdb_id) === 1445172 && row.language === 'te' && row.title === 'Dark Chocolate' &&
         row.release_date === '2026-11-13' && row.source_url === 'https://www.themoviedb.org/movie/1445172') {
       return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-11T05:23:11Z', source: 'BookMyShow',

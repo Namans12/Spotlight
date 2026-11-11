@@ -18,6 +18,19 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it.each([
+    [1531050, 'Black Gold', 'ta', 'Cinema Express'],
+    [1655020, 'John Doe', 'ta', 'Cinema Express'],
+    [1805816, 'Lambodhara 2.0', 'kn', 'BookMyShow'],
+  ])('scopes the exact regional theatrical announcement for %s', async (id, title, language, source) => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date: '2026-11-13',
+      source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry).toMatchObject({ tmdbId: id, region: 'IN', evidenceStatus: 'regional' });
+    expect(entry.dateCorroboration?.source).toBe(source);
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
+    expect(await getCalendarMonth(db([], [{ ...item, language: 'en' }]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+  });
   it.each([[1445172, 'Dark Chocolate', 'Dark Chocolate'], [1808841, 'Maya lady', 'Maya Lady']])('merges independently reviewed sources for %s without losing their explanations', async (id, title, wikiTitle) => {
     const tmdb = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language: 'te', release_date: '2026-11-13',
       source: 'TMDB', source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });
