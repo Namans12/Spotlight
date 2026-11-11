@@ -164,10 +164,10 @@ describe('calendar reconciliation queue', () => {
   it('prioritizes conflicts and reports separate unresolved region and stale review reasons', () => {
     const conflict = row({ id: 3, tmdb_id: 1774728, title: 'Untitled film', release_date: '2026-12-04',
       source_url: 'https://en.wikipedia.org/wiki/List_of_Hindi_films_of_2026', platform_or_distributor: 'Sri Venkateswara Creations, Cape of Good Films' });
-    const items = buildCalendarReviewQueue([row(), conflict], now);
+    const items = buildCalendarReviewQueue([row(), conflict], new Date('2026-12-12T00:00:00Z'));
     expect(items[0].id).toBe('3');
     expect(items[0].reasons).toEqual(['date_conflict', 'identity_unverified', 'region_unknown', 'evidence_stale']);
-    expect(items[0].reviewSourceUrl).toContain('bollywoodhungama.com');
+    expect(items[0].reviewSourceUrl).toContain('timesofindia.indiatimes.com');
     expect(items[1].reasons).toEqual(['unreviewed', 'region_unknown']);
   });
 

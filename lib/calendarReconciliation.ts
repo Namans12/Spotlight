@@ -146,9 +146,9 @@ export function reviewedCalendarEntry(row: {
   if (Number(row.tmdb_id) === 1774728 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
       row.title === 'Untitled film' && row.release_date === '2026-12-04' && row.source_url === hindiFilms &&
       row.platform_or_distributor === 'Sri Venkateswara Creations, Cape of Good Films') {
-    return { type: 'conflict' as const, checkedAt: '2026-11-10', suppressTitleLink: true, source: 'Bollywood Hungama',
-      sourceUrl: 'https://www.bollywoodhungama.com/news/bollywood/scoop-akshay-kumar-shraddha-kapoors-second-consecutive-box-office-clash-averted-as-akshay-vidya-balan-comic-caper-pushed-to-2027-eetha-gets-solo-december-4-release/',
-      message: 'Date needs review: the original date and producers match an Anees Bazmee comedy reported as Mauja Hi Mauja, but trade reporting says it may leave 4 December. The title match and replacement date remain unconfirmed.' };
+    return { type: 'conflict' as const, checkedAt: '2026-11-11T05:11:06Z', suppressTitleLink: true, source: 'The Times of India',
+      sourceUrl: 'https://timesofindia.indiatimes.com/entertainment/hindi/bollywood/news/akshay-kumars-next-with-anees-bazmee-mauja-hi-mauja-gets-rs-60-crore-all-india-distribution-deal-ahead-of-2027-release-report/articleshow/134502329.cms',
+      message: 'Date needs review: reporting says the Anees Bazmee comedy known as Mauja Hi Mauja is planned for 2027, with no new date confirmed. TMDB candidate 1569625 matches its cast and director, but the original untitled entry cannot yet be linked confidently; the stored TMDB ID is unavailable.' };
   }
   if (row.tmdb_id == null && row.media_type == null && row.entry_type === 'Show' && row.source_url === deadlineTv) {
     if (row.title === 'Off the Scales' && row.release_date === '2026-11-11' && row.platform_or_distributor === 'TLC') {

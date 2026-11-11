@@ -262,7 +262,8 @@ describe('calendar event identity', () => {
       release_date: '2026-12-04', platform_or_distributor: 'Sri Venkateswara Creations, Cape of Good Films',
       source_url: 'https://en.wikipedia.org/wiki/List_of_Hindi_films_of_2026', event_region: null, evidence: null });
     const entries = await getCalendarMonth(db([], [item, { ...item, id: 2, platform_or_distributor: 'Other' }]) as unknown as postgres.Sql, '2026-12', 'IN');
-    expect(entries[0].dateConflict?.message).toContain('title match and replacement date remain unconfirmed');
+    expect(entries[0].dateConflict?.message).toContain('TMDB candidate 1569625');
+    expect(entries[0].dateConflict?.message).toContain('cannot yet be linked confidently');
     expect(entries[0].releaseDate).toBe('2026-12-04');
     expect(entries[0].title).toBe('Untitled film');
     expect(entries[0].region).toBeNull();
