@@ -11,7 +11,7 @@ export interface ReviewQueueRow {
 }
 export interface ReviewQueueItem {
   id: string; title: string; releaseDate: string; origin: string; region: string | null;
-  tmdbId: number | null; sourceUrl: string | null; reviewSourceUrl: string | null;
+  tmdbId: number | null; reviewedTmdbId: number | null; sourceUrl: string | null; reviewSourceUrl: string | null;
   checkedAt: string | null; reasons: string[]; duplicateObservationIds: string[];
   evidenceObservedAt: string | null; reviewCheckedAt: string | null;
 }
@@ -71,7 +71,8 @@ export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): Rev
     if (identityDateConflict && reviewFreshness(identityDateConflict.checkedAt, now) !== 'fresh') reasons.push('date_review_stale');
     if (!reasons.length) continue;
     queue.push({ id: String(row.id), title: row.title, releaseDate: row.release_date, origin: row.origin,
-      region, tmdbId: row.tmdb_id == null ? null : Number(row.tmdb_id), sourceUrl: row.source_url,
+      region, tmdbId: row.tmdb_id == null ? null : Number(row.tmdb_id),
+      reviewedTmdbId: review && 'reviewedTmdbId' in review ? review.reviewedTmdbId ?? null : null, sourceUrl: row.source_url,
       reviewSourceUrl: review?.sourceUrl ?? identityDateConflict?.sourceUrl ?? identityReview?.sourceUrl ?? null, checkedAt: identityDateConflict?.checkedAt ?? checked,
       evidenceObservedAt, reviewCheckedAt: review?.checkedAt ?? identityDateConflict?.checkedAt ?? identityReview?.checkedAt ?? null, reasons, duplicateObservationIds });
   }
