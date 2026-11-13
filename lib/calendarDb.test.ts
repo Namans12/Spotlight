@@ -18,7 +18,16 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('shows the independently reviewed India release for Khashaba', async () => {
+    const item = editorial({ origin: 'district_in', tmdb_id: 1216701, title: 'Khashaba', language: 'mr', release_date: '2027-01-01',
+      source_url: 'https://www.district.in/movies/khashaba-movie-tickets-in-hyderabad-MV227187', event_region: null, evidence: null, platform_or_distributor: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2027-01', 'IN');
+    expect(entry).toMatchObject({ region: 'IN', tmdbId: 1216701, kind: 'theatrical' });
+    expect(entry.dateCorroboration?.source).toBe('BookMyShow');
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2027-01', 'US')).toEqual([]);
+  });
   it.each([
+    [1387155, 'Mahavatar', 'hi', 'mahavatar', 'MV183233'],
     [1475768, 'Maatrubhumi: May War Rest in Peace', 'hi', 'maatrubhumi-may-war-rest-in-peace', 'MV201390'],
     [1469537, 'Slumdog: 33 Temple Road', 'ta', 'slumdog-33-temple-road', 'MV213661'],
   ])('hides the reviewed unsupported year-end observation for %s', async (id, title, language, slug, key) => {

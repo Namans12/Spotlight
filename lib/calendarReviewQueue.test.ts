@@ -22,6 +22,7 @@ describe('calendar evidence freshness', () => {
 
 describe('calendar reconciliation queue', () => {
   it.each([
+    [1387155, 'Mahavatar', 'hi', 'mahavatar', 'MV183233', true],
     [1475768, 'Maatrubhumi: May War Rest in Peace', 'hi', 'maatrubhumi-may-war-rest-in-peace', 'MV201390', true],
     [1469537, 'Slumdog: 33 Temple Road', 'ta', 'slumdog-33-temple-road', 'MV213661', false],
   ])('retains reviewed year-end uncertainty for %s', (id, title, language, slug, key, conflict) => {

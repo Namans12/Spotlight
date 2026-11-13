@@ -8,8 +8,21 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'district_in' && Number(row.tmdb_id) === 1216701 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.platform_or_distributor == null && row.language === 'mr' && row.title === 'Khashaba' && row.release_date === '2027-01-01' &&
+      row.source_url === 'https://www.district.in/movies/khashaba-movie-tickets-in-hyderabad-MV227187') {
+    return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T15:23:00Z', source: 'BookMyShow',
+      sourceUrl: 'https://in.bookmyshow.com/movies/kolkata/khashaba/ET00505825',
+      message: 'BookMyShow lists the Marathi film for 1 January in India; its director and cast match TMDB. Bookings were not open when checked; showtimes and streaming availability remain unconfirmed.' };
+  }
   if (row.origin === 'district_in' && row.media_type === 'movie' && row.entry_type === 'Movie' &&
       row.platform_or_distributor == null && row.release_date === '2026-12-31') {
+    if (Number(row.tmdb_id) === 1387155 && row.language === 'hi' && row.title === 'Mahavatar' &&
+        row.source_url === 'https://www.district.in/movies/mahavatar-movie-tickets-in-hyderabad-MV183233') {
+      return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-13T15:23:00Z', source: 'Bollywood Hungama',
+        sourceUrl: 'https://www.bollywoodhungama.com/news/bollywood/breaking-shoot-of-vicky-kaushals-mahavatar-to-commence-in-january-2027-stree-3-goes-on-floors-in-2027-end-horror-comedy-expected-to-release-on-independence-day-or-christmas-2028/',
+        message: 'The producer described filming beginning in January 2027. The older 31 December 2026 observation conflicts with that statement and remains hidden; a replacement date is not confirmed.' };
+    }
     if (Number(row.tmdb_id) === 1475768 && row.language === 'hi' && row.title === 'Maatrubhumi: May War Rest in Peace' &&
         row.source_url === 'https://www.district.in/movies/maatrubhumi-may-war-rest-in-peace-movie-tickets-in-hyderabad-MV201390') {
       return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-13T15:20:00Z', source: 'Salman Khan Films',
