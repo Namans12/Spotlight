@@ -89,8 +89,29 @@ export function summarizeOfflineEvaluation(results: ReturnType<typeof evaluateOf
     const updated = values.reduce((sum, pair) => sum + pair[1], 0) / values.length;
     return { cases: values.length, baseline, updated, delta: updated - baseline };
   };
+  const deltas = results.flatMap(row => row.baselineMetrics.reciprocalRank === null || row.updatedMetrics.reciprocalRank === null
+    ? [] : [row.updatedMetrics.reciprocalRank - row.baselineMetrics.reciprocalRank]);
+  const outcomes = { improved: deltas.filter(delta => delta > 0).length,
+    declined: deltas.filter(delta => delta < 0).length, unchanged: deltas.filter(delta => delta === 0).length };
+  // Paired case-level bootstrap, seeded for reproducible local reports. It
+  // describes sampling uncertainty only; it cannot correct a biased dataset.
+  let interval95: [number, number] | null = null;
+  if (deltas.length >= 2) {
+    let state = 0x5b71a4e9;
+    const randomIndex = () => {
+      state ^= state << 13; state ^= state >>> 17; state ^= state << 5;
+      return (state >>> 0) % deltas.length;
+    };
+    const means = Array.from({ length: 2000 }, () => {
+      let total = 0;
+      for (let i = 0; i < deltas.length; i++) total += deltas[randomIndex()];
+      return total / deltas.length;
+    }).sort((a, b) => a - b);
+    interval95 = [means[49], means[1949]];
+  }
   return { totalCases: results.length, baselineKind: results[0]?.baselineKind ?? null,
     reciprocalRank: paired(row => [row.baselineMetrics.reciprocalRank, row.updatedMetrics.reciprocalRank]),
+    reciprocalRankUncertainty: { cases: deltas.length, ...outcomes, interval95 },
     precisionAtCutoff: paired(row => [row.baselineMetrics.precisionAtCutoff, row.updatedMetrics.precisionAtCutoff]),
     relevantCoverage: paired(row => [row.baselineMetrics.relevantCoverage, row.updatedMetrics.relevantCoverage]) };
 }

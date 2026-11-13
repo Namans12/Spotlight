@@ -65,6 +65,9 @@ describe('offline recommendation evaluation', () => {
     expect(summary.precisionAtCutoff.cases).toBe(1);
     expect(summary.relevantCoverage.cases).toBe(2);
     expect(summarizeOfflineEvaluation([]).reciprocalRank).toEqual({ cases: 0, baseline: null, updated: null, delta: null });
+    expect(summary.reciprocalRankUncertainty).toEqual({ cases: 2, improved: 2, declined: 0, unchanged: 0, interval95: [0.5, 0.5] });
+    expect(summarizeOfflineEvaluation([results[0]]).reciprocalRankUncertainty.interval95).toBeNull();
+    expect(summarizeOfflineEvaluation(results)).toEqual(summary);
   });
   it('rejects duplicate identities, malformed offers and invalid filters', () => {
     const duplicate = sample(); duplicate.cases[0].candidates.push(candidate(1, 'movie', []));
