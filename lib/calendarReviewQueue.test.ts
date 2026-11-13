@@ -21,6 +21,19 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it.each([
+    ['OM Chapter 1: Udhiram - The Blood Wood', 'ta', '2026-11-26', 1384528],
+    ['OM Chapter 1: Udhiram - The Blood Wood', 'ta', '2026-11-27', 1384528],
+    ['NBK111', 'te', '2026-12-11', 1494621],
+  ])('flags the unresolved older %s observation while retaining its missing identity', (title, language, release_date, sourceId) => {
+    const item = row({ origin: 'tmdb_upcoming', tmdb_id: null, media_type: null, title, language, release_date,
+      source_url: `https://www.themoviedb.org/movie/${sourceId}`, platform_or_distributor: null });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-13T16:00:00Z'));
+    expect(review.reasons).toEqual(expect.arrayContaining(['date_conflict', 'identity_missing', 'region_unknown']));
+    expect(review.reviewSourceUrl).toContain('indiatoday.in');
+    const [changed] = buildCalendarReviewQueue([{ ...item, source_url: 'https://example.org' }], new Date('2026-11-13T16:00:00Z'));
+    expect(changed.reasons).not.toContain('date_conflict');
+  });
   it('keeps regional review and source freshness separate after a TMDB refresh', () => {
     const item = row({ origin: 'tmdb_upcoming', tmdb_id: 1735403, title: 'Brindavihari', language: 'kn', release_date: '2026-11-20',
       source_url: 'https://www.themoviedb.org/movie/1735403', platform_or_distributor: null, event_region: 'IN',

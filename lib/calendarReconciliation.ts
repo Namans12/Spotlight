@@ -8,6 +8,20 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'tmdb_upcoming' && row.tmdb_id == null && row.media_type == null && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
+    if (row.language === 'ta' && row.title === 'OM Chapter 1: Udhiram - The Blood Wood' &&
+        ['2026-11-26', '2026-11-27'].includes(row.release_date) && row.source_url === 'https://www.themoviedb.org/movie/1384528') {
+      return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-13T15:12:00Z', source: 'India Today',
+        sourceUrl: 'https://www.indiatoday.in/movies/regional-cinema/story/dhanush-mammootty-om-chapter-1-udhiram-the-blood-wood-locks-release-date-avoiding-clashes-with-jailer-2-scene-3008591-2026-10-03',
+        message: 'The makers announced a 20 November theatrical release. This older observation has no verified region, event type or stored title identity and remains hidden.' };
+    }
+    if (row.language === 'te' && row.title === 'NBK111' && row.release_date === '2026-12-11' &&
+        row.source_url === 'https://www.themoviedb.org/movie/1494621') {
+      return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-13T15:12:00Z', source: 'India Today',
+        sourceUrl: 'https://www.indiatoday.in/movies/regional-cinema/story/nandamuri-balakrishna-dada-title-glimpse-retro-king-of-chaos-december-24-2026-2988833-2026-09-07',
+        message: 'The makers identify NBK111 as Dada and announced a 24 December theatrical release. This older observation has no verified region, event type or stored title identity and remains hidden.' };
+    }
+  }
   if (row.origin === 'tmdb_upcoming' && Number(row.tmdb_id) === 310209 && row.media_type === 'tv' &&
       row.entry_type === 'Show' && row.language === 'ko' && row.title === 'Nine to Six' && row.release_date === '2026-11-11' &&
       row.source_url === 'https://www.themoviedb.org/tv/310209') {

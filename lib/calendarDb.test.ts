@@ -18,6 +18,15 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it.each([
+    ['OM Chapter 1: Udhiram - The Blood Wood', 'ta', '2026-11-26', 1384528],
+    ['OM Chapter 1: Udhiram - The Blood Wood', 'ta', '2026-11-27', 1384528],
+    ['NBK111', 'te', '2026-12-11', 1494621],
+  ])('keeps the old unverified %s observation hidden after conflict review', async (title, language, release_date, sourceId) => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: null, media_type: null, title, language, release_date,
+      source_url: `https://www.themoviedb.org/movie/${sourceId}`, event_region: null, evidence: null, platform_or_distributor: null });
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, release_date.slice(0, 7), 'IN')).toEqual([]);
+  });
   it('keeps independent regional reporting after a matching TMDB refresh without changing its observation time', async () => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 1735403, title: 'Brindavihari', language: 'kn',
       release_date: '2026-11-20', source_url: 'https://www.themoviedb.org/movie/1735403', event_region: 'IN', platform_or_distributor: null,
