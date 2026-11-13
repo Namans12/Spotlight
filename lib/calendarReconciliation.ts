@@ -8,6 +8,13 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'district_in' && Number(row.tmdb_id) === 1720486 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.platform_or_distributor == null && row.language === 'en' && row.title === 'Lilo & Scratch' && row.release_date === '2026-11-25' &&
+      row.source_url === 'https://www.district.in/movies/lilo-scratch-movie-tickets-in-hyderabad-MV231108') {
+    return { type: 'corroboration' as const, checkedAt: '2026-11-13T20:26:00Z', source: 'The Walt Disney Company',
+      sourceUrl: 'https://thewaltdisneycompany.com/news/animation-annecy-2026-announcements/',
+      message: 'Disney describes this as an animated short playing with Hexed. The 25 November date and whether it accompanies local screenings in India remain unconfirmed; check the cinema listing.' };
+  }
   if (Number(row.tmdb_id) === 1450342 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
       row.platform_or_distributor == null && row.language === 'te' && row.title === 'Bhogi' &&
       ((row.origin === 'wikipedia' && row.release_date === '2026-11-21' && row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') ||

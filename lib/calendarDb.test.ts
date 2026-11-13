@@ -18,6 +18,15 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('explains that Lilo & Scratch is a short without asserting an India date', async () => {
+    const item = editorial({ origin: 'district_in', tmdb_id: 1720486, title: 'Lilo & Scratch', language: 'en', release_date: '2026-11-25',
+      source_url: 'https://www.district.in/movies/lilo-scratch-movie-tickets-in-hyderabad-MV231108', event_region: null, evidence: null, platform_or_distributor: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry).toMatchObject({ region: null, kind: 'unknown', evidenceStatus: 'unverified' });
+    expect(entry.dateCorroboration?.message).toContain('short playing with Hexed');
+    const [changed] = await getCalendarMonth(db([], [{ ...item, release_date: '2026-11-26' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(changed.dateCorroboration).toBeNull();
+  });
   it.each([
     ['wikipedia', '2026-11-21', 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026'],
     ['tmdb_upcoming', '2026-11-30', 'https://www.themoviedb.org/movie/1450342'],
