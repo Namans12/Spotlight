@@ -4,6 +4,8 @@ Run `npm run evaluate:tonight` to compare the existing Tonight ranking with the 
 
 These examples are synthetic regression probes, constructed to check that a negative genre signal changes ordering and that watched or unavailable feedback does not penalize a genre. They are not independent user judgments, production traffic, or evidence of improved satisfaction. The current expected MRR is 0.75 for the baseline and 1.00 with feedback on these four constructed examples.
 
+On 13 November 2026, a signed-in browser session on the deployed site generated live catalogue options, saved one previously unsaved option, verified it in the watchlist after reload, and removed it again; the removal persisted after reload. This is a smoke test of one save path, not an evaluation of recommendation quality, all filters, or a user study.
+
 Each case also reports precision among up to the first three eligible options, the fraction of labelled relevant titles present in the eligible set, and the eligible count. The paired comparison rejects mismatched or duplicate eligible identities. Keys distinguish movies from TV shows. Coverage is null when no relevant titles have been labelled; a missing label is not evidence of a dislike.
 
 Feedback stays in the current page session and is not sent to a server. A meaningful quality comparison would require a larger independently labelled, representative set or an explicitly opt-in user study, with the same eligibility constraints for both rankings and attention to coverage as well as ranking quality.
