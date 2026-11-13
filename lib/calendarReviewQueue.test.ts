@@ -21,6 +21,14 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('flags a TMDB source identity mismatch even when evidence is absent', () => {
+    const item = row({ origin: 'tmdb_upcoming', tmdb_id: 674527, media_type: 'movie', entry_type: 'Show', title: 'Student of the Year 3',
+      release_date: '2026-12-25', source_url: 'https://www.themoviedb.org/tv/334412', evidence: null });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-13T22:00:00Z'));
+    expect(review.reasons).toEqual(expect.arrayContaining(['unreviewed', 'identity_conflict', 'region_unknown']));
+    const [matching] = buildCalendarReviewQueue([{ ...item, source_url: 'https://www.themoviedb.org/movie/674527' }], new Date('2026-11-13T22:00:00Z'));
+    expect(matching.reasons).not.toContain('identity_conflict');
+  });
   it('surfaces evidence for the same TMDB identity and date without assigning its region', () => {
     const candidate = row({ id: 1, origin: 'tmdb_upcoming', tmdb_id: 1704200, title: 'Hail Mary', language: 'ml', release_date: '2026-11-26',
       source_url: 'https://www.themoviedb.org/movie/1704200', platform_or_distributor: null, event_region: null, evidence: null });

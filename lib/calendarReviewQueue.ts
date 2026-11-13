@@ -74,7 +74,10 @@ export function buildCalendarReviewQueue(rows: ReviewQueueRow[], now: Date): Rev
         typeof evidence.source_url !== 'string' || !evidence.source_url.startsWith('https://') ||
         (tmdbClaim && (row.tmdb_id == null || (row.media_type !== 'movie' && row.media_type !== 'tv') ||
           (typeof evidence.source_url === 'string' && !evidence.source_url.startsWith('https://www.themoviedb.org/')))))) reasons.push('evidence_incomplete');
-    if ((review && 'identityMismatch' in review && review.identityMismatch) || (evidence && row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
+    const tmdbSourceConflict = row.origin === 'tmdb_upcoming' && row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
+      typeof row.source_url === 'string' && /^https:\/\/www\.themoviedb\.org\/(?:movie|tv)\/\d+$/.test(row.source_url) &&
+      row.source_url !== `https://www.themoviedb.org/${row.media_type}/${row.tmdb_id}`;
+    if (tmdbSourceConflict || (review && 'identityMismatch' in review && review.identityMismatch) || (evidence && row.tmdb_id != null && (row.media_type === 'movie' || row.media_type === 'tv') &&
         typeof evidence.source_url === 'string' && evidence.source_url.startsWith('https://www.themoviedb.org/') &&
         evidence.source_url !== `https://www.themoviedb.org/${row.media_type}/${row.tmdb_id}`)) reasons.push('identity_conflict');
     const evidenceObservedAt = typeof evidence?.observed_at === 'string' ? evidence.observed_at : null;
