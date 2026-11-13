@@ -21,6 +21,16 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it.each([
+    ['wikipedia', '2026-11-21', 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026'],
+    ['tmdb_upcoming', '2026-11-30', 'https://www.themoviedb.org/movie/1450342'],
+  ])('retains the unconfirmed Bhogi observation from %s for review', (origin, release_date, source_url) => {
+    const item = row({ origin, tmdb_id: 1450342, title: 'Bhogi', language: 'te', release_date, source_url, platform_or_distributor: null });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-13T19:00:00Z'));
+    expect(review.region).toBeNull();
+    expect(review.reviewSourceUrl).toContain('telanganatoday.com');
+    expect(review.reasons).toContain('region_unknown');
+  });
   it('flags the wrong stored Love & War identity while exposing the reviewed match', () => {
     const item = row({ origin: 'district_in', tmdb_id: 1555752, title: 'Love & War', language: 'en', release_date: '2027-01-21',
       source_url: 'https://www.district.in/movies/love-war-movie-tickets-in-hyderabad-MV169730', event_region: null, evidence: null, platform_or_distributor: null });

@@ -8,6 +8,14 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (Number(row.tmdb_id) === 1450342 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.platform_or_distributor == null && row.language === 'te' && row.title === 'Bhogi' &&
+      ((row.origin === 'wikipedia' && row.release_date === '2026-11-21' && row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') ||
+       (row.origin === 'tmdb_upcoming' && row.release_date === '2026-11-30' && row.source_url === 'https://www.themoviedb.org/movie/1450342'))) {
+    return { type: 'corroboration' as const, suppressEvent: true, checkedAt: '2026-11-13T18:57:00Z', source: 'Telangana Today',
+      sourceUrl: 'https://telanganatoday.com/bhogi-release-postponed-due-to-unforeseen-delays-says-production-house',
+      message: 'The production house announced a postponement and said a new date will be announced. This later dated observation is unverified and remains hidden pending an official update.' };
+  }
   if (row.origin === 'district_in' && Number(row.tmdb_id) === 1555752 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
       row.platform_or_distributor == null && row.language === 'en' && row.title === 'Love & War' && row.release_date === '2027-01-21' &&
       row.source_url === 'https://www.district.in/movies/love-war-movie-tickets-in-hyderabad-MV169730') {
@@ -530,5 +538,5 @@ export function reviewedTmdbReviewAfterEvidence(row: Parameters<typeof reviewedC
     ? row.event_region === 'IN' && evidence.region === 'IN' && evidence.date_source === 'tmdb_regional_theatrical'
     : row.media_type === 'tv' && row.event_region == null && evidence.region == null && evidence.date_source === 'tmdb_global_first_air';
   if (!sameEvent) return null;
-  return review?.type === 'conflict' ? review : null;
+  return review?.type === 'conflict' || (review?.type === 'corroboration' && 'suppressEvent' in review && review.suppressEvent) ? review : null;
 }

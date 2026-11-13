@@ -18,6 +18,22 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it.each([
+    ['wikipedia', '2026-11-21', 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026'],
+    ['tmdb_upcoming', '2026-11-30', 'https://www.themoviedb.org/movie/1450342'],
+  ])('hides an unconfirmed Bhogi date from %s after the postponement', async (origin, release_date, source_url) => {
+    const item = editorial({ origin, tmdb_id: 1450342, title: 'Bhogi', language: 'te', release_date,
+      source_url, event_region: null, evidence: null, platform_or_distributor: null });
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+    const [changed] = await getCalendarMonth(db([], [{ ...item, origin: 'csv_seed' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(changed).toBeDefined();
+  });
+  it('keeps an unconfirmed Bhogi date hidden after a matching TMDB refresh', async () => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 1450342, title: 'Bhogi', language: 'te', release_date: '2026-11-30',
+      source_url: 'https://www.themoviedb.org/movie/1450342', event_region: 'IN', platform_or_distributor: null,
+      evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1450342' } });
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+  });
   it('corrects a wrong Love & War identity without reusing its poster and merges matching evidence', async () => {
     const district = editorial({ origin: 'district_in', tmdb_id: 1555752, title: 'Love & War', language: 'en', release_date: '2027-01-21',
       source_url: 'https://www.district.in/movies/love-war-movie-tickets-in-hyderabad-MV169730', event_region: null, evidence: null,
