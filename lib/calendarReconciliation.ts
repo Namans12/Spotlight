@@ -22,6 +22,9 @@ export function reviewedCalendarEntry(row: {
       { id: 1263040, title: 'The Pride of Bharat: Chhatrapati Shivaji Maharaj', language: 'kn', date: '2027-01-21', source: 'Hindustan Times / PTI',
         url: 'https://www.hindustantimes.com/entertainment/bollywood/bhushan-kumar-rishab-shetty-collaborate-on-two-part-chhatrapati-shivaji-maharaj-biopic-101793341647318.html',
         message: 'A later studio announcement says filming is planned for early 2027, putting the previously announced 21 January release in doubt. The old date remains hidden pending a current release announcement.' },
+      { id: 1590846, title: 'V. Shantaram', language: 'hi', date: '2026-11-18', source: 'Bollywood Hungama',
+        url: 'https://www.bollywoodhungama.com/news/bollywood/exclusive-v-shantaram-biopic-starring-siddhant-chaturvedi-and-tamannaah-bhatia-pushed-to-2027-director-reveals-reason-for-delay/',
+        message: 'The director said filming was moved to 2027, conflicting with the earlier 18 November 2026 release target. This date remains hidden pending a current release announcement.' },
     ].find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language && row.release_date === item.date &&
       row.source_url === `https://www.themoviedb.org/movie/${item.id}`);
     if (postponed) return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-13T20:39:00Z',
