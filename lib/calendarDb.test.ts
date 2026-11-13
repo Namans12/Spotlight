@@ -22,6 +22,7 @@ describe('calendar event identity', () => {
     [1214368, 'Golmaal 5', 'hi', '2026-12-04'],
     [1257973, 'Fauzi', 'te', '2026-12-03'],
     [1525648, 'Inji Vellam', 'ta', '2027-01-08'],
+    [1263040, 'The Pride of Bharat: Chhatrapati Shivaji Maharaj', 'kn', '2027-01-21'],
   ])('keeps the superseded %s observation hidden even after matching TMDB evidence', async (id, title, language, release_date) => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date,
       source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });

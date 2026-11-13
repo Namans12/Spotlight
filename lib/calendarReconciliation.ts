@@ -19,6 +19,9 @@ export function reviewedCalendarEntry(row: {
       { id: 1525648, title: 'Inji Vellam', language: 'ta', date: '2027-01-08', source: 'The Indian Express',
         url: 'https://indianexpress.com/article/entertainment/tamil/mani-ratnam-vijay-sethupathi-sai-pallavi-inji-vellam-gets-release-date-10959097/',
         message: 'Reporting on the makers’ announcement gives 29 January for the theatrical release. This older 8 January observation remains hidden; check local showtimes separately.' },
+      { id: 1263040, title: 'The Pride of Bharat: Chhatrapati Shivaji Maharaj', language: 'kn', date: '2027-01-21', source: 'Hindustan Times / PTI',
+        url: 'https://www.hindustantimes.com/entertainment/bollywood/bhushan-kumar-rishab-shetty-collaborate-on-two-part-chhatrapati-shivaji-maharaj-biopic-101793341647318.html',
+        message: 'A later studio announcement says filming is planned for early 2027, putting the previously announced 21 January release in doubt. The old date remains hidden pending a current release announcement.' },
     ].find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language && row.release_date === item.date &&
       row.source_url === `https://www.themoviedb.org/movie/${item.id}`);
     if (postponed) return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-13T20:39:00Z',
