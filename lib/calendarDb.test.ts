@@ -369,6 +369,10 @@ describe('calendar event identity', () => {
     ['Legacy', 'te', 1436202, '2026-12-04'],
     ['Pocket Rockkets', 'te', 1783023, '2026-12-11'],
     ['Mayan: Chapter 1', 'ml', 1654912, '2026-12-03'],
+    ['Vrushakarma', 'te', 1395627, '2026-12-04'],
+    ['Dada', 'te', 1494621, '2026-12-24'],
+    ['King 100', 'te', 1511403, '2026-12-24'],
+    ['Reality', 'te', 1443139, '2026-12-25'],
   ])('merges the reviewed unlinked %s observation without inferring changed rows', async (title, language, id, date) => {
     const source = `https://en.wikipedia.org/wiki/List_of_${language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_2026`;
     const base = editorial({ id: 1, origin: 'wikipedia', tmdb_id: null, media_type: 'movie', title, language, release_date: date,

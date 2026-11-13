@@ -149,6 +149,14 @@ export function reviewedCalendarEntry(row: {
         sourceUrl: 'https://www.cinemaexpress.com/telugu/news/2026/Nov/03/niharika-konidelas-pocket-rockkets-locks-release-date' },
       { title: 'Mayan: Chapter 1', language: 'ml', date: '2026-12-03', id: 1654912, checkedAt: '2026-11-13T14:47:00Z',
         sourceUrl: 'https://simplymollywood.com/movies/december-2026-malayalam-releases-mayan-padayaatra-athimanoharam-iffk', source: 'Simply Mollywood' },
+      { title: 'Vrushakarma', language: 'te', date: '2026-12-04', id: 1395627, checkedAt: '2026-11-13T14:51:00Z',
+        sourceUrl: 'https://telanganatoday.com/naga-chaitanyas-vrushakarma-set-for-december-4-release', source: 'Telangana Today' },
+      { title: 'Dada', language: 'te', date: '2026-12-24', id: 1494621, checkedAt: '2026-11-13T14:51:00Z',
+        sourceUrl: 'https://www.indiatoday.in/movies/regional-cinema/story/nandamuri-balakrishna-dada-title-glimpse-retro-king-of-chaos-december-24-2026-2988833-2026-09-07', source: 'India Today' },
+      { title: 'King 100', language: 'te', date: '2026-12-24', id: 1511403, checkedAt: '2026-11-13T14:51:00Z',
+        sourceUrl: 'https://indianexpress.com/article/entertainment/telugu/nagarjuna-tabu-film-king-100-glimpse-blends-action-with-emotion-10855355/', source: 'The Indian Express' },
+      { title: 'Reality', language: 'te', date: '2026-12-25', id: 1443139, checkedAt: '2026-11-13T14:51:00Z',
+        sourceUrl: 'https://www.newindianexpress.com/entertainment/entertainment-news/2026/Oct/06/telugunews2026oct05kiran-abbavarams-directorial-debut-titled-reality-locks-release-date', source: 'The New Indian Express' },
     ].find(item => row.title === item.title && row.language === item.language && row.release_date === item.date &&
       row.source_url === `https://en.wikipedia.org/wiki/List_of_${item.language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_2026`);
     if (reviewed) return { type: 'regional' as const, region: 'IN', reviewedTmdbId: reviewed.id, checkedAt: reviewed.checkedAt,
