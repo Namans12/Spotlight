@@ -8,6 +8,13 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'district_in' && Number(row.tmdb_id) === 1735225 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.platform_or_distributor == null && row.language === 'kn' && row.title === 'Tamma Sukhagamana Bayasuva' && row.release_date === '2026-12-25' &&
+      row.source_url === 'https://www.district.in/movies/tamma-sukhagamana-bayasuva-movie-tickets-in-hyderabad-MV226322') {
+    return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T20:29:00Z', source: 'BookMyShow',
+      sourceUrl: 'https://in.bookmyshow.com/movies/koraput/tamma-sukhagamana-bayasuva/ET00488629',
+      message: 'BookMyShow lists the Kannada film for 25 December in India; its director and cast match TMDB. Bookings were not open when checked; showtimes and streaming availability remain unconfirmed.' };
+  }
   if (row.origin === 'district_in' && Number(row.tmdb_id) === 1720486 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
       row.platform_or_distributor == null && row.language === 'en' && row.title === 'Lilo & Scratch' && row.release_date === '2026-11-25' &&
       row.source_url === 'https://www.district.in/movies/lilo-scratch-movie-tickets-in-hyderabad-MV231108') {

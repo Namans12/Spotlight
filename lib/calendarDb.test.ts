@@ -18,6 +18,16 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('scopes the reviewed Tamma Sukhagamana Bayasuva cinema listing to India', async () => {
+    const item = editorial({ origin: 'district_in', tmdb_id: 1735225, title: 'Tamma Sukhagamana Bayasuva', language: 'kn', release_date: '2026-12-25',
+      source_url: 'https://www.district.in/movies/tamma-sukhagamana-bayasuva-movie-tickets-in-hyderabad-MV226322', event_region: null, evidence: null, platform_or_distributor: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-12', 'IN');
+    expect(entry).toMatchObject({ region: 'IN', tmdbId: 1735225, kind: 'theatrical' });
+    expect(entry.dateCorroboration?.source).toBe('BookMyShow');
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-12', 'US')).toEqual([]);
+    const [changed] = await getCalendarMonth(db([], [{ ...item, release_date: '2026-12-26' }]) as unknown as postgres.Sql, '2026-12', 'IN');
+    expect(changed.region).toBeNull();
+  });
   it('explains that Lilo & Scratch is a short without asserting an India date', async () => {
     const item = editorial({ origin: 'district_in', tmdb_id: 1720486, title: 'Lilo & Scratch', language: 'en', release_date: '2026-11-25',
       source_url: 'https://www.district.in/movies/lilo-scratch-movie-tickets-in-hyderabad-MV231108', event_region: null, evidence: null, platform_or_distributor: null });
