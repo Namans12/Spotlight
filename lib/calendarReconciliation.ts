@@ -19,6 +19,15 @@ export function reviewedCalendarEntry(row: {
       { id: 1504630, title: 'Mysaa', language: 'te', date: '2026-11-27', source: 'NDTV / Rashmika Mandanna',
         url: 'https://www.ndtv.com/entertainment/after-recovery-from-hip-injury-rashmika-mandanna-announces-mysaa-release-date-11986338',
         message: 'The lead actor announced a worldwide 27 November cinema release. Check local showtimes; streaming availability is not established.' },
+      { id: 1555984, title: 'Prempaatta', language: 'ml', date: '2026-11-27', source: 'Cinema Express',
+        url: 'https://www.cinemaexpress.com/amp/story/malayalam/news/2026/Oct/14/joemon-jyothir-starrer-prempaatta-moves-out-of-october-makers-announce-new-release-date',
+        message: 'The makers announced a 27 November theatrical release after moving it from October. Check local showtimes; streaming availability is not established.' },
+      { id: 1417808, title: 'Haindava', language: 'te', date: '2026-11-27', source: 'Cinema Express',
+        url: 'https://www.cinemaexpress.com/telugu/news/2026/Oct/14/bellamkonda-sai-sreenivas-haindava-teaser-unveiled-release-date-announced',
+        message: 'The makers announced a 27 November theatrical release. Check local showtimes; streaming availability is not established.' },
+      { id: 1553480, title: 'Niram', language: 'ta', date: '2026-11-27', source: 'Tamil Film Active Producers Association',
+        url: 'https://tfapa.com/wp-content/uploads/2026/11/trade-guide-nov-2026.pdf',
+        message: 'The producers association lists a tentative 27 November theatrical release. Check local showtimes; streaming availability is not established.' },
     ].find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language && row.release_date === item.date &&
       row.source_url === `https://www.themoviedb.org/movie/${item.id}`);
     if (announcement) return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T20:50:00Z',

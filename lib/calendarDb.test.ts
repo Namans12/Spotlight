@@ -22,6 +22,9 @@ describe('calendar event identity', () => {
     [1381071, 'Godzilla Minus Zero', 'ja', '2026-11-20', 'PVR INOX Pictures / Bollywood Hungama'],
     [1510775, 'Gunmaaster G9', 'hi', '2026-11-27', 'Soham Rockstar Entertainment'],
     [1504630, 'Mysaa', 'te', '2026-11-27', 'NDTV / Rashmika Mandanna'],
+    [1555984, 'Prempaatta', 'ml', '2026-11-27', 'Cinema Express'],
+    [1417808, 'Haindava', 'te', '2026-11-27', 'Cinema Express'],
+    [1553480, 'Niram', 'ta', '2026-11-27', 'Tamil Film Active Producers Association'],
   ])('limits independently confirmed theatrical date for %s to the matching observation and region', async (id, title, language, release_date, source) => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date,
       source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });
