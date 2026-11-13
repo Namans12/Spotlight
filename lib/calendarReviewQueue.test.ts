@@ -35,6 +35,7 @@ describe('calendar reconciliation queue', () => {
     [1263040, 'The Pride of Bharat: Chhatrapati Shivaji Maharaj', 'kn', '2027-01-21'],
     [1590846, 'V. Shantaram', 'hi', '2026-11-18'],
     [1569625, 'Mauja Hi Mauja', 'hi', '2026-12-04'],
+    [1569041, 'Padayaatra', 'ml', '2026-12-04'],
   ])('retains the superseded %s date for review', (id, title, language, release_date) => {
     const item = row({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date, platform_or_distributor: null,
       source_url: `https://www.themoviedb.org/movie/${id}` });

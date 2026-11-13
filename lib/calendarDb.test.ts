@@ -62,6 +62,7 @@ describe('calendar event identity', () => {
     [1263040, 'The Pride of Bharat: Chhatrapati Shivaji Maharaj', 'kn', '2027-01-21'],
     [1590846, 'V. Shantaram', 'hi', '2026-11-18'],
     [1569625, 'Mauja Hi Mauja', 'hi', '2026-12-04'],
+    [1569041, 'Padayaatra', 'ml', '2026-12-04'],
   ])('keeps the superseded %s observation hidden even after matching TMDB evidence', async (id, title, language, release_date) => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date,
       source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });

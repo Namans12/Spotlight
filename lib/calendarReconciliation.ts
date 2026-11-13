@@ -8,6 +8,13 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'tmdb_upcoming' && Number(row.tmdb_id) === 1569041 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.title === 'Padayaatra' && row.language === 'ml' && row.release_date === '2026-12-04' && row.platform_or_distributor == null &&
+      row.source_url === 'https://www.themoviedb.org/movie/1569041') {
+    return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-13T21:14:00Z', source: 'Cinema Express',
+      sourceUrl: 'https://www.cinemaexpress.com/malayalam/news/2026/Oct/21/mammootty-adoor-gopalakrishnan-film-padayaatra-gets-release-date',
+      message: 'Reports disagree: this source gives 5 December, while other reporting on the producer’s poster gives 4 December. The date remains hidden pending direct confirmation of the announcement.' };
+  }
   if (row.origin === 'tmdb_upcoming' && Number(row.tmdb_id) === 335981 && row.media_type === 'tv' && row.entry_type === 'Show' &&
       row.title === 'Cunk on Cinema' && row.language === 'en' && row.release_date === '2026-11-30' &&
       row.platform_or_distributor === 'BBC Two' && row.source_url === 'https://www.themoviedb.org/tv/335981') {
