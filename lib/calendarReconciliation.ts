@@ -17,6 +17,20 @@ export function reviewedCalendarEntry(row: {
   }
   if (row.origin === 'district_in' && row.media_type === 'movie' && row.entry_type === 'Movie' &&
       row.platform_or_distributor == null && row.release_date === '2026-12-31') {
+    const undated = [
+      { id: 1411614, title: 'Raaka', language: 'te', slug: 'raaka', key: 'MV218847', source: 'Telugu Cinema',
+        url: 'https://telugucinema.com/news/allu-arjun-and-atlees-raaka-heres-the-latest-on-the-release-date',
+        message: 'The director has not confirmed a release date; reporting describes a late-2027 target. The original listing now says coming soon. This old 31 December date remains hidden.' },
+      { id: 1389373, title: 'Rowdy Janardhana', language: 'te', slug: 'rowdy-janardhana', key: 'MV212225', source: 'The Hollywood Reporter India',
+        url: 'https://www.hollywoodreporterindia.com/amp/story/features/insight/rowdy-janardhana-vijay-deverakondas-next-film-gets-a-title-teaser',
+        message: 'The makers announced December 2026 without a specific day, and the original listing now gives only the month. This old 31 December date remains hidden.' },
+      { id: 1562979, title: 'Dharman', language: 'ta', slug: 'dharman', key: 'MV226468', source: 'India Today',
+        url: 'https://www.indiatoday.in/movies/regional-cinema/story/nayanthara-reunites-with-rajinikanth-after-5-years-in-kamal-haasans-dharman-3024932-2026-10-26',
+        message: 'Reporting says the makers have not announced a release date; different 2027 dates have been reported. This old 31 December 2026 date remains hidden.' },
+    ].find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language &&
+      row.source_url === `https://www.district.in/movies/${item.slug}-movie-tickets-in-hyderabad-${item.key}`);
+    if (undated) return { type: 'corroboration' as const, suppressEvent: true, checkedAt: '2026-11-13T15:25:00Z',
+      source: undated.source, sourceUrl: undated.url, message: undated.message };
     if (Number(row.tmdb_id) === 1387155 && row.language === 'hi' && row.title === 'Mahavatar' &&
         row.source_url === 'https://www.district.in/movies/mahavatar-movie-tickets-in-hyderabad-MV183233') {
       return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-13T15:23:00Z', source: 'Bollywood Hungama',

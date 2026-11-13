@@ -27,6 +27,9 @@ describe('calendar event identity', () => {
     expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2027-01', 'US')).toEqual([]);
   });
   it.each([
+    [1411614, 'Raaka', 'te', 'raaka', 'MV218847'],
+    [1389373, 'Rowdy Janardhana', 'te', 'rowdy-janardhana', 'MV212225'],
+    [1562979, 'Dharman', 'ta', 'dharman', 'MV226468'],
     [1387155, 'Mahavatar', 'hi', 'mahavatar', 'MV183233'],
     [1475768, 'Maatrubhumi: May War Rest in Peace', 'hi', 'maatrubhumi-may-war-rest-in-peace', 'MV201390'],
     [1469537, 'Slumdog: 33 Temple Road', 'ta', 'slumdog-33-temple-road', 'MV213661'],
