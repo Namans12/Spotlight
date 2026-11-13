@@ -18,6 +18,23 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('keeps independent regional reporting after a matching TMDB refresh without changing its observation time', async () => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 1735403, title: 'Brindavihari', language: 'kn',
+      release_date: '2026-11-20', source_url: 'https://www.themoviedb.org/movie/1735403', event_region: 'IN', platform_or_distributor: null,
+      evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1735403', observed_at: '2026-11-12T01:00:00Z' } });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry.dateCorroboration?.source).toBe('BookMyShow');
+    expect(entry.dateCorroboration?.checkedAt).toBe('2026-11-13T15:02:00Z');
+    expect(entry.observedAt).toBe('2026-11-12T01:00:00Z');
+    for (const evidence of [
+      { ...item.evidence, region: 'US' },
+      { ...item.evidence, date_source: 'tmdb_regional_digital' },
+      { ...item.evidence, source_url: 'https://www.themoviedb.org/movie/999' },
+    ]) {
+      const [other] = await getCalendarMonth(db([], [{ ...item, evidence }]) as unknown as postgres.Sql, '2026-11', 'IN');
+      expect(other.dateCorroboration).toBeNull();
+    }
+  });
   it('distinguishes the reviewed Mrigaya cinema listing from its earlier streaming date', async () => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 1636756, title: 'Mrigaya 1.5: The Hunt Continues', language: 'bn',
       release_date: '2026-11-20', source_url: 'https://www.themoviedb.org/movie/1636756', event_region: null, evidence: null, platform_or_distributor: null });

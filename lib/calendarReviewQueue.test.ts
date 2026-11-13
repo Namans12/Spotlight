@@ -21,6 +21,17 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('keeps regional review and source freshness separate after a TMDB refresh', () => {
+    const item = row({ origin: 'tmdb_upcoming', tmdb_id: 1735403, title: 'Brindavihari', language: 'kn', release_date: '2026-11-20',
+      source_url: 'https://www.themoviedb.org/movie/1735403', platform_or_distributor: null, event_region: 'IN',
+      evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1735403', observed_at: '2026-10-01T00:00:00Z' } });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-13T16:00:00Z'));
+    expect(review.reasons).toContain('evidence_stale');
+    expect(review.reasons).not.toContain('review_stale');
+    expect(review.reviewSourceUrl).toContain('bookmyshow.com');
+    expect(review.evidenceObservedAt).toBe('2026-10-01T00:00:00Z');
+    expect(review.reviewCheckedAt).toBe('2026-11-13T15:02:00Z');
+  });
   it('distinguishes the missing stored identity from the reviewed match', () => {
     const item = row({ origin: 'wikipedia', tmdb_id: null, title: 'Aakasamlo Oka Tara', language: 'te', release_date: '2026-11-20',
       source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', platform_or_distributor: null });

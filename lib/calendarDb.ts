@@ -1,7 +1,7 @@
 import type postgres from "postgres";
 import type { CalendarEntryDTO } from "../shared/types/calendar.js";
 import { classifyPlatform, isKnownStreamer, mediaTypeFromEntryType, normalizePlatforms, splitPlatformField } from "../shared/platforms.js";
-import { reviewedCalendarEntry, reviewedTmdbConflictAfterEvidence } from "./calendarReconciliation.js";
+import { reviewedCalendarEntry, reviewedTmdbReviewAfterEvidence } from "./calendarReconciliation.js";
 import { reviewFreshness } from "../shared/calendarFreshness.js";
 import { hasUnverifiedEditorialTmdbIdentity, reviewedEditorialDateConflict, reviewedEditorialTmdbIdentity } from "./calendarIdentity.js";
 
@@ -116,7 +116,7 @@ export async function getCalendarMonth(sql: postgres.Sql, month: string, region 
     const reviewRow = { origin: row.origin, tmdb_id: row.tmdb_id, media_type: row.media_type,
       title: row.title, release_date: String(row.release_date), source_url: row.source_url,
       event_region: row.event_region, evidence: row.evidence, platform_or_distributor: row.platform_or_distributor, entry_type: row.entry_type, language: row.language };
-    const review = reviewedCalendarEntry(reviewRow) ?? reviewedTmdbConflictAfterEvidence(reviewRow);
+    const review = reviewedCalendarEntry(reviewRow) ?? reviewedTmdbReviewAfterEvidence(reviewRow);
     if (review && 'suppressEvent' in review && review.suppressEvent) continue;
     // The SQL includes unverified TMDB candidates so exact manual reviews can
     // be applied. Never expose the rest merely because they were fetched.
@@ -153,7 +153,7 @@ export async function getCalendarMonth(sql: postgres.Sql, month: string, region 
       posterUrl: suppressTitleLink || (row.tmdb_id == null && review && 'reviewedTmdbId' in review) ? null : row.poster_url ?? null, rating: null, overview: row.details,
       origin: "csv_seed", originRegion: row.origin_region ?? null, originReleaseDate: row.origin_release_date ?? null,
       source: review?.type === 'regional' ? [row.source, review.source].filter(Boolean).join(' / ') : (regionalEvidence || globalPremiere) && row.source && row.source.toLowerCase() !== 'tmdb' ? `${row.source} / TMDB` : row.source ?? null, sourceUrl: row.source_url ?? null,
-      observedAt: review?.type === 'regional' ? review.checkedAt : regionalEvidence || globalPremiere ? row.evidence?.observed_at ?? null : null, availabilityTypes: null,
+      observedAt: regionalEvidence || globalPremiere ? row.evidence?.observed_at ?? null : review?.type === 'regional' ? review.checkedAt : null, availabilityTypes: null,
       evidenceStatus: globalPremiere ? "global" : regionalEvidence || review?.type === 'regional' ? "regional" : "unverified",
       reviewFreshness: review ? reviewFreshness(review.checkedAt) : identityReview ? reviewFreshness(identityReview.checkedAt) : identityDateConflict ? reviewFreshness(identityDateConflict.checkedAt) : null,
       seasonPremiere: review?.type === 'season' ? review : null,
