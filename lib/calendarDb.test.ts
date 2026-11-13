@@ -18,6 +18,16 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('scopes the independently reported Children of Blood and Bone cinema date to India', async () => {
+    const item = editorial({ origin: 'district_in', tmdb_id: 621304, title: 'Children of Blood and Bone', language: 'en', release_date: '2027-01-15',
+      source_url: 'https://www.district.in/movies/children-of-blood-and-bone-movie-tickets-in-hyderabad-MV227336', event_region: null, evidence: null, platform_or_distributor: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2027-01', 'IN');
+    expect(entry).toMatchObject({ region: 'IN', tmdbId: 621304, kind: 'theatrical' });
+    expect(entry.dateCorroboration?.source).toBe('Glamsham');
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2027-01', 'US')).toEqual([]);
+    const [changed] = await getCalendarMonth(db([], [{ ...item, release_date: '2027-01-14' }]) as unknown as postgres.Sql, '2027-01', 'IN');
+    expect(changed.region).toBeNull();
+  });
   it('shows the independently reviewed India release for Khashaba', async () => {
     const item = editorial({ origin: 'district_in', tmdb_id: 1216701, title: 'Khashaba', language: 'mr', release_date: '2027-01-01',
       source_url: 'https://www.district.in/movies/khashaba-movie-tickets-in-hyderabad-MV227187', event_region: null, evidence: null, platform_or_distributor: null });

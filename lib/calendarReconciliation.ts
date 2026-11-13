@@ -8,6 +8,13 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'district_in' && Number(row.tmdb_id) === 621304 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.platform_or_distributor == null && row.language === 'en' && row.title === 'Children of Blood and Bone' && row.release_date === '2027-01-15' &&
+      row.source_url === 'https://www.district.in/movies/children-of-blood-and-bone-movie-tickets-in-hyderabad-MV227336') {
+    return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T18:38:00Z', source: 'Glamsham',
+      sourceUrl: 'https://glamsham.com/hollywood/entertainment-news/children-of-blood-and-bone-trailer-fantasy-world-filled-magic-danger/',
+      message: 'Indian reporting lists a 15 January theatrical release; the director and cast match Paramount and TMDB. Check local showtimes; streaming availability remains unconfirmed.' };
+  }
   if (row.origin === 'district_in' && Number(row.tmdb_id) === 1216701 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
       row.platform_or_distributor == null && row.language === 'mr' && row.title === 'Khashaba' && row.release_date === '2027-01-01' &&
       row.source_url === 'https://www.district.in/movies/khashaba-movie-tickets-in-hyderabad-MV227187') {
