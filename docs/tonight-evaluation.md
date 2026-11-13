@@ -6,9 +6,13 @@ These examples are synthetic regression probes, constructed to check that a nega
 
 On 13 November 2026, a signed-in browser session on the deployed site generated live catalogue options, saved one previously unsaved option, verified it in the watchlist after reload, and removed it again; the removal persisted after reload. This is a smoke test of one save path, not an evaluation of recommendation quality, all filters, or a user study.
 
+On the same date, a live India-filtered session showed Netflix subscription matches; selecting Apple TV Store without paid offers produced no matches, while enabling rentals and purchases returned separately labelled rent/buy offers. Session feedback hid an option and could be cleared. These checks demonstrate the tested cases only; provider data can change and the checks are not judgments of recommendation relevance.
+
 Each case also reports precision among up to the first three eligible options, the fraction of labelled relevant titles present in the eligible set, and the eligible count. The paired comparison rejects mismatched or duplicate eligible identities. Keys distinguish movies from TV shows. Coverage is null when no relevant titles have been labelled; a missing label is not evidence of a dislike.
 
 Feedback stays in the current page session and is not sent to a server. A meaningful quality comparison would require a larger independently labelled, representative set or an explicitly opt-in user study, with the same eligibility constraints for both rankings and attention to coverage as well as ranking quality.
+
+One possible external research source is [MovieLens latest-small](https://files.grouplens.org/datasets/movielens/ml-latest-small-README.html), which contains historical, independently supplied movie ratings and TMDB links. Its licence prohibits commercial or revenue-bearing use without permission, and GroupLens describes it as a changing development dataset unsuitable for shared research results. Ratings are not Tonight's session feedback, omit TV and current India availability, and are affected by what people chose to rate. The dataset has not been imported or used here; assess the project's intended use and applicable licence before any experiment, and do not treat such an experiment as Spotlight user satisfaction.
 
 For a separately prepared local dataset, run `npm run evaluate:tonight -- --input path/to/cases.json`. A synthetic example is available at `docs/tonight-evaluation-example.json`. The file is read locally; the evaluator makes no network requests and sends no feedback or labels to a server. Do not include personal or identifying information in shared fixtures.
 
