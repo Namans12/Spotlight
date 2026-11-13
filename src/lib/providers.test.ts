@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchProvidersBatch } from './providers';
+import { fetchProvidersBatch, providerStaleTime } from './providers';
 vi.mock('@/lib/http', () => ({ fetchJson: vi.fn() }));
 import { fetchJson } from '@/lib/http';
 beforeEach(() => { vi.mocked(fetchJson).mockReset(); });
 
 describe('provider batch compatibility', () => {
+  it('makes incomplete data stale sooner than complete regional lookups', () => {
+    const batch = { providers: {}, runtimes: {}, genres: {} };
+    expect(providerStaleTime({ state: { data: batch } })).toBe(6 * 60 * 60_000);
+    expect(providerStaleTime({ state: { data: { ...batch, hadFailures: true } } })).toBe(60_000);
+  });
   it('leaves offer type unknown for a legacy cached provider response', async () => {
     vi.mocked(fetchJson).mockResolvedValue({ providers: { 'movie:1': ['Netflix'] }, runtimes: {}, genres: {} });
     const result = await fetchProvidersBatch([{ id: 1, mediaType: 'movie' }]);

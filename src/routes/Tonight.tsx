@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Sparkles } from 'lucide-react';
 import { getTrending, getPopularMovies, getPopularTV, getYouMayAlsoLike } from '@/lib/tmdb';
-import { fetchProvidersBatch, providerKey } from '@/lib/providers';
+import { fetchProvidersBatch, providerKey, providerStaleTime } from '@/lib/providers';
 import { buildPool } from '@/lib/duelPool';
 import { nextPair, recordPick, type DuelPick, type Weights } from '@/lib/duel';
 import { MOODS, rankTonight, type Mood, type TonightFilters } from '@/lib/tonight';
@@ -51,7 +51,7 @@ export default function Tonight() {
   [sourcesReady, wl.watchlist, wl.watchLater, wl.watchedKeys, recommended.data, trending.data, films.data, shows.data]);
   const cacheKey = pool.map(item => providerKey(item.mediaType, item.id)).sort().join(',');
   const details = useQuery({ queryKey: ['providers', cacheKey], queryFn: () => fetchProvidersBatch(pool),
-    enabled: pool.length > 0, staleTime: 6 * 60 * 60_000, retry: false });
+    enabled: pool.length > 0, staleTime: providerStaleTime, retry: false });
   const candidates = pool.map(item => ({ ...item,
     runtime: details.data?.runtimes[providerKey(item.mediaType, item.id)],
     genres: details.data?.genres[providerKey(item.mediaType, item.id)],

@@ -1,6 +1,6 @@
 import type { ProviderOffer } from '../../shared/types/availability';
 import { useQuery } from '@tanstack/react-query';
-import { fetchProvidersBatch, providerKey, type ProviderSubject } from '@/lib/providers';
+import { fetchProvidersBatch, providerKey, providerStaleTime, type ProviderSubject } from '@/lib/providers';
 
 /** What every grid actually needs: a title -> platform-list lookup. */
 export type ProvidersLookup = (mediaType: string, tmdbId: number) => string[] | undefined;
@@ -25,7 +25,7 @@ export function useProviders(items: ProviderSubject[]): ProvidersLookup {
     // Availability shifts (a title leaves/joins a service) but not by the
     // minute — long enough to spare a repeat grid view a refetch, short
     // enough that a licensing change shows up within the day.
-    staleTime: 6 * 60 * 60_000,
+    staleTime: providerStaleTime,
   });
 
   const map = query.data?.providers;
@@ -48,7 +48,7 @@ export function useRuntimes(items: ProviderSubject[]): RuntimeLookup {
     queryKey: ['providers', cacheKey],
     queryFn: () => fetchProvidersBatch(keys),
     enabled: keys.length > 0,
-    staleTime: 6 * 60 * 60_000,
+    staleTime: providerStaleTime,
   });
 
   const map = query.data?.runtimes;
@@ -69,7 +69,7 @@ export function useGenres(items: ProviderSubject[]): GenresLookup {
     queryKey: ['providers', cacheKey],
     queryFn: () => fetchProvidersBatch(keys),
     enabled: keys.length > 0,
-    staleTime: 6 * 60 * 60_000,
+    staleTime: providerStaleTime,
   });
 
   const map = query.data?.genres;
@@ -81,6 +81,6 @@ export function useAvailability(items: ProviderSubject[]): (mediaType: string, t
   const keys = items.map((item) => ({ mediaType: item.mediaType, id: item.id }));
   const cacheKey = keys.map((key) => providerKey(key.mediaType, key.id)).sort().join(',');
   const query = useQuery({ queryKey: ['providers', cacheKey], queryFn: () => fetchProvidersBatch(keys),
-    enabled: keys.length > 0, staleTime: 6 * 60 * 60_000 });
+    enabled: keys.length > 0, staleTime: providerStaleTime });
   return (mediaType, tmdbId) => query.data?.availability?.[providerKey(mediaType, tmdbId)];
 }

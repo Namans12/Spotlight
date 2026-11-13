@@ -12,7 +12,8 @@ vi.mock('@/contexts/watchlist-context', async () => {
 });
 import { watchlistStub, resetWatchlistStub } from '@/test/watchlistStub';
 
-vi.mock('@/lib/providers', () => ({
+vi.mock('@/lib/providers', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/providers')>(),
   fetchProvidersBatch: vi.fn(),
   providerKey: (mediaType: string, tmdbId: number) => `${mediaType}:${tmdbId}`,
 }));

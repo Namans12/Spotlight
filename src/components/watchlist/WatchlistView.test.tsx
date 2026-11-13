@@ -11,7 +11,8 @@ import type { WatchlistItem } from '@/types/movie';
 // the wiring — that the controls appear only when they can do something, that
 // picking one narrows the list, and that dragging is off while filtered.
 
-vi.mock('@/lib/providers', () => ({
+vi.mock('@/lib/providers', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/providers')>(),
   fetchProvidersBatch: vi.fn(),
   providerKey: (mediaType: string, tmdbId: number) => `${mediaType}:${tmdbId}`,
 }));

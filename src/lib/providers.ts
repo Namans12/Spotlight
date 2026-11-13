@@ -32,6 +32,12 @@ export interface ProviderBatch {
   genres: Record<string, string[]>;
 }
 
+/** Retry incomplete results on a later mount or focus instead of treating
+ * missing regional offers as fresh for the full six-hour cache period. */
+export function providerStaleTime(query: { state: { data?: ProviderBatch } }): number {
+  return query.state.data?.hadFailures ? 60_000 : 6 * 60 * 60_000;
+}
+
 async function fetchProviderChunk(ids: string[]): Promise<ProviderBatch> {
   const data = await fetchJson<unknown>(`/api/tmdb/providers-batch?ids=${encodeURIComponent(ids.join(','))}`);
 
