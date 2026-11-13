@@ -42,6 +42,8 @@ describe('calendar event identity', () => {
     [1213227, 'Train', 'ta', '2026-12-04', 'The Hollywood Reporter India / V Creations'],
     [1596658, 'Hello Kadhal', 'ta', '2026-12-04', 'Simply Mollywood / film teaser'],
     [1475768, 'Maatrubhumi:  May War Rest in Peace', 'hi', '2026-12-04', 'India Today / trailer launch'],
+    [1713050, 'Alias Rukmini', 'te', '2026-12-04', 'Telangana Today / Unanimous Productions'],
+    [1763356, 'Cousin Isha', 'hi', '2026-12-04', 'BookMyShow'],
   ])('limits independently confirmed theatrical date for %s to the matching observation and region', async (id, title, language, release_date, source) => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date,
       source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });
@@ -63,6 +65,7 @@ describe('calendar event identity', () => {
     [1590846, 'V. Shantaram', 'hi', '2026-11-18'],
     [1569625, 'Mauja Hi Mauja', 'hi', '2026-12-04'],
     [1569041, 'Padayaatra', 'ml', '2026-12-04'],
+    [1733518, 'Bouma', 'ml', '2026-12-04'],
   ])('keeps the superseded %s observation hidden even after matching TMDB evidence', async (id, title, language, release_date) => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date,
       source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });

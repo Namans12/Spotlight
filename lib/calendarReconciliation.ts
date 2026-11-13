@@ -8,6 +8,13 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'tmdb_upcoming' && Number(row.tmdb_id) === 1733518 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.title === 'Bouma' && row.language === 'ml' && row.release_date === '2026-12-04' && row.platform_or_distributor == null &&
+      row.source_url === 'https://www.themoviedb.org/movie/1733518') {
+    return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-13T21:19:00Z', source: 'Cinema Express',
+      sourceUrl: 'https://www.cinemaexpress.com/malayalam/news/2026/Nov/11/bouma-opens-kerala-bookings-today',
+      message: 'The makers announced Kerala bookings for a 12 November theatrical release. This later 4 December observation remains hidden until a separate release event is verified.' };
+  }
   if (row.origin === 'tmdb_upcoming' && Number(row.tmdb_id) === 1569041 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
       row.title === 'Padayaatra' && row.language === 'ml' && row.release_date === '2026-12-04' && row.platform_or_distributor == null &&
       row.source_url === 'https://www.themoviedb.org/movie/1569041') {
@@ -69,6 +76,12 @@ export function reviewedCalendarEntry(row: {
       { id: 1475768, title: 'Maatrubhumi:  May War Rest in Peace', language: 'hi', date: '2026-12-04', checkedAt: '2026-11-13T21:12:00Z', source: 'India Today / trailer launch',
         url: 'https://www.indiatoday.in/movies/bollywood/story/salman-khan-maatrubhumi-november-20-release-date-3033620-2026-11-06',
         message: 'The makers announced a 4 December theatrical release at the trailer launch, after earlier dates moved. Check local showtimes; streaming availability is not established.' },
+      { id: 1713050, title: 'Alias Rukmini', language: 'te', date: '2026-12-04', checkedAt: '2026-11-13T21:19:00Z', source: 'Telangana Today / Unanimous Productions',
+        url: 'https://telanganatoday.com/nithiins-alias-rukmini-to-hit-screens-on-december-4',
+        message: 'The production company announced a worldwide 4 December theatrical release. Check local showtimes; streaming availability is not established.' },
+      { id: 1763356, title: 'Cousin Isha', language: 'hi', date: '2026-12-04', checkedAt: '2026-11-13T21:19:00Z', source: 'BookMyShow',
+        url: 'https://in.bookmyshow.com/movies/pune/cousin-isha/ET00516373',
+        message: 'BookMyShow lists a 4 December release; bookings were not open when checked. The makers’ date is unconfirmed. Check local showtimes; streaming availability is not established.' },
     ].find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language && row.release_date === item.date &&
       row.source_url === `https://www.themoviedb.org/movie/${item.id}`);
     if (announcement) return { type: 'regional' as const, region: 'IN', checkedAt: announcement.checkedAt ?? '2026-11-13T20:50:00Z',
