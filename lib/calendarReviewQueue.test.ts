@@ -29,6 +29,7 @@ describe('calendar reconciliation queue', () => {
     expect(review.reasons).toContain('identity_conflict');
   });
   it.each([
+    [1389589, 'Rakkayie', 'ta', 'rakkayie', 'MV183794', false],
     [1411614, 'Raaka', 'te', 'raaka', 'MV218847', false],
     [1389373, 'Rowdy Janardhana', 'te', 'rowdy-janardhana', 'MV212225', false],
     [1562979, 'Dharman', 'ta', 'dharman', 'MV226468', false],

@@ -33,6 +33,9 @@ export function reviewedCalendarEntry(row: {
   if (row.origin === 'district_in' && row.media_type === 'movie' && row.entry_type === 'Movie' &&
       row.platform_or_distributor == null && row.release_date === '2026-12-31') {
     const undated = [
+      { id: 1389589, title: 'Rakkayie', language: 'ta', slug: 'rakkayie', key: 'MV183794', source: 'BookMyShow',
+        url: 'https://in.bookmyshow.com/movies/chennai/rakkayie/ET00420342',
+        message: 'BookMyShow lists the film for 2026 without a specific day; another catalogue gives a different December date. This old 31 December observation remains hidden pending stronger evidence.' },
       { id: 1411614, title: 'Raaka', language: 'te', slug: 'raaka', key: 'MV218847', source: 'Telugu Cinema',
         url: 'https://telugucinema.com/news/allu-arjun-and-atlees-raaka-heres-the-latest-on-the-release-date',
         message: 'The director has not confirmed a release date; reporting describes a late-2027 target. The original listing now says coming soon. This old 31 December date remains hidden.' },
