@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { classifyPlatform } from '../shared/platforms';
+import { classifyPlatform, splitPlatformField } from '../shared/platforms';
 
 // Same shape-free alias lib/tmdbProxy.ts uses for raw TMDB JSON: these
 // fixtures are deliberately partial payloads, not typed records.
@@ -35,6 +35,11 @@ afterEach(() => {
 });
 
 describe('resolveProviders', () => {
+  it('keeps a buy/rent label intact when parsing calendar provider fields', () => {
+    const field = 'Apple TV+ (Buy/Rent) / Netflix';
+    expect(splitPlatformField(field)).toEqual(['Apple TV+ (Buy/Rent)', 'Netflix']);
+    expect(classifyPlatform('Movie', 'Apple TV+ (Buy/Rent)')).toBe('streaming');
+  });
   it('keeps add-on channels distinct from standalone subscriptions', () => {
     const details = watchProvidersPayload('IN', { flatrate: [{ provider_name: 'MUBI Amazon Channel' }] });
     expect(resolveProviders(details, 'IN')).toEqual(['MUBI Amazon Channel']);

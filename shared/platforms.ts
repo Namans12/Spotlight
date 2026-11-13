@@ -6,6 +6,7 @@ const ALIASES: Record<string, string> = platformData.aliases;
 // would chop it into a half-name.
 const STRIP_SUFFIXES: string[] = [...platformData.stripSuffixes].sort((a, b) => b.length - a.length);
 const ADD_ON_CHANNEL = /\s+(?:Amazon Channel|Apple TV Channel|Roku Premium Channel)$/i;
+const BUY_RENT_LABEL = /\s*\(Buy\/Rent\)\s*$/i;
 
 /**
  * Collapses TMDB's several spellings of the same service into one canonical
@@ -54,14 +55,14 @@ export type PlatformKind = "streaming" | "tv_network" | "theatrical";
  */
 export function splitPlatformField(raw: string | null | undefined): string[] {
   return (raw ?? "")
-    .split(/[/,]/)
+    .split(/[,/](?![^()]*\))/)
     .map((part) => part.trim())
     .filter(Boolean);
 }
 
 /** Whether a name maps to a known streaming service, rather than a distributor. */
 export function isKnownStreamer(name: string): boolean {
-  const normalized = normalizePlatform(name);
+  const normalized = normalizePlatform(name.replace(BUY_RENT_LABEL, ''));
   return KNOWN_STREAMERS.has(normalizePlatform(normalized.replace(ADD_ON_CHANNEL, '')).toLowerCase());
 }
 

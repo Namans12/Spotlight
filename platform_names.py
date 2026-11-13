@@ -20,6 +20,7 @@ from pathlib import Path
 
 _DATA_PATH = Path(__file__).resolve().parent / "shared" / "platforms.json"
 _ADD_ON_CHANNEL = re.compile(r"\s+(?:Amazon Channel|Apple TV Channel|Roku Premium Channel)$", re.IGNORECASE)
+_BUY_RENT_LABEL = re.compile(r"\s*\(Buy/Rent\)\s*$", re.IGNORECASE)
 
 
 @lru_cache(maxsize=1)
@@ -74,7 +75,7 @@ def split_platform_field(raw: str | None) -> list[str]:
     It mixes two separators — ' / ' on the Wikipedia/Deadline rows and ', ' on
     the Hindi rows.
     """
-    return [part.strip() for part in re.split(r"[/,]", raw or "") if part.strip()]
+    return [part.strip() for part in re.split(r"[,/](?![^()]*\))", raw or "") if part.strip()]
 
 
 def classify_platform(entry_type: str | None, platform_field: str | None) -> str:
@@ -88,7 +89,8 @@ def classify_platform(entry_type: str | None, platform_field: str | None) -> str
     parts = split_platform_field(platform_field)
 
     for part in parts:
-        if normalize_platform(_ADD_ON_CHANNEL.sub("", normalize_platform(part))).lower() in streamers:
+        untagged = _BUY_RENT_LABEL.sub("", part)
+        if normalize_platform(_ADD_ON_CHANNEL.sub("", normalize_platform(untagged))).lower() in streamers:
             return "streaming"
     for part in parts:
         if part.lower() in tv_networks:
