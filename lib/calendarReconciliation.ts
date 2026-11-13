@@ -8,6 +8,25 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'district_in' && Number(row.tmdb_id) === 1411090 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.platform_or_distributor == null && row.language === 'hi' && row.title === 'Chamunda' && row.release_date === '2026-12-04' &&
+      row.source_url === 'https://www.district.in/movies/chamunda-movie-tickets-in-hyderabad-MV189193') {
+    return { type: 'corroboration' as const, suppressTitleLink: true, checkedAt: '2026-11-13T20:31:00Z', source: 'Odisha Post',
+      sourceUrl: 'https://odishapostepaper.com/uploads/epaper/2025-01/6778394f42b54.pdf',
+      message: 'A 2025 report on the studio slate listed 4 December 2026. The candidate TMDB record lacks matching credits and reports a different date; its identity and the current local release remain unconfirmed.' };
+  }
+  if (row.origin === 'district_in' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.platform_or_distributor == null &&
+      row.language === 'en' && row.release_date === '2027-02-05') {
+    const reviewed = [
+      { id: 1384758, title: 'Ice Age: Boiling Point', slug: 'ice-age-boiling-point', key: 'MV183060', source: 'Walt Disney Studios India',
+        url: 'https://www.youtube.com/watch?v=hjnisLhVFDk', message: 'Disney Studios India advertises a 5 February theatrical release in English and Hindi; cast and director match TMDB. Check local showtimes and current streaming availability.' },
+      { id: 1425859, title: 'Remain', slug: 'remain', key: 'MV207238', source: 'BookMyShow',
+        url: 'https://in.bookmyshow.com/movies/gonda/remain/ET00516392', message: 'BookMyShow lists a 5 February Indian theatrical release; cast and director match TMDB. Bookings were not open when checked; verify local showtimes and streaming availability.' },
+    ].find(item => Number(row.tmdb_id) === item.id && row.title === item.title &&
+      row.source_url === `https://www.district.in/movies/${item.slug}-movie-tickets-in-hyderabad-${item.key}`);
+    if (reviewed) return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T20:31:00Z',
+      source: reviewed.source, sourceUrl: reviewed.url, message: reviewed.message };
+  }
   if (row.origin === 'district_in' && Number(row.tmdb_id) === 1735225 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
       row.platform_or_distributor == null && row.language === 'kn' && row.title === 'Tamma Sukhagamana Bayasuva' && row.release_date === '2026-12-25' &&
       row.source_url === 'https://www.district.in/movies/tamma-sukhagamana-bayasuva-movie-tickets-in-hyderabad-MV226322') {

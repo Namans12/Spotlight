@@ -18,6 +18,27 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('does not link Chamunda to an unverified matching-name TMDB record', async () => {
+    const item = editorial({ origin: 'district_in', tmdb_id: 1411090, title: 'Chamunda', language: 'hi', release_date: '2026-12-04',
+      source_url: 'https://www.district.in/movies/chamunda-movie-tickets-in-hyderabad-MV189193', event_region: null, evidence: null,
+      platform_or_distributor: null, poster_url: 'https://example.org/unverified.jpg' });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-12', 'IN');
+    expect(entry).toMatchObject({ tmdbId: null, posterUrl: null, region: null, kind: 'unknown', evidenceStatus: 'unverified' });
+    expect(entry.dateCorroboration?.message).toContain('identity');
+  });
+  it.each([
+    [1384758, 'Ice Age: Boiling Point', 'ice-age-boiling-point', 'MV183060', 'Walt Disney Studios India'],
+    [1425859, 'Remain', 'remain', 'MV207238', 'BookMyShow'],
+  ])('scopes the reviewed February Indian cinema listing for %s', async (id, title, slug, key, source) => {
+    const item = editorial({ origin: 'district_in', tmdb_id: id, title, language: 'en', release_date: '2027-02-05',
+      source_url: `https://www.district.in/movies/${slug}-movie-tickets-in-hyderabad-${key}`, event_region: null, evidence: null, platform_or_distributor: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2027-02', 'IN');
+    expect(entry).toMatchObject({ region: 'IN', tmdbId: id, kind: 'theatrical' });
+    expect(entry.dateCorroboration?.source).toBe(source);
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2027-02', 'US')).toEqual([]);
+    const [changed] = await getCalendarMonth(db([], [{ ...item, release_date: '2027-02-06' }]) as unknown as postgres.Sql, '2027-02', 'IN');
+    expect(changed.region).toBeNull();
+  });
   it('scopes the reviewed Tamma Sukhagamana Bayasuva cinema listing to India', async () => {
     const item = editorial({ origin: 'district_in', tmdb_id: 1735225, title: 'Tamma Sukhagamana Bayasuva', language: 'kn', release_date: '2026-12-25',
       source_url: 'https://www.district.in/movies/tamma-sukhagamana-bayasuva-movie-tickets-in-hyderabad-MV226322', event_region: null, evidence: null, platform_or_distributor: null });
