@@ -279,6 +279,14 @@ export function reviewedCalendarEntry(row: {
         message: 'Date needs review: industry reporting says the earlier 4 December release was pushed to 2027. The new date and this event’s region are unconfirmed.' };
     }
     if (Number(row.tmdb_id) === 1411089 && row.title === 'Shakti Shalini' && row.release_date === '2026-12-24') {
+      if (row.language === 'hi' && row.entry_type === 'Movie' && row.platform_or_distributor === 'Maddock Films') {
+        return { type: 'conflict' as const, checkedAt: '2026-11-13T14:42:00Z', source: 'Mid-day',
+          sourceUrl: 'https://www.mid-day.com/amp/entertainment/bollywood-news/article/shakti-shalini-to-be-postponed-to-avoid-clash-with-king-23653896',
+          message: 'Date needs review: an earlier report suggested a move to 2027; later reporting observed a promotional video still showing 24 December. The final local release remains unconfirmed.',
+          additionalCorroboration: { checkedAt: '2026-11-13T14:42:00Z', source: 'The Free Press Journal',
+            sourceUrl: 'https://www.freepressjournal.in/entertainment/is-aneet-paddas-shakti-shalini-not-getting-postponed-all-set-to-clash-with-shah-rukh-khans-king',
+            message: 'Later reporting says a cinema promotional video still displayed 24 December; it does not confirm the current release plan.' } };
+      }
       return { type: 'conflict' as const, checkedAt: '2026-11-10', source: 'Mid-day',
         sourceUrl: 'https://www.mid-day.com/amp/entertainment/bollywood-news/article/shakti-shalini-to-be-postponed-to-avoid-clash-with-king-23653896',
         message: 'Date needs review: press reports suggest a move to 2027; an official new date has not been established here.' };

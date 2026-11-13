@@ -495,6 +495,18 @@ describe('calendar event identity', () => {
     expect(entry.isTheatrical).toBe(false);
   });
 
+  it('shows both conflicting Shakti Shalini reports without asserting a confirmed local date', async () => {
+    const item = editorial({ origin: 'csv_seed', tmdb_id: 1411089, media_type: 'movie', entry_type: 'Movie', title: 'Shakti Shalini',
+      language: 'hi', release_date: '2026-12-24', source_url: 'https://en.wikipedia.org/wiki/List_of_Hindi_films_of_2026',
+      platform_or_distributor: 'Maddock Films', event_region: null, evidence: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-12', 'IN');
+    expect(entry.region).toBeNull();
+    expect(entry.evidenceStatus).toBe('unverified');
+    expect(entry.dateConflict?.source).toBe('Mid-day');
+    expect(entry.dateCorroboration?.source).toBe('The Free Press Journal');
+    expect(entry.dateCorroboration?.message).toContain('does not confirm');
+  });
+
   it('limits a warning for an unmatched title to the named distributor', async () => {
     const item = editorial({ origin: 'csv_seed', tmdb_id: null, media_type: null, title: 'Zero A. D.', release_date: '2026-12-25',
       platform_or_distributor: 'Angel Studios', event_region: null, evidence: null, source_url: 'https://en.wikipedia.org/wiki/List_of_American_films_of_2026' });
