@@ -361,6 +361,24 @@ describe('calendar event identity', () => {
   });
 
   it.each([
+    ['Hail Mary', 'ml', 1704200, '2026-11-26'],
+    ['Cosmic Samson', 'ml', 1179380, '2026-11-27'],
+    ['Haindava', 'te', 1417808, '2026-11-27'],
+    ['Mysaa', 'te', 1504630, '2026-11-27'],
+  ])('merges the reviewed unlinked %s observation without inferring changed rows', async (title, language, id, date) => {
+    const source = `https://en.wikipedia.org/wiki/List_of_${language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_2026`;
+    const base = editorial({ id: 1, origin: 'wikipedia', tmdb_id: null, media_type: 'movie', title, language, release_date: date,
+      source_url: source, platform_or_distributor: null, event_region: null, evidence: null });
+    const linked = { ...base, id: 2, tmdb_id: id, event_region: 'IN', evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: `https://www.themoviedb.org/movie/${id}` } };
+    const entries = await getCalendarMonth(db([], [base, linked]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ region: 'IN', tmdbId: id, kind: 'theatrical' });
+    const [changed] = await getCalendarMonth(db([], [{ ...base, release_date: '2026-11-28' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(changed.tmdbId).toBeNull();
+    expect(changed.region).toBeNull();
+  });
+
+  it.each([
     ['Dear Astronaut', '2026-11-20', 'Cinema Express'],
   ])('adds reporting for the exact Telugu record without assigning a region', async (title, release_date, source) => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: null, title, language: 'te', release_date,
