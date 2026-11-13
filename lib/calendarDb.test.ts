@@ -19,6 +19,16 @@ function db(releases: unknown[], calendar: unknown[]) {
 
 describe('calendar event identity', () => {
   it.each([
+    [1475768, 'Maatrubhumi: May War Rest in Peace', 'hi', 'maatrubhumi-may-war-rest-in-peace', 'MV201390'],
+    [1469537, 'Slumdog: 33 Temple Road', 'ta', 'slumdog-33-temple-road', 'MV213661'],
+  ])('hides the reviewed unsupported year-end observation for %s', async (id, title, language, slug, key) => {
+    const item = editorial({ origin: 'district_in', tmdb_id: id, title, language, release_date: '2026-12-31',
+      source_url: `https://www.district.in/movies/${slug}-movie-tickets-in-hyderabad-${key}`, event_region: null, evidence: null, platform_or_distributor: null });
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-12', 'IN')).toEqual([]);
+    const [changed] = await getCalendarMonth(db([], [{ ...item, source_url: 'https://example.org' }]) as unknown as postgres.Sql, '2026-12', 'IN');
+    expect(changed.kind).toBe('unknown');
+  });
+  it.each([
     ['Jhimma 3', 'mr', 'jhimma-3', 'MV218947', 'BookMyShow'],
     ['Super Kaand', 'gu', 'super-kaand', 'MV231030', 'Gujarati Jagran'],
   ])('scopes the reviewed January theatrical listing for %s without guessing its identity', async (title, language, slug, id, source) => {

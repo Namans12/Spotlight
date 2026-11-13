@@ -8,6 +8,21 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'district_in' && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.platform_or_distributor == null && row.release_date === '2026-12-31') {
+    if (Number(row.tmdb_id) === 1475768 && row.language === 'hi' && row.title === 'Maatrubhumi: May War Rest in Peace' &&
+        row.source_url === 'https://www.district.in/movies/maatrubhumi-may-war-rest-in-peace-movie-tickets-in-hyderabad-MV201390') {
+      return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-13T15:20:00Z', source: 'Salman Khan Films',
+        sourceUrl: 'https://www.salmankhanfilms.com/news/a-glimpse-into-the-life-of-a-soldier-both-at-the-border-back-home-maatrubhumi-may-war-rest',
+        message: 'The production company announces a 4 December theatrical release. The older 31 December observation remains hidden; verify current local showtimes separately.' };
+    }
+    if (Number(row.tmdb_id) === 1469537 && row.language === 'ta' && row.title === 'Slumdog: 33 Temple Road' &&
+        row.source_url === 'https://www.district.in/movies/slumdog-33-temple-road-movie-tickets-in-hyderabad-MV213661') {
+      return { type: 'corroboration' as const, suppressEvent: true, checkedAt: '2026-11-13T15:20:00Z', source: 'Simply Mollywood',
+        sourceUrl: 'https://simplymollywood.com/movies/slumdog-33-temple-road-wrap-vijay-sethupathi-samyuktha-tabu-malayalam',
+        message: 'Reporting cites the production company saying the release date will be announced; the current ticketing listing says coming soon. The older 31 December date remains unverified and hidden.' };
+    }
+  }
   if (row.origin === 'district_in' && row.tmdb_id == null && row.media_type === 'movie' && row.entry_type === 'Movie' &&
       row.platform_or_distributor == null && row.release_date === '2027-01-01') {
     if (row.language === 'mr' && row.title === 'Jhimma 3' && row.source_url === 'https://www.district.in/movies/jhimma-3-movie-tickets-in-hyderabad-MV218947') {

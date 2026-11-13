@@ -22,6 +22,17 @@ describe('calendar evidence freshness', () => {
 
 describe('calendar reconciliation queue', () => {
   it.each([
+    [1475768, 'Maatrubhumi: May War Rest in Peace', 'hi', 'maatrubhumi-may-war-rest-in-peace', 'MV201390', true],
+    [1469537, 'Slumdog: 33 Temple Road', 'ta', 'slumdog-33-temple-road', 'MV213661', false],
+  ])('retains reviewed year-end uncertainty for %s', (id, title, language, slug, key, conflict) => {
+    const item = row({ origin: 'district_in', tmdb_id: id, title, language, release_date: '2026-12-31', platform_or_distributor: null,
+      source_url: `https://www.district.in/movies/${slug}-movie-tickets-in-hyderabad-${key}` });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-13T16:00:00Z'));
+    expect(review.reasons).toContain('region_unknown');
+    expect(review.reasons.includes('date_conflict')).toBe(conflict);
+    expect(review.reviewSourceUrl).toMatch(/^https:\/\//);
+  });
+  it.each([
     ['OM Chapter 1: Udhiram - The Blood Wood', 'ta', '2026-11-26', 1384528],
     ['OM Chapter 1: Udhiram - The Blood Wood', 'ta', '2026-11-27', 1384528],
     ['NBK111', 'te', '2026-12-11', 1494621],
