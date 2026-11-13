@@ -8,6 +8,13 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'tmdb_upcoming' && Number(row.tmdb_id) === 674527 && row.media_type === 'movie' && row.entry_type === 'Show' &&
+      row.platform_or_distributor == null && row.language === 'hi' && row.title === 'Student of the Year 3' && row.release_date === '2026-12-25' &&
+      row.source_url === 'https://www.themoviedb.org/tv/334412') {
+    return { type: 'conflict' as const, suppressEvent: true, identityMismatch: true, checkedAt: '2026-11-13T20:37:00Z', source: 'Cinema Express',
+      sourceUrl: 'https://www.cinemaexpress.com/hindi/news/2026/Oct/19/karan-johars-student-of-the-year-universe-moves-to-streaming-with-new-series-premiere-date-out',
+      message: 'Reporting identifies the project as Student of the Year: After Dark, a series announced for JioHotstar on 13 November. The stored movie identity and 25 December observation are not verified and remain hidden.' };
+  }
   if (row.origin === 'district_in' && Number(row.tmdb_id) === 1411090 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
       row.platform_or_distributor == null && row.language === 'hi' && row.title === 'Chamunda' && row.release_date === '2026-12-04' &&
       row.source_url === 'https://www.district.in/movies/chamunda-movie-tickets-in-hyderabad-MV189193') {

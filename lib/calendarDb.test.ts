@@ -18,6 +18,11 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('keeps the mismatched Student of the Year observation hidden', async () => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 674527, media_type: 'movie', entry_type: 'Show', title: 'Student of the Year 3',
+      language: 'hi', release_date: '2026-12-25', source_url: 'https://www.themoviedb.org/tv/334412', event_region: null, evidence: null, platform_or_distributor: null });
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-12', 'IN')).toEqual([]);
+  });
   it('does not link Chamunda to an unverified matching-name TMDB record', async () => {
     const item = editorial({ origin: 'district_in', tmdb_id: 1411090, title: 'Chamunda', language: 'hi', release_date: '2026-12-04',
       source_url: 'https://www.district.in/movies/chamunda-movie-tickets-in-hyderabad-MV189193', event_region: null, evidence: null,

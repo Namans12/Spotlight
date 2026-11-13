@@ -22,10 +22,11 @@ describe('calendar evidence freshness', () => {
 
 describe('calendar reconciliation queue', () => {
   it('flags a TMDB source identity mismatch even when evidence is absent', () => {
-    const item = row({ origin: 'tmdb_upcoming', tmdb_id: 674527, media_type: 'movie', entry_type: 'Show', title: 'Student of the Year 3',
+    const item = row({ origin: 'tmdb_upcoming', tmdb_id: 674527, media_type: 'movie', entry_type: 'Show', title: 'Student of the Year 3', language: 'hi', platform_or_distributor: null,
       release_date: '2026-12-25', source_url: 'https://www.themoviedb.org/tv/334412', evidence: null });
     const [review] = buildCalendarReviewQueue([item], new Date('2026-11-13T22:00:00Z'));
-    expect(review.reasons).toEqual(expect.arrayContaining(['unreviewed', 'identity_conflict', 'region_unknown']));
+    expect(review.reasons).toEqual(expect.arrayContaining(['date_conflict', 'identity_conflict', 'region_unknown']));
+    expect(review.reviewSourceUrl).toContain('cinemaexpress.com');
     const [matching] = buildCalendarReviewQueue([{ ...item, source_url: 'https://www.themoviedb.org/movie/674527' }], new Date('2026-11-13T22:00:00Z'));
     expect(matching.reasons).not.toContain('identity_conflict');
   });
