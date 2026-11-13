@@ -51,6 +51,13 @@ export function reviewedCalendarEntry(row: {
       message: 'Date needs review: local reporting says the announced 12 November release has been postponed; no replacement date is confirmed here.' };
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie') {
+    if (Number(row.tmdb_id) === 1636756 && row.language === 'bn' && row.title === 'Mrigaya 1.5: The Hunt Continues' &&
+        row.platform_or_distributor == null && row.release_date === '2026-11-20' && row.source_url === 'https://www.themoviedb.org/movie/1636756') {
+      // Separate streaming announcement: https://www.zee5.com/global/blog/mrigaya-1-5-the-hunt-continues-story-explained-inside-the-cop-universe-at-the-heart-of-the-hunt/
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T15:04:00Z', source: 'BookMyShow',
+        sourceUrl: 'https://in.bookmyshow.com/movies/chennai/mrigaya-15-the-hunt-continues/ET00489767',
+        message: 'BookMyShow lists a 20 November cinema release with matching director and cast; bookings were not open when checked. ZEE5 separately reports streaming from 13 November. Check current showtimes and streaming availability.' };
+    }
     const regionalFilms = [
       { id: 1733594, title: 'Shankarabharana', language: 'kn', url: 'https://in.bookmyshow.com/movies/mumbai/shankarabharanna/ET00523262' },
       { id: 1735403, title: 'Brindavihari', language: 'kn', url: 'https://in.bookmyshow.com/movies/karad/brindavihari/ET00520736' },

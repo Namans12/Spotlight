@@ -18,6 +18,15 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('distinguishes the reviewed Mrigaya cinema listing from its earlier streaming date', async () => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 1636756, title: 'Mrigaya 1.5: The Hunt Continues', language: 'bn',
+      release_date: '2026-11-20', source_url: 'https://www.themoviedb.org/movie/1636756', event_region: null, evidence: null, platform_or_distributor: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry).toMatchObject({ region: 'IN', tmdbId: 1636756, kind: 'theatrical' });
+    expect(entry.dateCorroboration?.message).toContain('streaming from 13 November');
+    expect(await getCalendarMonth(db([], [{ ...item, release_date: '2026-11-13' }]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
+  });
   it.each([
     [1733594, 'Shankarabharana', 'kn'],
     [1735403, 'Brindavihari', 'kn'],
