@@ -45,6 +45,7 @@ describe('calendar event identity', () => {
     [1713050, 'Alias Rukmini', 'te', '2026-12-04', 'Telangana Today / Unanimous Productions'],
     [1763356, 'Cousin Isha', 'hi', '2026-12-04', 'BookMyShow'],
     [1619638, 'Idupu Kayitham', 'te', '2026-12-11', 'Shreyas Media'],
+    [1783023, 'Pocket rockkets', 'te', '2026-12-11', 'Cinema Express'],
   ])('limits independently confirmed theatrical date for %s to the matching observation and region', async (id, title, language, release_date, source) => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date,
       source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });
