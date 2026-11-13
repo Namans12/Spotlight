@@ -45,6 +45,22 @@ describe('offline recommendation evaluation', () => {
     expect(result.baselineMetrics.precisionAtCutoff).toBeNull();
     expect(result.baselineMetrics.topThree).toEqual({ shown: 2, judged: 1, judgedPrecision: 1 });
   });
+  it('reports precision separately when only one ranking has a fully judged top three', () => {
+    const input = sample();
+    const test = input.cases[0];
+    test.candidates.push(candidate(3, 'movie', ['Comedy']), candidate(4, 'movie', ['Comedy']));
+    test.offers['movie:2'] = [{ provider: 'Netflix', type: 'subscription' }];
+    test.offers['movie:3'] = [{ provider: 'Netflix', type: 'subscription' }];
+    test.offers['movie:4'] = [{ provider: 'Netflix', type: 'subscription' }];
+    (test.judgments as Record<string, string>)['movie:3'] = 'relevant';
+    const withOrder = { ...test, baselineOrder: ['movie:1', 'tv:1', 'movie:3', 'movie:4', 'movie:2'] };
+    const [result] = evaluateOfflineCases(parseOfflineCases({ cases: [withOrder] }));
+    expect(result.baseline.slice(0, 3)).toEqual(['movie:1', 'tv:1', 'movie:3']);
+    expect(result.baselineMetrics.precisionAtCutoff).toBeCloseTo(2 / 3);
+    expect(result.updated.slice(0, 3)).toContain('movie:4');
+    expect(result.updatedMetrics.precisionAtCutoff).toBeNull();
+    expect(summarizeOfflineEvaluation([result]).precisionAtCutoff.cases).toBe(0);
+  });
   it('does not report zero precision when no candidate is eligible', () => {
     const input = sample(); input.cases[0].filters.services = ['Unavailable service'];
     const [result] = evaluateOfflineCases(parseOfflineCases(input));

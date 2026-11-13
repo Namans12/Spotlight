@@ -72,11 +72,12 @@ export function evaluateOfflineCases(cases: OfflineCase[]) {
     const baseline = test.baselineOrder ? test.baselineOrder.filter(key => eligible.has(key)) : noFeedback;
     const updated = rankTonight(remaining, test.filters, test.duelWeights, offersFor, feedbackWeights(test.feedback)).map(choice => keyOf(choice.candidate));
     const metrics = compareRankings(baseline, updated, relevant);
-    // Overall precision treats unjudged titles as irrelevant; suppress it for partial labels.
-    const partial = baseline.some(key => test.judgments[key] === undefined);
+    // Precision only depends on the displayed cutoff. An unjudged title below
+    // it cannot affect that ranking's precision, while one inside it can.
+    const precisionKnown = (ranking: string[]) => ranking.length > 0 && ranking.slice(0, 3).every(key => test.judgments[key] !== undefined);
     return { name: test.name, baselineKind: test.baselineOrder ? 'provided_order' as const : 'tonight_without_feedback' as const, baseline, updated, labelCoverage: baseline.length ? baseline.filter(key => test.judgments[key] !== undefined).length / baseline.length : null,
-      baselineMetrics: { ...metrics.baseline, reciprocalRank: relevant.length ? metrics.baseline.reciprocalRank : null, precisionAtCutoff: partial || !baseline.length ? null : metrics.baseline.precisionAtCutoff, topThree: judgedTopThree(baseline, test.judgments) },
-      updatedMetrics: { ...metrics.updated, reciprocalRank: relevant.length ? metrics.updated.reciprocalRank : null, precisionAtCutoff: partial || !updated.length ? null : metrics.updated.precisionAtCutoff, topThree: judgedTopThree(updated, test.judgments) } };
+      baselineMetrics: { ...metrics.baseline, reciprocalRank: relevant.length ? metrics.baseline.reciprocalRank : null, precisionAtCutoff: precisionKnown(baseline) ? metrics.baseline.precisionAtCutoff : null, topThree: judgedTopThree(baseline, test.judgments) },
+      updatedMetrics: { ...metrics.updated, reciprocalRank: relevant.length ? metrics.updated.reciprocalRank : null, precisionAtCutoff: precisionKnown(updated) ? metrics.updated.precisionAtCutoff : null, topThree: judgedTopThree(updated, test.judgments) } };
   });
 }
 
