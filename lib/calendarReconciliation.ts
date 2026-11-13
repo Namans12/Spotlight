@@ -133,19 +133,27 @@ export function reviewedCalendarEntry(row: {
   }
   if (row.origin === 'wikipedia' && row.tmdb_id == null && row.media_type === 'movie' && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
     const reviewed = [
-      { title: 'Hail Mary', language: 'ml', date: '2026-11-26', id: 1704200,
+      { title: 'Hail Mary', language: 'ml', date: '2026-11-26', id: 1704200, checkedAt: '2026-11-13T14:22:00Z',
         sourceUrl: 'https://www.cinemaexpress.com/malayalam/news/2026/Nov/05/kunchacko-bobans-hail-mary-gets-a-release-date' },
-      { title: 'Cosmic Samson', language: 'ml', date: '2026-11-27', id: 1179380,
+      { title: 'Cosmic Samson', language: 'ml', date: '2026-11-27', id: 1179380, checkedAt: '2026-11-13T14:22:00Z',
         sourceUrl: 'https://www.cinemaexpress.com/malayalam/news/2026/Oct/20/cosmic-samson-starring-sandeep-pradeep-gets-release-date' },
-      { title: 'Haindava', language: 'te', date: '2026-11-27', id: 1417808,
+      { title: 'Haindava', language: 'te', date: '2026-11-27', id: 1417808, checkedAt: '2026-11-13T14:22:00Z',
         sourceUrl: 'https://telanganatoday.com/haindava-teaser-unveiled-bellamkonda-sai-sreenivass-pan-indian-film-set-for-nov-27-release', source: 'Telangana Today' },
-      { title: 'Mysaa', language: 'te', date: '2026-11-27', id: 1504630,
+      { title: 'Mysaa', language: 'te', date: '2026-11-27', id: 1504630, checkedAt: '2026-11-13T14:22:00Z',
         sourceUrl: 'https://www.cinemaexpress.com/telugu/news/2026/Sep/01/rashmika-mandannas-mysaa-gets-release-date' },
+      { title: 'Alias Rukmini', language: 'te', date: '2026-12-04', id: 1713050, checkedAt: '2026-11-13T14:47:00Z',
+        sourceUrl: 'https://telanganatoday.com/alias-rukmini-nithiins-new-look-unveiled-ahead-of-december-4-release', source: 'Telangana Today' },
+      { title: 'Legacy', language: 'te', date: '2026-12-04', id: 1436202, checkedAt: '2026-11-13T14:47:00Z',
+        sourceUrl: 'https://timesofindia.indiatimes.com/entertainment/telugu/movies/news/legacy-vishwak-sen-announces-december-4-release-date-for-political-action-drama-says-politics-is-personal/articleshow/133837154.cms', source: 'The Times of India' },
+      { title: 'Pocket Rockkets', language: 'te', date: '2026-12-11', id: 1783023, checkedAt: '2026-11-13T14:47:00Z',
+        sourceUrl: 'https://www.cinemaexpress.com/telugu/news/2026/Nov/03/niharika-konidelas-pocket-rockkets-locks-release-date' },
+      { title: 'Mayan: Chapter 1', language: 'ml', date: '2026-12-03', id: 1654912, checkedAt: '2026-11-13T14:47:00Z',
+        sourceUrl: 'https://simplymollywood.com/movies/december-2026-malayalam-releases-mayan-padayaatra-athimanoharam-iffk', source: 'Simply Mollywood' },
     ].find(item => row.title === item.title && row.language === item.language && row.release_date === item.date &&
       row.source_url === `https://en.wikipedia.org/wiki/List_of_${item.language === 'ml' ? 'Malayalam' : 'Telugu'}_films_of_2026`);
-    if (reviewed) return { type: 'regional' as const, region: 'IN', reviewedTmdbId: reviewed.id, checkedAt: '2026-11-13T14:22:00Z',
+    if (reviewed) return { type: 'regional' as const, region: 'IN', reviewedTmdbId: reviewed.id, checkedAt: reviewed.checkedAt,
       source: reviewed.source ?? 'Cinema Express', sourceUrl: reviewed.sourceUrl,
-      message: 'The editorial listing and TMDB match the reviewed director and cast; TMDB reports this India theatrical date. Showtimes and streaming availability remain unconfirmed.' };
+      message: 'The editorial listing and TMDB match reviewed cast and other identifying credits; TMDB reports this India theatrical date. Showtimes and streaming availability remain unconfirmed.' };
   }
   if (row.origin === 'wikipedia' && row.entry_type === 'Movie' &&
       (row.media_type === 'movie' || (row.media_type == null && row.tmdb_id == null && row.title === 'Donga Naa Koduku'))) {
