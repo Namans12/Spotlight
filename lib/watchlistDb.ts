@@ -40,7 +40,7 @@ function toListDTO(row: any): CustomListDTO {
   return { id: Number(row.id), name: row.name, createdAt: new Date(row.created_at).getTime() };
 }
 
-export async function getWatchlistState(sql: postgres.Sql<any>, userId: number): Promise<WatchlistStateDTO> {
+export async function getWatchlistState(sql: postgres.Sql, userId: number): Promise<WatchlistStateDTO> {
   const rows = await sql`SELECT * FROM watchlist_items WHERE user_id = ${userId} ORDER BY sort_order ASC`;
   const listRows = await sql`SELECT * FROM custom_lists WHERE user_id = ${userId} ORDER BY created_at ASC`;
   // Part of the same state, fetched with it. A separate request would load on
@@ -81,7 +81,7 @@ export async function getWatchlistState(sql: postgres.Sql<any>, userId: number):
  * of its target bucket. The purge is user-scoped — without that, adding a
  * film to your own watchlist would delete it from every other user's. */
 export async function addWatchlistItem(
-  sql: postgres.Sql<any>,
+  sql: postgres.Sql,
   userId: number,
   body: AddWatchlistItemBody,
 ): Promise<WatchlistItemDTO> {
@@ -116,7 +116,7 @@ export async function addWatchlistItem(
 }
 
 export async function moveWatchlistItem(
-  sql: postgres.Sql<any>,
+  sql: postgres.Sql,
   userId: number,
   dbId: number,
   bucket: Bucket,
@@ -152,7 +152,7 @@ export async function moveWatchlistItem(
   });
 }
 
-export async function removeWatchlistItem(sql: postgres.Sql<any>, userId: number, dbId: number): Promise<void> {
+export async function removeWatchlistItem(sql: postgres.Sql, userId: number, dbId: number): Promise<void> {
   await sql`DELETE FROM watchlist_items WHERE id = ${dbId} AND user_id = ${userId}`;
 }
 
@@ -164,7 +164,7 @@ export async function removeWatchlistItem(sql: postgres.Sql<any>, userId: number
  *  dragging a card actually feels. Same pattern already used for batch reads
  *  in ratingsDb.ts's unnest(...)::bigint[] lookup. */
 export async function reorderBucket(
-  sql: postgres.Sql<any>,
+  sql: postgres.Sql,
   userId: number,
   bucket: Bucket,
   listId: number | null,
@@ -186,13 +186,13 @@ export async function reorderBucket(
   `;
 }
 
-export async function createCustomList(sql: postgres.Sql<any>, userId: number, name: string): Promise<CustomListDTO> {
+export async function createCustomList(sql: postgres.Sql, userId: number, name: string): Promise<CustomListDTO> {
   const [row] = await sql`INSERT INTO custom_lists (user_id, name) VALUES (${userId}, ${name}) RETURNING *`;
   return toListDTO(row);
 }
 
 export async function renameCustomList(
-  sql: postgres.Sql<any>,
+  sql: postgres.Sql,
   userId: number,
   id: number,
   name: string,
@@ -201,7 +201,7 @@ export async function renameCustomList(
   return row ? toListDTO(row) : null;
 }
 
-export async function deleteCustomList(sql: postgres.Sql<any>, userId: number, id: number): Promise<void> {
+export async function deleteCustomList(sql: postgres.Sql, userId: number, id: number): Promise<void> {
   // ON DELETE CASCADE on watchlist_items.list_id handles orphaned items.
   await sql`DELETE FROM custom_lists WHERE id = ${id} AND user_id = ${userId}`;
 }

@@ -91,7 +91,7 @@ export function toRatingDTO(row: CachedRating): TitleRatingDTO | null {
  *  absent from the map. Never touches OMDb — this is the call a poster grid
  *  makes, and it must stay free. */
 export async function getCachedRatings(
-  sql: postgres.Sql<any>,
+  sql: postgres.Sql,
   keys: RatingKey[],
 ): Promise<Map<string, CachedRating>> {
   const found = new Map<string, CachedRating>();
@@ -119,7 +119,7 @@ export async function getCachedRatings(
  *  stored row. Only ever called with a real answer; an unknown result (network
  *  failure, unset key) must not be cached or it would mask a title for a week. */
 export async function upsertRatings(
-  sql: postgres.Sql<any>,
+  sql: postgres.Sql,
   key: RatingKey,
   ratings: OmdbRatings,
 ): Promise<CachedRating> {

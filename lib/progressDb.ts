@@ -18,7 +18,7 @@ export function progressKey(mediaType: string, tmdbId: number): string {
 /** Everything this account is part-way through, as one map. Read once when the
  *  watchlist state loads rather than per card: a reader with forty saved shows
  *  should cost one query, not forty. */
-export async function getProgressForUser(sql: postgres.Sql<any>, userId: number): Promise<ProgressMap> {
+export async function getProgressForUser(sql: postgres.Sql, userId: number): Promise<ProgressMap> {
   const rows = await sql`
     SELECT tmdb_id, media_type, season, episode
     FROM title_progress
@@ -51,7 +51,7 @@ export async function getProgressForUser(sql: postgres.Sql<any>, userId: number)
  * a pointer that outlives a season renumbering degrades rather than breaks.
  */
 export async function setProgress(
-  sql: postgres.Sql<any>,
+  sql: postgres.Sql,
   userId: number,
   entry: ProgressDTO,
 ): Promise<void> {
@@ -66,7 +66,7 @@ export async function setProgress(
 /** Forgets a show entirely. Used by "start over", and by un-marking: absence
  *  of a row is what "not started" means, so there is nothing to set it to. */
 export async function clearProgress(
-  sql: postgres.Sql<any>,
+  sql: postgres.Sql,
   userId: number,
   tmdbId: number,
   mediaType: string,

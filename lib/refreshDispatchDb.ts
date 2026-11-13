@@ -39,7 +39,7 @@ function pluralize(n: number, unit: string): string {
   return `${n} ${unit}${n === 1 ? "" : "s"}`;
 }
 
-export async function checkRefreshRateLimit(sql: postgres.Sql<any>, userId: number): Promise<RateLimitCheck> {
+export async function checkRefreshRateLimit(sql: postgres.Sql, userId: number): Promise<RateLimitCheck> {
   const [globalRow] = await sql`SELECT dispatched_at FROM refresh_dispatches ORDER BY dispatched_at DESC LIMIT 1`;
   if (globalRow) {
     const remainingMs = GLOBAL_COOLDOWN_MINUTES * 60_000 - (Date.now() - new Date(globalRow.dispatched_at).getTime());
@@ -74,6 +74,6 @@ export async function checkRefreshRateLimit(sql: postgres.Sql<any>, userId: numb
   return { allowed: true };
 }
 
-export async function recordRefreshDispatch(sql: postgres.Sql<any>, userId: number, ok: boolean): Promise<void> {
+export async function recordRefreshDispatch(sql: postgres.Sql, userId: number, ok: boolean): Promise<void> {
   await sql`INSERT INTO refresh_dispatches (user_id, ok) VALUES (${userId}, ${ok})`;
 }

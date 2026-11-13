@@ -16,7 +16,7 @@ function eventKey(entry: CalendarEntryDTO): string | null {
     part ? `${part[0].replace(/\s+/g, " ").toLowerCase()}` : null]);
 }
 
-export async function getCalendarMonth(sql: postgres.Sql<any>, month: string, region = process.env.REGION ?? "IN"): Promise<CalendarEntryDTO[]> {
+export async function getCalendarMonth(sql: postgres.Sql, month: string, region = process.env.REGION ?? "IN"): Promise<CalendarEntryDTO[]> {
   const monthStart = `${month}-01`;
   const releaseRows = await sql`
     SELECT tmdb_id, media_type, title, language, release_date::text AS release_date, rating, poster_url, overview,

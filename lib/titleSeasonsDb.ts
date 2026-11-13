@@ -75,7 +75,7 @@ export function toSeasonsDTO(row: CachedSeasons): TitleSeasonsDTO | null {
  *  absent from the map. Never touches TMDB — this is the call a poster grid
  *  makes, and it must stay free. */
 export async function getCachedSeasons(
-  sql: postgres.Sql<any>,
+  sql: postgres.Sql,
   keys: SeasonKey[],
 ): Promise<Map<string, CachedSeasons>> {
   const found = new Map<string, CachedSeasons>();
@@ -104,7 +104,7 @@ export async function getCachedSeasons(
  *  failure, unset key) must not be cached or it would mask a title for the
  *  full TTL. */
 export async function upsertSeasons(
-  sql: postgres.Sql<any>,
+  sql: postgres.Sql,
   key: SeasonKey,
   numberOfSeasons: number | null,
   notFound: boolean,

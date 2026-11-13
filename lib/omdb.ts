@@ -77,17 +77,20 @@ function nonEmpty(raw: unknown): string | null {
 /** Maps an OMDb payload onto our shape. The `Ratings` array and the top-level
  *  `imdbRating` disagree often enough (one is "N/A" while the other isn't) that
  *  both are read, with the top-level value winning when present. */
-export function parseOmdbPayload(payload: any): OmdbRatings {
-  if (!payload || payload.Response === "False") {
+export function parseOmdbPayload(payload: unknown): OmdbRatings {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) || (payload as Record<string, unknown>).Response === "False") {
     return { imdbId: null, imdbRating: null, imdbVotes: null, rtScore: null, metacritic: null, notFound: true };
   }
+  const record = payload as Record<string, unknown>;
 
   let imdbFromArray: number | null = null;
   let rtScore: number | null = null;
   let metacritic: number | null = null;
 
-  for (const entry of Array.isArray(payload.Ratings) ? payload.Ratings : []) {
-    switch (entry?.Source) {
+  for (const item of Array.isArray(record.Ratings) ? record.Ratings : []) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const entry = item as Record<string, unknown>;
+    switch (entry.Source) {
       case "Internet Movie Database":
         imdbFromArray = parseImdbScore(entry.Value);
         break;
@@ -103,20 +106,21 @@ export function parseOmdbPayload(payload: any): OmdbRatings {
   }
 
   return {
-    imdbId: nonEmpty(payload.imdbID),
-    imdbRating: parseImdbScore(payload.imdbRating) ?? imdbFromArray,
-    imdbVotes: parseVotes(payload.imdbVotes),
+    imdbId: nonEmpty(record.imdbID),
+    imdbRating: parseImdbScore(record.imdbRating) ?? imdbFromArray,
+    imdbVotes: parseVotes(record.imdbVotes),
     rtScore,
-    metacritic: metacritic ?? parsePercentScore(payload.Metascore),
+    metacritic: metacritic ?? parsePercentScore(record.Metascore),
     notFound: false,
   };
 }
 
-async function getJson(url: string): Promise<any | null> {
+async function getJson(url: string): Promise<Record<string, unknown> | null> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
     if (!res.ok) return null;
-    return await res.json();
+    const payload: unknown = await res.json();
+    return payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : null;
   } catch {
     // Transport-level failure. Deliberately indistinguishable from "no key" to
     // callers: both mean "we learned nothing", and neither may be cached.
@@ -166,7 +170,10 @@ export async function resolveOmdbLookup(mediaType: "movie" | "tv", tmdbId: numbe
   const payload = await getJson(url);
   if (!payload) return null;
 
-  const imdbId = mediaType === "movie" ? nonEmpty(payload.imdb_id) : nonEmpty(payload.external_ids?.imdb_id);
+  const externalIds = payload.external_ids;
+  const tvImdbId = externalIds && typeof externalIds === "object" && !Array.isArray(externalIds)
+    ? (externalIds as Record<string, unknown>).imdb_id : null;
+  const imdbId = mediaType === "movie" ? nonEmpty(payload.imdb_id) : nonEmpty(tvImdbId);
   const title = nonEmpty(payload.title) ?? nonEmpty(payload.name);
   const releaseDate = nonEmpty(payload.release_date) ?? nonEmpty(payload.first_air_date);
 
