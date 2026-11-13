@@ -31,6 +31,21 @@ export function reviewedCalendarEntry(row: {
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
     const announcement = [
+      { id: 1436202, title: 'Legacy', language: 'te', date: '2026-12-04', checkedAt: '2026-11-13T21:29:00Z', source: 'The Times of India / film makers',
+        url: 'https://timesofindia.indiatimes.com/entertainment/telugu/movies/news/legacy-vishwak-sen-announces-december-4-release-date-for-political-action-drama-says-politics-is-personal/articleshow/133837154.cms',
+        message: 'The makers announced a 4 December theatrical release. Check local showtimes; streaming availability is not established.' },
+      { id: 1511403, title: 'King 100', language: 'te', date: '2026-12-24', checkedAt: '2026-11-13T21:29:00Z', source: 'The Indian Express / Annapurna Studios',
+        url: 'https://indianexpress.com/article/entertainment/telugu/nagarjuna-tabu-film-king-100-glimpse-blends-action-with-emotion-10855355/',
+        message: 'The studio announced a worldwide 24 December theatrical release. Check local showtimes; streaming availability is not established.' },
+      { id: 1713187, title: 'Thagappan', language: 'ta', date: '2026-12-24', checkedAt: '2026-11-13T21:29:00Z', source: 'Cinema Express / film makers',
+        url: 'https://www.cinemaexpress.com/tamil/news/2026/Oct/23/jiiva-starrer-thagappan-gets-december-release',
+        message: 'The makers announced a 24 December theatrical release. Check local showtimes; streaming availability is not established.' },
+      { id: 1621270, title: 'Raawadi', language: 'ta', date: '2026-12-24', checkedAt: '2026-11-13T21:29:00Z', source: 'The New Indian Express / Seven Screen Studio',
+        url: 'https://www.newindianexpress.com/entertainment/2026/Sep/22/tamilnews2026sep21raawadi-locks-december-release-date',
+        message: 'The studio announced a worldwide 24 December theatrical release. Check local showtimes; streaming availability is not established.' },
+      { id: 1504729, title: 'Athimanoharam', language: 'ml', date: '2026-12-24', checkedAt: '2026-11-13T21:29:00Z', source: 'The Indian Express / Mohanlal',
+        url: 'https://indianexpress.com/article/entertainment/malayalam/mohanlal-confirms-athimanoharam-release-date-with-a-moving-note-10757540/',
+        message: 'The lead actor announced a 24 December theatrical release. Check local showtimes; streaming availability is not established.' },
       { id: 1381071, title: 'Godzilla Minus Zero', language: 'ja', date: '2026-11-20', source: 'PVR INOX Pictures / Bollywood Hungama',
         url: 'https://www.bollywoodhungama.com/news/bollywood/exclusive-godzilla-minus-zero-to-finally-release-in-india-on-november-20-pvr-inox-pictures-nayana-bijli-confirms-imax-release/',
         message: 'The Indian distributor confirmed a 20 November theatrical release. Check local showtimes; streaming availability is not established.' },

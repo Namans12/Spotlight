@@ -27,6 +27,11 @@ describe('calendar event identity', () => {
     expect(await getCalendarMonth(db([], [refreshed]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
   });
   it.each([
+    [1436202, 'Legacy', 'te', '2026-12-04', 'The Times of India / film makers'],
+    [1511403, 'King 100', 'te', '2026-12-24', 'The Indian Express / Annapurna Studios'],
+    [1713187, 'Thagappan', 'ta', '2026-12-24', 'Cinema Express / film makers'],
+    [1621270, 'Raawadi', 'ta', '2026-12-24', 'The New Indian Express / Seven Screen Studio'],
+    [1504729, 'Athimanoharam', 'ml', '2026-12-24', 'The Indian Express / Mohanlal'],
     [1381071, 'Godzilla Minus Zero', 'ja', '2026-11-20', 'PVR INOX Pictures / Bollywood Hungama'],
     [1510775, 'Gunmaaster G9', 'hi', '2026-11-27', 'Soham Rockstar Entertainment'],
     [1504630, 'Mysaa', 'te', '2026-11-27', 'NDTV / Rashmika Mandanna'],
