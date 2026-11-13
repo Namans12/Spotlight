@@ -1,5 +1,5 @@
 import { useOutletContext } from 'react-router-dom';
-import { useWatchlistContext } from '@/contexts/WatchlistContext';
+import { useWatchlistContext } from '@/contexts/watchlist-context';
 import { WatchlistView } from '@/components/watchlist/WatchlistView';
 import type { Movie } from '@/types/movie';
 

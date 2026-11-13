@@ -1,4 +1,4 @@
-import { useWatchlistContext } from '@/contexts/WatchlistContext';
+import { useWatchlistContext } from '@/contexts/watchlist-context';
 import { CustomListsPanel } from '@/components/watchlist/CustomListsPanel';
 
 export default function CustomLists() {

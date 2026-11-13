@@ -1,22 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { SidebarContext } from './sidebar-context';
 
 const STORAGE_KEY = 'spotlight:sidebar-expanded';
-
-interface SidebarState {
-  /** Desktop: drawer shows labels (240px) rather than the icon rail (72px). */
-  expanded: boolean;
-  toggleExpanded: () => void;
-  /** Mobile: the drawer is an overlay sheet instead of an inline column. */
-  mobileOpen: boolean;
-  setMobileOpen: (open: boolean) => void;
-  isMobile: boolean;
-  /** One handler for the topbar button, which means "collapse" on desktop and
-   *  "open the sheet" on mobile. */
-  toggle: () => void;
-}
-
-const SidebarContext = createContext<SidebarState | null>(null);
 
 function readStored(): boolean {
   if (typeof window === 'undefined') return true;
@@ -44,10 +30,4 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   );
 
   return <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>;
-}
-
-export function useSidebar(): SidebarState {
-  const ctx = useContext(SidebarContext);
-  if (!ctx) throw new Error('useSidebar must be used inside <SidebarProvider>');
-  return ctx;
 }

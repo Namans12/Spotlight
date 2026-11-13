@@ -2,7 +2,7 @@ import { type ReleaseItem, toMovie } from "@/types/digest";
 import { PosterCard } from "./PosterCard";
 import type { RatingLookup } from "@/hooks/useRatings";
 import { useSeasons } from "@/hooks/useSeasons";
-import { useWatchlistContext } from "@/contexts/WatchlistContext";
+import { useWatchlistContext } from "@/contexts/watchlist-context";
 
 interface ReleaseGridProps {
   items: ReleaseItem[];

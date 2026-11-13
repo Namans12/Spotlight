@@ -9,7 +9,7 @@ import { nextPair, recordPick, type DuelPick, type Weights } from '@/lib/duel';
 import { MOODS, rankTonight, type Mood, type TonightFilters } from '@/lib/tonight';
 import { feedbackWeights, recordTonightFeedback, type TonightFeedbackKind, type TonightFeedbackMap } from '@/lib/tonightFeedback';
 import type { DuelCandidate } from '@/lib/duel';
-import { useWatchlistContext } from '@/contexts/WatchlistContext';
+import { useWatchlistContext } from '@/contexts/watchlist-context';
 import { useAuth } from '@/hooks/useAuth';
 import { useDocumentMeta, siteUrl } from '@/hooks/useDocumentMeta';
 import { staticRouteMeta } from '../../shared/seo';

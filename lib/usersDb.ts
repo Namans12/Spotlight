@@ -21,7 +21,7 @@ export interface UserDTO {
   notifyWatchlistDrops: boolean;
 }
 
-function toUserDTO(row: any): UserDTO {
+function toUserDTO(row: postgres.Row): UserDTO {
   return {
     id: Number(row.id),
     email: row.email,

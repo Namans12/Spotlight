@@ -8,7 +8,7 @@ import { FilterSelect } from '@/components/ui/filter-select';
 import { useMediaScope } from '@/hooks/useMediaScope';
 import { useSeasons, type SeasonsLookup } from '@/hooks/useSeasons';
 import { languageName, compareByLanguageName } from '@/lib/languages';
-import { evidenceDate, providerDetails } from '@/components/release/ReleaseEvidence';
+import { evidenceDate, providerDetails } from '@/components/release/evidence-format';
 import { tmdbPoster } from '@/lib/tmdbImage';
 import { fetchProvidersBatch, providerKey } from '@/lib/providers';
 import type { CalendarEntryDTO, CalendarKind } from '../../shared/types/calendar';

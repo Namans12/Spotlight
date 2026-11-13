@@ -20,22 +20,57 @@ const GENERIC_BUY_RENT = "Buy/Rent";
 // A title can be purchasable in 30+ territories; listing every store is noise.
 const MAX_PROVIDERS = 3;
 
+interface TmdbProviderRegion {
+  link?: unknown;
+  [bucket: string]: unknown;
+}
+interface TmdbProviderDetails {
+  'watch/providers'?: { results?: Record<string, TmdbProviderRegion | undefined> };
+  [key: string]: unknown;
+}
+
+interface TmdbResultRow {
+  id: number;
+  title?: string;
+  name?: string;
+  media_type?: string;
+  poster_path?: string | null;
+  backdrop_path?: string | null;
+  overview?: string;
+  release_date?: string;
+  first_air_date?: string;
+  vote_average?: number;
+  original_language?: string;
+  genre_ids?: unknown;
+  vote_count?: unknown;
+}
+
+function regionEntries(details: TmdbProviderDetails | null | undefined, region: string, bucket: string): unknown[] {
+  const entries = details?.['watch/providers']?.results?.[region]?.[bucket];
+  return Array.isArray(entries) ? entries : [];
+}
+
+function providerName(entry: unknown): string {
+  if (!entry || typeof entry !== 'object') return '';
+  const name = (entry as Record<string, unknown>).provider_name;
+  return typeof name === 'string' ? name : '';
+}
+
 /** One entry per listing, empty string included. A nameless purchase-bucket
  * entry is kept deliberately: "there is a listing here but we cannot name the
  * store" still means the title is buyable. `normalizePlatforms` drops blanks
  * before anything reaches the UI, so this never yields a phantom platform. */
-function namesInRegion(details: any, region: string, buckets: readonly string[]): string[] {
-  const payload = details?.["watch/providers"]?.results?.[region] ?? {};
+function namesInRegion(details: TmdbProviderDetails | null | undefined, region: string, buckets: readonly string[]): string[] {
   const names: string[] = [];
   for (const bucket of buckets) {
-    for (const entry of payload[bucket] ?? []) {
-      names.push(entry?.provider_name ?? "");
+    for (const entry of regionEntries(details, region, bucket)) {
+      names.push(providerName(entry));
     }
   }
   return names;
 }
 
-function flatrateProviders(details: any, region: string): string[] {
+function flatrateProviders(details: TmdbProviderDetails | null | undefined, region: string): string[] {
   return normalizePlatforms(namesInRegion(details, region, AVAILABILITY_BUCKETS));
 }
 
@@ -50,27 +85,26 @@ function tagBuyRent(names: string[]): string[] {
   return names.length > 0 ? [GENERIC_BUY_RENT] : [];
 }
 
-function rentBuyProviders(details: any, region: string): string[] {
+function rentBuyProviders(details: TmdbProviderDetails | null | undefined, region: string): string[] {
   return tagBuyRent(namesInRegion(details, region, PURCHASE_BUCKETS));
 }
 
 /** Only listings explicitly observed in the requested region qualify. */
-export function resolveProviders(details: any, region: string): string[] {
+export function resolveProviders(details: TmdbProviderDetails | null | undefined, region: string): string[] {
   const subs = flatrateProviders(details, region);
   return subs.length > 0 ? subs.slice(0, MAX_PROVIDERS) : rentBuyProviders(details, region);
 }
 
 /** Preserve each local offer and monetization type independently. */
-export function resolveProviderOffers(details: any, region: string): ProviderOffer[] {
-  const payload = details?.["watch/providers"]?.results?.[region] ?? {};
+export function resolveProviderOffers(details: TmdbProviderDetails | null | undefined, region: string): ProviderOffer[] {
   const buckets: [string, AvailabilityType][] = [
     ["flatrate", "subscription"], ["free", "free"], ["ads", "ads"], ["rent", "rent"], ["buy", "buy"],
   ];
   const offers: ProviderOffer[] = [];
   const seen = new Set<string>();
   for (const [bucket, type] of buckets) {
-    for (const entry of payload[bucket] ?? []) {
-      const provider = normalizePlatform(entry?.provider_name ?? "");
+    for (const entry of regionEntries(details, region, bucket)) {
+      const provider = normalizePlatform(providerName(entry));
       const key = `${provider}:${type}`;
       if (provider && !seen.has(key)) { seen.add(key); offers.push({ provider, type }); }
     }
@@ -96,10 +130,10 @@ export interface TmdbMovieResult {
   voteCount?: number;
 }
 
-function mapResult(r: any, mediaType?: string): TmdbMovieResult {
+function mapResult(r: TmdbResultRow, mediaType?: string): TmdbMovieResult {
   return {
     id: r.id,
-    title: r.title || r.name,
+    title: r.title || r.name || "",
     mediaType: (mediaType || r.media_type || (r.title ? "movie" : "tv")) as "movie" | "tv",
     posterPath: r.poster_path ?? null,
     backdropPath: r.backdrop_path ?? null,
@@ -125,9 +159,9 @@ export async function tmdbSearchMulti(query: string): Promise<TmdbMovieResult[]>
   if (!res.ok) throw new Error(`TMDB search failed: ${res.status}`);
   const data = await res.json();
   return (data.results ?? [])
-    .filter((r: any) => r.media_type === "movie" || r.media_type === "tv")
+    .filter((r: TmdbResultRow) => r.media_type === "movie" || r.media_type === "tv")
     .slice(0, 20)
-    .map((r: any) => mapResult(r));
+    .map((r: TmdbResultRow) => mapResult(r));
 }
 
 export async function tmdbTrending(): Promise<TmdbMovieResult[]> {
@@ -136,9 +170,9 @@ export async function tmdbTrending(): Promise<TmdbMovieResult[]> {
   if (!res.ok) throw new Error(`TMDB trending failed: ${res.status}`);
   const data = await res.json();
   return (data.results ?? [])
-    .filter((r: any) => r.media_type === "movie" || r.media_type === "tv")
+    .filter((r: TmdbResultRow) => r.media_type === "movie" || r.media_type === "tv")
     .slice(0, 20)
-    .map((r: any) => mapResult(r));
+    .map((r: TmdbResultRow) => mapResult(r));
 }
 
 export async function tmdbPopularMovies(): Promise<TmdbMovieResult[]> {
@@ -146,7 +180,7 @@ export async function tmdbPopularMovies(): Promise<TmdbMovieResult[]> {
   const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`TMDB popular movies failed: ${res.status}`);
   const data = await res.json();
-  return (data.results ?? []).slice(0, 10).map((r: any) => mapResult(r, "movie"));
+  return (data.results ?? []).slice(0, 10).map((r: TmdbResultRow) => mapResult(r, "movie"));
 }
 
 export async function tmdbPopularTV(): Promise<TmdbMovieResult[]> {
@@ -154,7 +188,7 @@ export async function tmdbPopularTV(): Promise<TmdbMovieResult[]> {
   const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`TMDB popular TV failed: ${res.status}`);
   const data = await res.json();
-  return (data.results ?? []).slice(0, 10).map((r: any) => mapResult(r, "tv"));
+  return (data.results ?? []).slice(0, 10).map((r: TmdbResultRow) => mapResult(r, "tv"));
 }
 
 async function tmdbList(path: string, mediaType?: "movie" | "tv"): Promise<TmdbMovieResult[]> {
@@ -163,9 +197,9 @@ async function tmdbList(path: string, mediaType?: "movie" | "tv"): Promise<TmdbM
   if (!res.ok) throw new Error(`TMDB request failed: ${res.status}`);
   const data = await res.json();
   return (data.results ?? [])
-    .filter((r: any) => mediaType || r.media_type === "movie" || r.media_type === "tv")
+    .filter((r: TmdbResultRow) => mediaType || r.media_type === "movie" || r.media_type === "tv")
     .slice(0, 20)
-    .map((r: any) => mapResult(r, mediaType));
+    .map((r: TmdbResultRow) => mapResult(r, mediaType));
 }
 
 /** TMDB's own "recommendations" — behaviour-derived, generally stronger than /similar. */
@@ -271,8 +305,8 @@ export async function tmdbCollectionParts(
   const collection = await collectionRes.json();
 
   const parts: CollectionPart[] = (collection?.parts ?? [])
-    .filter((p: any) => typeof p?.id === "number")
-    .map((p: any) => ({
+    .filter((p: TmdbResultRow) => typeof p?.id === "number")
+    .map((p: TmdbResultRow) => ({
       id: p.id,
       title: p.title || "Untitled",
       posterPath: p.poster_path ?? null,
@@ -698,8 +732,8 @@ export async function tmdbDetail(mediaType: "movie" | "tv", id: number, region =
     releaseDate: r.release_date || r.first_air_date || "",
     rating: r.vote_average || null,
     runtime: mediaType === "movie" ? r.runtime ?? null : r.episode_run_time?.[0] ?? null,
-    genres: (r.genres ?? []).map((g: any) => g.name),
-    genreIds: (r.genres ?? []).map((g: any) => g.id).filter((id: any) => typeof id === "number"),
+    genres: (r.genres ?? []).map((g: { name: string }) => g.name),
+    genreIds: (r.genres ?? []).map((g: { id: unknown }) => g.id).filter((id: unknown) => typeof id === "number"),
     providers,
     availability: resolveProviderOffers(r, region),
     watchUrl: regionalWatchLink(r, region, { mediaType, id }),
@@ -779,7 +813,7 @@ export interface ProviderBatchResult {
 }
 
 /** Only forward the same title and territory's official TMDB watch link. */
-export function regionalWatchLink(details: any, region: string, key: ProviderKey): string | null {
+export function regionalWatchLink(details: TmdbProviderDetails | null | undefined, region: string, key: ProviderKey): string | null {
   const raw = details?.['watch/providers']?.results?.[region]?.link;
   if (typeof raw !== 'string') return null;
   try {

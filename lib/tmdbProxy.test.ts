@@ -62,6 +62,12 @@ describe('resolveProviders', () => {
   it('returns nothing when no tier has an answer', () => {
     expect(resolveProviders({}, 'IN')).toEqual([]);
   });
+
+  it('ignores malformed regional buckets and provider names', () => {
+    const details = { 'watch/providers': { results: { IN: { flatrate: 'invalid', rent: [null, { provider_name: 3 }, { provider_name: 'Apple TV' }] } } } };
+    expect(resolveProviders(details, 'IN')).toEqual(['Apple TV+ (Buy/Rent)']);
+    expect(resolveProviderOffers(details, 'IN')).toEqual([{ provider: 'Apple TV+', type: 'rent' }]);
+  });
 });
 
 describe('tmdbWatchProvidersBatch', () => {

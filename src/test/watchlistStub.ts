@@ -19,7 +19,7 @@ import type { WatchlistItem } from '@/types/movie';
  * `vi.mock` factories are hoisted above imports, so a suite reaches this
  * through an async factory:
  *
- *     vi.mock('@/contexts/WatchlistContext', async () => {
+ *     vi.mock('@/contexts/watchlist-context', async () => {
  *       const { watchlistStub } = await import('@/test/watchlistStub');
  *       return { useWatchlistContext: () => watchlistStub };
  *     });

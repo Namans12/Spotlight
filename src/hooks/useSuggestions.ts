@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Movie, WatchlistItem } from '@/types/movie';
 import { getRecommendations, getCredits, discover, type MediaType } from '@/lib/tmdb';
-import { useWatchlistContext } from '@/contexts/WatchlistContext';
+import { useWatchlistContext } from '@/contexts/watchlist-context';
 import { likedSeeds, opinionKey } from '@/lib/taste';
 
 export interface SuggestionRow {

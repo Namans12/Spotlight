@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchTitleDetail, titleDetailToMovie } from '@/lib/tmdbDetail';
 import { useAuth } from '@/hooks/useAuth';
-import { useWatchlistContext } from '@/contexts/WatchlistContext';
+import { useWatchlistContext } from '@/contexts/watchlist-context';
 import { ActionButton } from '@/components/watchlist/ActionButton';
 import { WatchedToggle } from '@/components/watchlist/WatchedToggle';
 import { TasteThumbs } from '@/components/watchlist/TasteThumbs';

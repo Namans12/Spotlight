@@ -22,7 +22,7 @@ vi.mock('@/lib/seasons', () => ({
   fetchSeasonsBatch: vi.fn().mockResolvedValue({}),
   seasonsKey: (tmdbId: number) => `tv:${tmdbId}`,
 }));
-vi.mock('@/contexts/WatchlistContext', async () => {
+vi.mock('@/contexts/watchlist-context', async () => {
   const { watchlistStub } = await import('@/test/watchlistStub');
   return { useWatchlistContext: () => watchlistStub };
 });

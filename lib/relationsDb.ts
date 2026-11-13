@@ -76,7 +76,7 @@ export interface TitleRelationsDTO {
   hasMore: boolean;
 }
 
-function toRelatedTitle(row: any): RelatedTitleDTO {
+function toRelatedTitle(row: postgres.Row): RelatedTitleDTO {
   return {
     tmdbId: Number(row.to_tmdb_id),
     mediaType: row.to_media_type,
@@ -150,7 +150,7 @@ async function walkMustChain(
     ORDER BY to_media_type, to_tmdb_id, hop, direction
   `;
 
-  return rows.map((row: any) => ({ direction: row.direction as "before" | "after", row: toRelatedTitle(row) }));
+  return rows.map((row) => ({ direction: row.direction as "before" | "after", row: toRelatedTitle(row) }));
 }
 
 /** Chronological order for `before` (oldest first) and `after` (next up

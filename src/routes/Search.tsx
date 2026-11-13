@@ -6,7 +6,7 @@ import { searchMovies } from '@/lib/tmdb';
 import { PosterCard } from '@/components/release/PosterCard';
 import { FilterSelect } from '@/components/ui/filter-select';
 import { fromMovie } from '@/types/digest';
-import { useWatchlistContext } from '@/contexts/WatchlistContext';
+import { useWatchlistContext } from '@/contexts/watchlist-context';
 import { useMediaScope } from '@/hooks/useMediaScope';
 import { useSeasons } from '@/hooks/useSeasons';
 import { useProviders } from '@/hooks/useProviders';

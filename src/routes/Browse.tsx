@@ -6,7 +6,7 @@ import { getTrending, getPopularMovies, getPopularTV } from '@/lib/tmdb';
 import { tmdbBackdrop } from '@/lib/tmdbImage';
 import { ActionButton } from '@/components/watchlist/ActionButton';
 import { PosterCard } from '@/components/release/PosterCard';
-import { useWatchlistContext } from '@/contexts/WatchlistContext';
+import { useWatchlistContext } from '@/contexts/watchlist-context';
 import { fromMovie } from '@/types/digest';
 import { PosterRow } from '@/components/release/PosterRow';
 import { useSuggestions } from '@/hooks/useSuggestions';

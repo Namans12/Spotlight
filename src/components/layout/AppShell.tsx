@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { SidebarProvider, useSidebar } from './SidebarContext';
+import { SidebarProvider } from './SidebarContext';
+import { useSidebar } from './sidebar-context';
 import { Topbar } from './Topbar';
 import { ToolbarOutlet, ToolbarProvider } from './Toolbar';
 import { Footer } from './Footer';

@@ -10,7 +10,7 @@ vi.mock('@/lib/tmdbDetail', () => ({ fetchTitleDetail: vi.fn().mockResolvedValue
   certification: null, budget: null, revenue: null, logoPath: null, trailer: null,
 }), titleDetailToMovie: vi.fn(() => ({})) }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ isAuthenticated: false }) }));
-vi.mock('@/contexts/WatchlistContext', () => ({ useWatchlistContext: () => ({ watched: [], opinions: {}, watchedKeys: new Set() }) }));
+vi.mock('@/contexts/watchlist-context', () => ({ useWatchlistContext: () => ({ watched: [], opinions: {}, watchedKeys: new Set() }) }));
 vi.mock('@/hooks/useRelations', () => ({ useRelations: () => ({ data: null }) }));
 vi.mock('@/hooks/useRatings', () => ({ useRating: () => ({ data: null }) }));
 vi.mock('@/hooks/useDocumentMeta', () => ({ useDocumentMeta: () => {}, siteUrl: () => 'https://example.com' }));

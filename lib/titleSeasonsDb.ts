@@ -45,7 +45,7 @@ export function isStale(fetchedAt: string): boolean {
   return Date.now() - at > TTL_MS;
 }
 
-function toCached(row: any): CachedSeasons {
+function toCached(row: postgres.Row): CachedSeasons {
   return {
     tmdbId: Number(row.tmdb_id),
     mediaType: row.media_type,

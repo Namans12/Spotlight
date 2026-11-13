@@ -1,7 +1,7 @@
 import { Movie } from '@/types/movie';
 import { PosterCard } from '@/components/release/PosterCard';
 import { fromMovie } from '@/types/digest';
-import { useWatchlistContext } from '@/contexts/WatchlistContext';
+import { useWatchlistContext } from '@/contexts/watchlist-context';
 import { useRatings } from '@/hooks/useRatings';
 import { useSeasons } from '@/hooks/useSeasons';
 import { useProviders, type ProvidersLookup } from '@/hooks/useProviders';

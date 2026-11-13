@@ -18,7 +18,7 @@ import { getOpinionsForUser } from "./opinionsDb.js";
 // of this file post-multi-user; every function signature below carries
 // userId specifically so that property can't quietly regress.
 
-function toItemDTO(row: any): WatchlistItemDTO {
+function toItemDTO(row: postgres.Row): WatchlistItemDTO {
   return {
     dbId: Number(row.id),
     tmdbId: Number(row.tmdb_id),
@@ -36,7 +36,7 @@ function toItemDTO(row: any): WatchlistItemDTO {
   };
 }
 
-function toListDTO(row: any): CustomListDTO {
+function toListDTO(row: postgres.Row): CustomListDTO {
   return { id: Number(row.id), name: row.name, createdAt: new Date(row.created_at).getTime() };
 }
 

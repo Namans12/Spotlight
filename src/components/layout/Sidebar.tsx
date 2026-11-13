@@ -3,10 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import * as SheetPrimitive from '@radix-ui/react-dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { SpotlightLogo } from '@/components/brand/SpotlightLogo';
-import { useWatchlistContext } from '@/contexts/WatchlistContext';
+import { useWatchlistContext } from '@/contexts/watchlist-context';
 import { useAuth } from '@/hooks/useAuth';
 import { fetchDigest } from '@/lib/api';
-import { useSidebar } from './SidebarContext';
+import { useSidebar } from './sidebar-context';
 import { cn, formatDayMonthYearTime } from '@/lib/utils';
 import {
   Home as HomeIcon,

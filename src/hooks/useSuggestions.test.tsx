@@ -5,7 +5,7 @@ import type { Movie, WatchlistItem } from '@/types/movie';
 import { useSuggestions } from './useSuggestions';
 
 const state = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
-vi.mock('@/contexts/WatchlistContext', () => ({ useWatchlistContext: () => state.current }));
+vi.mock('@/contexts/watchlist-context', () => ({ useWatchlistContext: () => state.current }));
 vi.mock('@/lib/tmdb', () => ({ getRecommendations: vi.fn(), getCredits: vi.fn(), discover: vi.fn() }));
 import { getRecommendations, getCredits } from '@/lib/tmdb';
 

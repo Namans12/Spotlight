@@ -12,7 +12,7 @@ import { searchMovies } from '@/lib/tmdb';
 // Search renders PosterCard for every result, which calls into the watchlist
 // context for its Add buttons — stubbed so a test doesn't need the real
 // hook's localStorage/network behaviour, only that Search wires it up.
-vi.mock('@/contexts/WatchlistContext', async () => {
+vi.mock('@/contexts/watchlist-context', async () => {
   const { watchlistStub } = await import('@/test/watchlistStub');
   return { useWatchlistContext: () => watchlistStub };
 });

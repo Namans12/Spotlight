@@ -4,10 +4,10 @@ import { toast } from 'sonner';
 import { Segmented } from '@/components/ui/segmented';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { SpotlightLogo } from '@/components/brand/SpotlightLogo';
-import { useWatchlistContext } from '@/contexts/WatchlistContext';
+import { useWatchlistContext } from '@/contexts/watchlist-context';
 import { useAuth } from '@/hooks/useAuth';
 import { useMediaScope, type MediaScope } from '@/hooks/useMediaScope';
-import { useSidebar } from './SidebarContext';
+import { useSidebar } from './sidebar-context';
 import { cn } from '@/lib/utils';
 import { Film, Tv, LayoutGrid, List, Eye, RefreshCw, LogOut, Bell } from 'lucide-react';
 

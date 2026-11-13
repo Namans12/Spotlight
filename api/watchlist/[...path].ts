@@ -155,7 +155,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         return sendJson(
           res,
           200,
-          rows.map((r: any) => ({ id: Number(r.id), name: r.name, createdAt: new Date(r.created_at).getTime() })),
+          rows.map((r) => ({ id: Number(r.id), name: r.name, createdAt: new Date(r.created_at).getTime() })),
         );
       }
       if (req.method === "POST") {

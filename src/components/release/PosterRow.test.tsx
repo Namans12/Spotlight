@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PosterRow } from './PosterRow';
 import type { Movie } from '@/types/movie';
 
-vi.mock('@/contexts/WatchlistContext', async () => {
+vi.mock('@/contexts/watchlist-context', async () => {
   const { watchlistStub } = await import('@/test/watchlistStub');
   return { useWatchlistContext: () => watchlistStub };
 });

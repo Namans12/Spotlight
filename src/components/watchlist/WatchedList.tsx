@@ -4,7 +4,7 @@ import { fromMovie } from '@/types/digest';
 import { useSeasons } from '@/hooks/useSeasons';
 import { useProviders } from '@/hooks/useProviders';
 import { TasteThumbs } from '@/components/watchlist/TasteThumbs';
-import { useWatchlistContext } from '@/contexts/WatchlistContext';
+import { useWatchlistContext } from '@/contexts/watchlist-context';
 import { Trophy } from 'lucide-react';
 
 interface WatchedListProps {

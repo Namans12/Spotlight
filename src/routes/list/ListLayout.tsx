@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { useWatchlistContext } from '@/contexts/WatchlistContext';
+import { useWatchlistContext } from '@/contexts/watchlist-context';
 import { AddToListDialog } from '@/components/watchlist/AddToListDialog';
 import { Toolbar } from '@/components/layout/Toolbar';
 import { cn } from '@/lib/utils';

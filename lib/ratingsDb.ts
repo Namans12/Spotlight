@@ -53,7 +53,7 @@ export function isStale(fetchedAt: string): boolean {
   return Date.now() - at > TTL_MS;
 }
 
-function toCached(row: any): CachedRating {
+function toCached(row: postgres.Row): CachedRating {
   return {
     tmdbId: Number(row.tmdb_id),
     mediaType: row.media_type,

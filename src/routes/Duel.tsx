@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Clapperboard, Loader2, Plus, RotateCcw, Sparkles, Swords, Tv } from 'lucide-react';
 import { getTrending, getPopularMovies, getPopularTV, getYouMayAlsoLike, type MediaType } from '@/lib/tmdb';
-import { useWatchlistContext } from '@/contexts/WatchlistContext';
+import { useWatchlistContext } from '@/contexts/watchlist-context';
 import { useGenres, useRuntimes } from '@/hooks/useProviders';
 import { buildPool, type PoolSource } from '@/lib/duelPool';
 import {

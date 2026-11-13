@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Eye, Sparkles, Clock, Copy, Check, Hourglass } from 'lucide-react';
-import { useWatchlistContext } from '@/contexts/WatchlistContext';
+import { useWatchlistContext } from '@/contexts/watchlist-context';
 import { useProviders, useRuntimes, useGenres } from '@/hooks/useProviders';
 import { computeWrapped, wrappedSummary, MIN_TITLES_FOR_WRAPPED, type Tally } from '@/lib/wrapped';
 import { formatRuntime } from '@/lib/format';
