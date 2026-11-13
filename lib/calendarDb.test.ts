@@ -405,6 +405,13 @@ describe('calendar event identity', () => {
     expect(entry.dateCorroboration).toBeNull();
     expect(entry.region).toBeNull();
   });
+  it('recognizes the separately corroborated 14 November Jayannth listing without inventing a TMDB identity', async () => {
+    const item = editorial({ origin: 'wikipedia', tmdb_id: null, title: 'Jayannth And The Jingo Pen', language: 'te', release_date: '2026-11-14',
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', platform_or_distributor: null, event_region: null, evidence: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry).toMatchObject({ region: 'IN', tmdbId: null, kind: 'theatrical' });
+    expect(entry.dateCorroboration?.source).toBe('BookMyShow');
+  });
   it('collapses matching Wikipedia observations and preserves different evidence', async () => {
     const item = editorial({ origin: 'wikipedia', event_region: null, evidence: null, observation_fingerprint: 'same observation' });
     const entries = await getCalendarMonth(db([], [item, { ...item, id: 2 },

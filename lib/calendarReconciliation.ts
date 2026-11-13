@@ -224,6 +224,11 @@ export function reviewedCalendarEntry(row: {
           sourceUrl: 'https://www.thehansindia.com/cinema/jayannth-and-the-jingo-pen-locks-nov-14-release-1140244',
           message: 'Date needs review: the filmmakers’ trailer announcement lists 12 November, while later reporting lists 14 November. The TMDB identity and local release event remain unconfirmed.' };
       }
+      if (row.title === 'Jayannth And The Jingo Pen' && row.release_date === '2026-11-14') {
+        return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T14:54:00Z', source: 'BookMyShow',
+          sourceUrl: 'https://in.bookmyshow.com/movies/mumbai/jayannth-the-jingo-pen/ET00526028',
+          message: 'BookMyShow lists the Telugu film for 14 November in India, matching its director and cast. Bookings were not open on the checked listing; the TMDB identity remains unverified.' };
+      }
     }
     if (Number(row.tmdb_id) === 1450342 && row.title === 'Bhogi' && row.release_date === '2026-11-12' &&
         row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') {
