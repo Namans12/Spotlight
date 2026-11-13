@@ -44,12 +44,11 @@ def normalize_platform(raw: str) -> str:
     if not name:
         return ""
     # Add-on channels must not imply a standalone subscription match.
-    if _ADD_ON_CHANNEL.search(name):
-        return name
-
     # A service can carry more than one suffix ("... with Ads Amazon Channel").
     changed = True
     while changed:
+        if _ADD_ON_CHANNEL.search(name):
+            return name
         changed = False
         for suffix in suffixes:
             if name.lower().endswith(suffix.lower()):
@@ -89,7 +88,7 @@ def classify_platform(entry_type: str | None, platform_field: str | None) -> str
     parts = split_platform_field(platform_field)
 
     for part in parts:
-        if normalize_platform(_ADD_ON_CHANNEL.sub("", part)).lower() in streamers:
+        if normalize_platform(_ADD_ON_CHANNEL.sub("", normalize_platform(part))).lower() in streamers:
             return "streaming"
     for part in parts:
         if part.lower() in tv_networks:

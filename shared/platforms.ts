@@ -18,11 +18,10 @@ export function normalizePlatform(raw: string): string {
   if (!name) return "";
   // A channel add-on is a distinct offer: the standalone service name does
   // not establish access through the selected base subscription.
-  if (ADD_ON_CHANNEL.test(name)) return name;
-
   // A service can carry more than one suffix ("... with Ads Amazon Channel").
   let changed = true;
   while (changed) {
+    if (ADD_ON_CHANNEL.test(name)) return name;
     changed = false;
     for (const suffix of STRIP_SUFFIXES) {
       if (name.toLowerCase().endsWith(suffix.toLowerCase())) {
@@ -62,7 +61,8 @@ export function splitPlatformField(raw: string | null | undefined): string[] {
 
 /** Whether a name maps to a known streaming service, rather than a distributor. */
 export function isKnownStreamer(name: string): boolean {
-  return KNOWN_STREAMERS.has(normalizePlatform(name.replace(ADD_ON_CHANNEL, '')).toLowerCase());
+  const normalized = normalizePlatform(name);
+  return KNOWN_STREAMERS.has(normalizePlatform(normalized.replace(ADD_ON_CHANNEL, '')).toLowerCase());
 }
 
 /**

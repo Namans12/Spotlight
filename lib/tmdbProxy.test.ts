@@ -40,6 +40,9 @@ describe('resolveProviders', () => {
     expect(resolveProviders(details, 'IN')).toEqual(['MUBI Amazon Channel']);
     expect(resolveProviderOffers(details, 'IN')).toEqual([{ provider: 'MUBI Amazon Channel', type: 'subscription' }]);
     expect(classifyPlatform('Show', 'MUBI Amazon Channel')).toBe('streaming');
+    const ads = watchProvidersPayload('IN', { ads: [{ provider_name: 'MUBI Amazon Channel with Ads' }] });
+    expect(resolveProviderOffers(ads, 'IN')).toEqual([{ provider: 'MUBI Amazon Channel', type: 'ads' }]);
+    expect(classifyPlatform('Show', 'MUBI Amazon Channel with Ads')).toBe('streaming');
   });
   it('prefers a local subscription over everything else', () => {
     const details = watchProvidersPayload('IN', {
