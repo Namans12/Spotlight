@@ -19,6 +19,19 @@ function db(releases: unknown[], calendar: unknown[]) {
 
 describe('calendar event identity', () => {
   it.each([
+    [1733594, 'Shankarabharana', 'kn'],
+    [1735403, 'Brindavihari', 'kn'],
+    [1540824, 'Sathyavan Savithiri', 'ta'],
+  ])('corroborates only the exact India theatrical observation for %s', async (id, title, language) => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date: '2026-11-20',
+      source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry).toMatchObject({ region: 'IN', tmdbId: id, kind: 'theatrical' });
+    expect(entry.dateCorroboration?.source).toBe('BookMyShow');
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
+    expect(await getCalendarMonth(db([], [{ ...item, release_date: '2026-11-21' }]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+  });
+  it.each([
     [310209, 'Nine to Six', 'tv', 'Show', 'ko', '2026-11-11', 'tmdb_global_first_air', null, 'SBS'],
     [1450342, 'Bhogi', 'movie', 'Movie', 'te', '2026-11-12', 'tmdb_regional_theatrical', 'IN', '123telugu'],
   ])('retains an independent conflict after a matching TMDB refresh for %s', async (id, title, media_type, entry_type, language, release_date, date_source, event_region, source) => {

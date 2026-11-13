@@ -51,6 +51,17 @@ export function reviewedCalendarEntry(row: {
       message: 'Date needs review: local reporting says the announced 12 November release has been postponed; no replacement date is confirmed here.' };
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie') {
+    const regionalFilms = [
+      { id: 1733594, title: 'Shankarabharana', language: 'kn', url: 'https://in.bookmyshow.com/movies/mumbai/shankarabharanna/ET00523262' },
+      { id: 1735403, title: 'Brindavihari', language: 'kn', url: 'https://in.bookmyshow.com/movies/karad/brindavihari/ET00520736' },
+      { id: 1540824, title: 'Sathyavan Savithiri', language: 'ta', url: 'https://in.bookmyshow.com/movies/delhi/sathyavan-savithiri/ET00522599' },
+    ].find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language &&
+      row.source_url === `https://www.themoviedb.org/movie/${item.id}`);
+    if (regionalFilms && row.release_date === '2026-11-20' && row.platform_or_distributor == null) {
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T15:02:00Z', source: 'BookMyShow',
+        sourceUrl: regionalFilms.url,
+        message: 'BookMyShow lists this film for 20 November in India; its director and cast match TMDB. Bookings were not open on the checked listing, and streaming availability is unconfirmed.' };
+    }
     if (Number(row.tmdb_id) === 1322273 && row.language === 'te' && row.title === 'Aakasam Lo Oka Tara' && row.platform_or_distributor == null &&
         row.release_date === '2026-11-20' && row.source_url === 'https://www.themoviedb.org/movie/1322273') {
       return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T14:57:00Z', source: 'The New Indian Express',
