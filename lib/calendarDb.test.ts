@@ -502,6 +502,12 @@ describe('calendar event identity', () => {
     expect(entry.kind).toBe('unknown');
     expect(entry.isTheatrical).toBe(false);
   });
+  it('does not infer a cinema event from an unverified legacy ticketing movie', async () => {
+    const item = editorial({ origin: 'district_in', title: 'Unverified film', tmdb_id: null, event_region: null, evidence: null,
+      source_url: 'https://www.district.in/movies/example', platform_or_distributor: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry).toMatchObject({ kind: 'unknown', isTheatrical: false, region: null, evidenceStatus: 'unverified' });
+  });
   it('merges credit-matched Aakasamlo Oka Tara observations for India', async () => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: null, title: 'Aakasamlo Oka Tara', language: 'te',
       release_date: '2026-11-20', source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', event_region: null, evidence: null, platform_or_distributor: null });
