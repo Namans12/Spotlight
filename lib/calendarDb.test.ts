@@ -18,6 +18,14 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('keeps the disputed BBC Cunk observation hidden after a matching global-air refresh', async () => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 335981, media_type: 'tv', entry_type: 'Show', title: 'Cunk on Cinema',
+      language: 'en', release_date: '2026-11-30', platform_or_distributor: 'BBC Two', source_url: 'https://www.themoviedb.org/tv/335981',
+      event_region: null, evidence: null });
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+    const refreshed = { ...item, evidence: { region: null, date_source: 'tmdb_global_first_air', source_url: 'https://www.themoviedb.org/tv/335981' } };
+    expect(await getCalendarMonth(db([], [refreshed]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+  });
   it.each([
     [1381071, 'Godzilla Minus Zero', 'ja', '2026-11-20', 'PVR INOX Pictures / Bollywood Hungama'],
     [1510775, 'Gunmaaster G9', 'hi', '2026-11-27', 'Soham Rockstar Entertainment'],

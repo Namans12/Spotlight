@@ -21,6 +21,13 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('keeps the old Cunk on Cinema observation in the date-conflict queue', () => {
+    const item = row({ origin: 'tmdb_upcoming', tmdb_id: 335981, media_type: 'tv', entry_type: 'Show', title: 'Cunk on Cinema',
+      language: 'en', release_date: '2026-11-30', platform_or_distributor: 'BBC Two', source_url: 'https://www.themoviedb.org/tv/335981' });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-13T21:06:00Z'));
+    expect(review.reasons).toContain('date_conflict');
+    expect(review.reviewSourceUrl).toContain('rts.org.uk');
+  });
   it.each([
     [1214368, 'Golmaal 5', 'hi', '2026-12-04'],
     [1257973, 'Fauzi', 'te', '2026-12-03'],

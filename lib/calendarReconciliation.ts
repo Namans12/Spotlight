@@ -8,6 +8,13 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'tmdb_upcoming' && Number(row.tmdb_id) === 335981 && row.media_type === 'tv' && row.entry_type === 'Show' &&
+      row.title === 'Cunk on Cinema' && row.language === 'en' && row.release_date === '2026-11-30' &&
+      row.platform_or_distributor === 'BBC Two' && row.source_url === 'https://www.themoviedb.org/tv/335981') {
+    return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-13T21:06:00Z', source: 'Royal Television Society',
+      sourceUrl: 'https://rts.org.uk/article/diane-morgan-baffles-benedict-cumberbatch-trailer-cunk-cinema',
+      message: 'BBC Two’s UK run starts on 12 November, according to reporting on the broadcaster’s announcement. The 30 November observation remains hidden; the India streaming date must be verified separately.' };
+  }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
     const announcement = [
       { id: 1381071, title: 'Godzilla Minus Zero', language: 'ja', date: '2026-11-20', source: 'PVR INOX Pictures / Bollywood Hungama',
