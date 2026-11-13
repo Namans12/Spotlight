@@ -47,6 +47,12 @@ export function reviewedCalendarEntry(row: {
       { id: 1503283, title: 'Makkal Kaavalan', language: 'ta', date: '2026-12-04', source: 'The New Indian Express / Neelam Studios',
         url: 'https://www.newindianexpress.com/entertainment/2026/Sep/30/tamilnews2026sep29makkal-kaavalan-gets-december-release-date',
         message: 'The studio announced a 4 December theatrical release. Check local showtimes; streaming availability is not established.' },
+      { id: 1395627, title: 'Vrushakarma', language: 'te', date: '2026-12-04', source: 'Cinema Express / SVCC',
+        url: 'https://www.cinemaexpress.com/telugu/news/2026/Oct/28/dil-raju-acquires-vrushakarma-theatrical-rights-for-ap-telangana-and-karnataka',
+        message: 'The makers announced a 4 December release and Indian theatrical distribution. Check local showtimes; streaming availability is not established.' },
+      { id: 718833, title: 'Bokshi', language: 'hi', date: '2026-12-04', source: 'Cinema Express / Lorien Motion Pictures',
+        url: 'https://www.cinemaexpress.com/hindi/news/2026/Oct/08/bokshi-critically-appreciated-horror-film-gets-new-release-date',
+        message: 'The producer announced an India theatrical release on 4 December after postponement. Check local showtimes; streaming availability is not established.' },
     ].find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language && row.release_date === item.date &&
       row.source_url === `https://www.themoviedb.org/movie/${item.id}`);
     if (announcement) return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T20:50:00Z',

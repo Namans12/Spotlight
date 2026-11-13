@@ -37,6 +37,8 @@ describe('calendar event identity', () => {
     [1654912, 'Mayan - Chapter 1', 'ml', '2026-12-03', 'The New Indian Express'],
     [1489396, 'Eetha', 'hi', '2026-12-04', 'Hindustan Times / Maddock Films'],
     [1503283, 'Makkal Kaavalan', 'ta', '2026-12-04', 'The New Indian Express / Neelam Studios'],
+    [1395627, 'Vrushakarma', 'te', '2026-12-04', 'Cinema Express / SVCC'],
+    [718833, 'Bokshi', 'hi', '2026-12-04', 'Cinema Express / Lorien Motion Pictures'],
   ])('limits independently confirmed theatrical date for %s to the matching observation and region', async (id, title, language, release_date, source) => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date,
       source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });
