@@ -82,6 +82,9 @@ export function reviewedCalendarEntry(row: {
       { id: 1763356, title: 'Cousin Isha', language: 'hi', date: '2026-12-04', checkedAt: '2026-11-13T21:19:00Z', source: 'BookMyShow',
         url: 'https://in.bookmyshow.com/movies/pune/cousin-isha/ET00516373',
         message: 'BookMyShow lists a 4 December release; bookings were not open when checked. The makers’ date is unconfirmed. Check local showtimes; streaming availability is not established.' },
+      { id: 1619638, title: 'Idupu Kayitham', language: 'te', date: '2026-12-11', checkedAt: '2026-11-13T21:22:00Z', source: 'Shreyas Media',
+        url: 'https://www.shreyasgroup.net/post/idupu-kayitham-teaser-launch-event-by-shreyas-media',
+        message: 'The film’s promotional event partner lists an 11 December theatrical release. Check local showtimes; streaming availability is not established.' },
     ].find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language && row.release_date === item.date &&
       row.source_url === `https://www.themoviedb.org/movie/${item.id}`);
     if (announcement) return { type: 'regional' as const, region: 'IN', checkedAt: announcement.checkedAt ?? '2026-11-13T20:50:00Z',
