@@ -28,6 +28,11 @@ describe('Tonight ranking', () => {
     expect(rankTonight(items, { ...filters, services: ['Netflix'] }, {}, lookup).map(x => x.candidate.id)).toEqual([2]);
     expect(rankTonight(items, { ...filters, services: ['Netflix'], includeRentBuy: true }, {}, lookup).map(x => x.candidate.id)).toEqual([1, 2]);
   });
+  it('does not match a standalone service to its separately listed channel add-on', () => {
+    const channel = () => [{ provider: 'MUBI Amazon Channel', type: 'subscription' as const }];
+    expect(rankTonight([candidate(1)], { ...filters, services: ['MUBI'] }, {}, channel)).toEqual([]);
+    expect(rankTonight([candidate(1)], { ...filters, services: ['MUBI Amazon Channel'] }, {}, channel)).toHaveLength(1);
+  });
   it('does not imply that empty or missing provider data is unavailable', () => {
     const result = rankTonight([candidate(3), candidate(4)], filters, {}, lookup);
     expect(result).toHaveLength(2);

@@ -19,6 +19,7 @@ from functools import lru_cache
 from pathlib import Path
 
 _DATA_PATH = Path(__file__).resolve().parent / "shared" / "platforms.json"
+_ADD_ON_CHANNEL = re.compile(r"\s+(?:Amazon Channel|Apple TV Channel|Roku Premium Channel)$", re.IGNORECASE)
 
 
 @lru_cache(maxsize=1)
@@ -42,6 +43,9 @@ def normalize_platform(raw: str) -> str:
     name = (raw or "").strip()
     if not name:
         return ""
+    # Add-on channels must not imply a standalone subscription match.
+    if _ADD_ON_CHANNEL.search(name):
+        return name
 
     # A service can carry more than one suffix ("... with Ads Amazon Channel").
     changed = True
@@ -85,7 +89,7 @@ def classify_platform(entry_type: str | None, platform_field: str | None) -> str
     parts = split_platform_field(platform_field)
 
     for part in parts:
-        if normalize_platform(part).lower() in streamers:
+        if normalize_platform(_ADD_ON_CHANNEL.sub("", part)).lower() in streamers:
             return "streaming"
     for part in parts:
         if part.lower() in tv_networks:

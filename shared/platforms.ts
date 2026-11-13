@@ -5,6 +5,7 @@ const ALIASES: Record<string, string> = platformData.aliases;
 // Longest-first so " Amazon Channel" is stripped before the shorter " Channel"
 // would chop it into a half-name.
 const STRIP_SUFFIXES: string[] = [...platformData.stripSuffixes].sort((a, b) => b.length - a.length);
+const ADD_ON_CHANNEL = /\s+(?:Amazon Channel|Apple TV Channel|Roku Premium Channel)$/i;
 
 /**
  * Collapses TMDB's several spellings of the same service into one canonical
@@ -15,6 +16,9 @@ const STRIP_SUFFIXES: string[] = [...platformData.stripSuffixes].sort((a, b) => 
 export function normalizePlatform(raw: string): string {
   let name = (raw || "").trim();
   if (!name) return "";
+  // A channel add-on is a distinct offer: the standalone service name does
+  // not establish access through the selected base subscription.
+  if (ADD_ON_CHANNEL.test(name)) return name;
 
   // A service can carry more than one suffix ("... with Ads Amazon Channel").
   let changed = true;
@@ -58,7 +62,7 @@ export function splitPlatformField(raw: string | null | undefined): string[] {
 
 /** Whether a name maps to a known streaming service, rather than a distributor. */
 export function isKnownStreamer(name: string): boolean {
-  return KNOWN_STREAMERS.has(normalizePlatform(name).toLowerCase());
+  return KNOWN_STREAMERS.has(normalizePlatform(name.replace(ADD_ON_CHANNEL, '')).toLowerCase());
 }
 
 /**
@@ -74,7 +78,7 @@ export function classifyPlatform(entryType: string | null | undefined, platformF
   const parts = splitPlatformField(platformField);
 
   for (const part of parts) {
-    if (KNOWN_STREAMERS.has(normalizePlatform(part).toLowerCase())) return "streaming";
+    if (isKnownStreamer(part)) return "streaming";
   }
   for (const part of parts) {
     if (TV_NETWORKS.has(part.toLowerCase())) return "tv_network";

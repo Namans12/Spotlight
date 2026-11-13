@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { classifyPlatform } from '../shared/platforms';
 
 // Same shape-free alias lib/tmdbProxy.ts uses for raw TMDB JSON: these
 // fixtures are deliberately partial payloads, not typed records.
@@ -34,6 +35,12 @@ afterEach(() => {
 });
 
 describe('resolveProviders', () => {
+  it('keeps add-on channels distinct from standalone subscriptions', () => {
+    const details = watchProvidersPayload('IN', { flatrate: [{ provider_name: 'MUBI Amazon Channel' }] });
+    expect(resolveProviders(details, 'IN')).toEqual(['MUBI Amazon Channel']);
+    expect(resolveProviderOffers(details, 'IN')).toEqual([{ provider: 'MUBI Amazon Channel', type: 'subscription' }]);
+    expect(classifyPlatform('Show', 'MUBI Amazon Channel')).toBe('streaming');
+  });
   it('prefers a local subscription over everything else', () => {
     const details = watchProvidersPayload('IN', {
       flatrate: [{ provider_name: 'Netflix' }],
