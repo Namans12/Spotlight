@@ -10,10 +10,8 @@ export function providerKey(mediaType: string, tmdbId: number): string {
   return `${mediaType}:${tmdbId}`;
 }
 
-/** Batch "where to watch" lookup ("Netflix", "HBO", "Apple TV+ (Buy/Rent)") for
- * a grid or row of titles. One request no matter how many keys are passed —
- * the fan-out to TMDB happens server-side (see api/tmdb/[...path].ts's
- * "providers-batch" route), so the browser never fires one request per card.
+/** Batch "where to watch" lookup for a grid or row of titles. Requests are
+ * limited to 100 unique titles each; TMDB fan-out happens server-side.
  *
  * A key that TMDB failed to resolve (rate limit, transient error) is simply
  * absent from the response rather than mapped to an empty list — see
@@ -34,10 +32,8 @@ export interface ProviderBatch {
   genres: Record<string, string[]>;
 }
 
-export async function fetchProvidersBatch(keys: ProviderSubject[]): Promise<ProviderBatch> {
-  if (keys.length === 0) return { providers: {}, runtimes: {}, genres: {} };
-  const ids = [...new Set(keys.map((k) => providerKey(k.mediaType, k.id)))].join(",");
-  const data = await fetchJson<unknown>(`/api/tmdb/providers-batch?ids=${encodeURIComponent(ids)}`);
+async function fetchProviderChunk(ids: string[]): Promise<ProviderBatch> {
+  const data = await fetchJson<unknown>(`/api/tmdb/providers-batch?ids=${encodeURIComponent(ids.join(','))}`);
 
   // Two shapes are accepted on purpose. The route now answers
   // `{ providers, runtimes }`, but it used to answer the bare providers map,
@@ -53,4 +49,29 @@ export async function fetchProvidersBatch(keys: ProviderSubject[]): Promise<Prov
     return { providers: batch.providers ?? {}, availability: batch.availability ?? {}, watchLinks: batch.watchLinks ?? {}, runtimes: batch.runtimes ?? {}, genres: batch.genres ?? {}, hadFailures: batch.hadFailures === true };
   }
   return { providers: (data as Record<string, string[]>) ?? {}, runtimes: {}, genres: {} };
+}
+
+/** Match the server limit; omitted chunks remain unknown when a request fails. */
+export async function fetchProvidersBatch(keys: ProviderSubject[]): Promise<ProviderBatch> {
+  const ids = [...new Set(keys.map((key) => providerKey(key.mediaType, key.id)))];
+  const combined: ProviderBatch = { providers: {}, availability: {}, watchLinks: {}, runtimes: {}, genres: {} };
+  let successes = 0;
+  let lastError: unknown;
+  for (let offset = 0; offset < ids.length; offset += 100) {
+    try {
+      const result = await fetchProviderChunk(ids.slice(offset, offset + 100));
+      successes++;
+      Object.assign(combined.providers, result.providers);
+      Object.assign(combined.availability!, result.availability);
+      Object.assign(combined.watchLinks!, result.watchLinks);
+      Object.assign(combined.runtimes, result.runtimes);
+      Object.assign(combined.genres, result.genres);
+      if (result.hadFailures) combined.hadFailures = true;
+    } catch (error) {
+      lastError = error;
+      combined.hadFailures = true;
+    }
+  }
+  if (ids.length && !successes) throw lastError;
+  return combined;
 }
