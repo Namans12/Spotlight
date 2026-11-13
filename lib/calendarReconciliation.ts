@@ -51,6 +51,12 @@ export function reviewedCalendarEntry(row: {
       message: 'Date needs review: local reporting says the announced 12 November release has been postponed; no replacement date is confirmed here.' };
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie') {
+    if (Number(row.tmdb_id) === 1322273 && row.language === 'te' && row.title === 'Aakasam Lo Oka Tara' && row.platform_or_distributor == null &&
+        row.release_date === '2026-11-20' && row.source_url === 'https://www.themoviedb.org/movie/1322273') {
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T14:57:00Z', source: 'The New Indian Express',
+        sourceUrl: 'https://www.newindianexpress.com/entertainment/2026/Sep/18/telugunews2026sep17dulquer-salmaans-aakasamlo-oka-tara-gets-november-release-date',
+        message: 'The makers announced a 20 November theatrical release; reporting and TMDB match the director and cast. Showtimes and streaming availability remain unconfirmed.' };
+    }
     if (Number(row.tmdb_id) === 1805816 && row.language === 'kn' && row.title === 'Lambodhara 2.0' && row.platform_or_distributor == null &&
         row.release_date === '2026-11-20' && row.source_url === 'https://www.themoviedb.org/movie/1805816') {
       return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-11T11:48:00Z', source: 'SouthSide Studio',
@@ -210,9 +216,9 @@ export function reviewedCalendarEntry(row: {
           message: 'BookMyShow lists the Telugu film for 13 November in India; bookings were not yet open when checked. The TMDB identity remains unverified.' };
       }
       if (row.title === 'Aakasamlo Oka Tara' && row.release_date === '2026-11-20' && row.platform_or_distributor == null) {
-        return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-11T10:31:35Z', source: 'Simply Mollywood',
-          sourceUrl: 'https://simplymollywood.com/movies/november-malayalam-movie-releases',
-          message: 'Kerala release reporting lists the film for 20 November in cinemas, citing the makers’ announcement. Showtimes and the TMDB identity remain unverified.' };
+        return { type: 'regional' as const, region: 'IN', reviewedTmdbId: 1322273, checkedAt: '2026-11-13T14:57:00Z', source: 'The New Indian Express',
+          sourceUrl: 'https://www.newindianexpress.com/entertainment/2026/Sep/18/telugunews2026sep17dulquer-salmaans-aakasamlo-oka-tara-gets-november-release-date',
+          message: 'The editorial listing and TMDB match the director and cast; the makers announced a 20 November theatrical release. Showtimes and streaming availability remain unconfirmed.' };
       }
       if (row.title === 'Dear Astronaut' && row.release_date === '2026-11-20') {
         return { type: 'corroboration' as const, checkedAt: '2026-11-10', source: 'Cinema Express',

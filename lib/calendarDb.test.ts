@@ -425,13 +425,17 @@ describe('calendar event identity', () => {
     expect(entry.kind).toBe('unknown');
     expect(entry.isTheatrical).toBe(false);
   });
-  it('scopes the reported Aakasamlo Oka Tara cinema release to India without inventing a title link', async () => {
+  it('merges credit-matched Aakasamlo Oka Tara observations for India', async () => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: null, title: 'Aakasamlo Oka Tara', language: 'te',
       release_date: '2026-11-20', source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', event_region: null, evidence: null, platform_or_distributor: null });
     const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
-    expect(entry).toMatchObject({ region: 'IN', kind: 'theatrical', tmdbId: null, evidenceStatus: 'regional' });
-    expect(entry.dateCorroboration?.sourceUrl).toContain('simplymollywood.com');
+    expect(entry).toMatchObject({ region: 'IN', kind: 'theatrical', tmdbId: 1322273, evidenceStatus: 'regional' });
+    expect(entry.dateCorroboration?.sourceUrl).toContain('newindianexpress.com');
     expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
+    const tmdb = editorial({ ...item, id: 2, origin: 'tmdb_upcoming', tmdb_id: 1322273, title: 'Aakasam Lo Oka Tara', source_url: 'https://www.themoviedb.org/movie/1322273' });
+    expect(await getCalendarMonth(db([], [item, tmdb]) as unknown as postgres.Sql, '2026-11', 'IN')).toHaveLength(1);
+    const [changed] = await getCalendarMonth(db([], [{ ...item, release_date: '2026-11-21' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(changed.tmdbId).toBeNull();
   });
   it.each([
     [1450342, 'Bhogi', '2026-11-12', 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', 'conflict'],
