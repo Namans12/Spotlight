@@ -8,6 +8,13 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'district_in' && row.tmdb_id == null && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.platform_or_distributor == null && row.language === 'te' && row.title === 'SYG: Sambarala Yeti Gattu' &&
+      row.release_date === '2027-01-12' && row.source_url === 'https://www.district.in/movies/syg-sambarala-yeti-gattu-movie-tickets-in-hyderabad-MV185888') {
+    return { type: 'regional' as const, region: 'IN', reviewedTmdbId: 1424955, checkedAt: '2026-11-13T15:14:00Z', source: 'BookMyShow',
+      sourceUrl: 'https://in.bookmyshow.com/movies/mussoorie/syg-sambarala-yeti-gattu/ET00427854',
+      message: 'The ticketing listings and TMDB match the director and cast; BookMyShow and TMDB list a 12 January India theatrical release. Bookings were not open when checked; verify showtimes and streaming availability.' };
+  }
   if (row.origin === 'tmdb_upcoming' && row.tmdb_id == null && row.media_type == null && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
     if (row.language === 'ta' && row.title === 'OM Chapter 1: Udhiram - The Blood Wood' &&
         ['2026-11-26', '2026-11-27'].includes(row.release_date) && row.source_url === 'https://www.themoviedb.org/movie/1384528') {

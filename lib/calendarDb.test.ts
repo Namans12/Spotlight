@@ -18,6 +18,22 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('merges the reviewed District and TMDB observations for Sambarala Yeti Gattu', async () => {
+    const district = editorial({ origin: 'district_in', tmdb_id: null, title: 'SYG: Sambarala Yeti Gattu', language: 'te', release_date: '2027-01-12',
+      source_url: 'https://www.district.in/movies/syg-sambarala-yeti-gattu-movie-tickets-in-hyderabad-MV185888', event_region: null, evidence: null, platform_or_distributor: null });
+    const tmdb = editorial({ id: 2, origin: 'tmdb_upcoming', tmdb_id: 1424955, title: 'Sambarala Yetti Gattu', language: 'te', release_date: '2027-01-12',
+      source_url: 'https://www.themoviedb.org/movie/1424955', event_region: 'IN', platform_or_distributor: null,
+      evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1424955' } });
+    for (const rows of [[district, tmdb], [tmdb, district]]) {
+      const entries = await getCalendarMonth(db([], rows) as unknown as postgres.Sql, '2027-01', 'IN');
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({ region: 'IN', tmdbId: 1424955, kind: 'theatrical' });
+      expect(entries[0].dateCorroboration?.source).toBe('BookMyShow');
+    }
+    const [changed] = await getCalendarMonth(db([], [{ ...district, release_date: '2027-01-13' }]) as unknown as postgres.Sql, '2027-01', 'IN');
+    expect(changed.tmdbId).toBeNull();
+    expect(changed.region).toBeNull();
+  });
   it.each([
     ['OM Chapter 1: Udhiram - The Blood Wood', 'ta', '2026-11-26', 1384528],
     ['OM Chapter 1: Udhiram - The Blood Wood', 'ta', '2026-11-27', 1384528],
