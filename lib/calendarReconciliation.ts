@@ -9,6 +9,19 @@ export function reviewedCalendarEntry(row: {
 }) {
   if (row.event_region != null || row.evidence != null) return null;
   if (row.origin === 'district_in' && row.tmdb_id == null && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.platform_or_distributor == null && row.release_date === '2027-01-01') {
+    if (row.language === 'mr' && row.title === 'Jhimma 3' && row.source_url === 'https://www.district.in/movies/jhimma-3-movie-tickets-in-hyderabad-MV218947') {
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T15:16:00Z', source: 'BookMyShow',
+        sourceUrl: 'https://in.bookmyshow.com/movies/pune/jhimma-3/ET00501318',
+        message: 'BookMyShow lists the Marathi film for 1 January in India, matching its director and lead. Showtimes, streaming availability and the TMDB identity remain unverified.' };
+    }
+    if (row.language === 'gu' && row.title === 'Super Kaand' && row.source_url === 'https://www.district.in/movies/super-kaand-movie-tickets-in-hyderabad-MV231030') {
+      return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T15:16:00Z', source: 'Gujarati Jagran',
+        sourceUrl: 'https://www.gujaratijagran.com/entertainment/super-kaand-gujarati-movie-official-teaser-release-date-2027-1976467',
+        message: 'Gujarati reporting on the teaser lists a 1 January theatrical release and matches the director and production details. Showtimes, streaming availability and the TMDB identity remain unverified.' };
+    }
+  }
+  if (row.origin === 'district_in' && row.tmdb_id == null && row.media_type === 'movie' && row.entry_type === 'Movie' &&
       row.platform_or_distributor == null && row.language === 'te' && row.title === 'SYG: Sambarala Yeti Gattu' &&
       row.release_date === '2027-01-12' && row.source_url === 'https://www.district.in/movies/syg-sambarala-yeti-gattu-movie-tickets-in-hyderabad-MV185888') {
     return { type: 'regional' as const, region: 'IN', reviewedTmdbId: 1424955, checkedAt: '2026-11-13T15:14:00Z', source: 'BookMyShow',
