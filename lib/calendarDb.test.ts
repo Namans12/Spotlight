@@ -345,6 +345,22 @@ describe('calendar event identity', () => {
   });
 
   it.each([
+    ['DNK: Donga Naa Koduku', 'DNK', 1641520, '2026-11-13'],
+    ['ENE Repeat', 'ENE Repeat', 1505644, '2026-11-19'],
+  ])('merges a newly imported %s observation only with the independently matched event', async (editorialTitle, tmdbTitle, id, date) => {
+    const wiki = editorial({ id: 1, origin: 'wikipedia', tmdb_id: null, media_type: 'movie', title: editorialTitle, language: 'te', release_date: date,
+      source_url: 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026', platform_or_distributor: null, event_region: null, evidence: null });
+    const tmdb = editorial({ id: 2, origin: 'tmdb_upcoming', tmdb_id: id, title: tmdbTitle, language: 'te', release_date: date,
+      source_url: `https://www.themoviedb.org/movie/${id}`, platform_or_distributor: null, event_region: null, evidence: null });
+    const entries = await getCalendarMonth(db([], [wiki, tmdb]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ region: 'IN', tmdbId: id, kind: 'theatrical' });
+    const [other] = await getCalendarMonth(db([], [{ ...wiki, release_date: '2026-11-21' }]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(other.tmdbId).toBeNull();
+    expect(other.region).toBeNull();
+  });
+
+  it.each([
     ['Dear Astronaut', '2026-11-20', 'Cinema Express'],
   ])('adds reporting for the exact Telugu record without assigning a region', async (title, release_date, source) => {
     const item = editorial({ origin: 'wikipedia', tmdb_id: null, title, language: 'te', release_date,

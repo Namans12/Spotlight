@@ -141,6 +141,18 @@ export function reviewedCalendarEntry(row: {
         message: 'The producers’ council reports a 13 November theatrical release, including Andhra Pradesh and Telangana. The stored TMDB link belongs to a different film; the correct title identity and showtimes are unconfirmed.' };
     }
     if (row.tmdb_id == null && row.language === 'te' && row.source_url === 'https://en.wikipedia.org/wiki/List_of_Telugu_films_of_2026') {
+      if (row.media_type === 'movie' && row.platform_or_distributor == null &&
+          row.title === 'DNK: Donga Naa Koduku' && row.release_date === '2026-11-13') {
+        return { type: 'regional' as const, region: 'IN', reviewedTmdbId: 1641520, checkedAt: '2026-11-13T14:15:00Z', source: 'BookMyShow',
+          sourceUrl: 'https://in.bookmyshow.com/movies/bengaluru/donga-naa-koduku/ET00521157',
+          message: 'The editorial listing, BookMyShow and TMDB identify the same film by its director and cast. The India theatrical date is reported for 13 November; showtimes and streaming availability are unconfirmed.' };
+      }
+      if (row.media_type === 'movie' && row.platform_or_distributor == null &&
+          row.title === 'ENE Repeat' && row.release_date === '2026-11-19') {
+        return { type: 'regional' as const, region: 'IN', reviewedTmdbId: 1505644, checkedAt: '2026-11-13T14:15:00Z', source: 'BookMyShow',
+          sourceUrl: 'https://in.bookmyshow.com/movies/national-capital-region-ncr/ene-repeat/ET00506990',
+          message: 'The editorial listing, BookMyShow and TMDB identify the same film by its director and cast. The India theatrical date is reported for 19 November; showtimes and streaming availability are unconfirmed.' };
+      }
       if (row.title === 'High' && row.release_date === '2026-11-27') {
         return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-10T18:30:54Z', source: 'Ticketnew',
           sourceUrl: 'https://ticketnew.com/movies/high-movie-detail-238606',
