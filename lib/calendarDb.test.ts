@@ -18,6 +18,16 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it.each([
+    [1257973, 'Fauzi', 'te', '2026-12-03'],
+    [1525648, 'Inji Vellam', 'ta', '2027-01-08'],
+  ])('keeps the superseded %s observation hidden even after matching TMDB evidence', async (id, title, language, release_date) => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date,
+      source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, release_date.slice(0, 7), 'IN')).toEqual([]);
+    const refreshed = { ...item, event_region: 'IN', evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: `https://www.themoviedb.org/movie/${id}` } };
+    expect(await getCalendarMonth(db([], [refreshed]) as unknown as postgres.Sql, release_date.slice(0, 7), 'IN')).toEqual([]);
+  });
   it('keeps the mismatched Student of the Year observation hidden', async () => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 674527, media_type: 'movie', entry_type: 'Show', title: 'Student of the Year 3',
       language: 'hi', release_date: '2026-12-25', source_url: 'https://www.themoviedb.org/tv/334412', event_region: null, evidence: null, platform_or_distributor: null });

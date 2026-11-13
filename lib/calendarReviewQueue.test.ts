@@ -21,6 +21,16 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it.each([
+    [1257973, 'Fauzi', 'te', '2026-12-03'],
+    [1525648, 'Inji Vellam', 'ta', '2027-01-08'],
+  ])('retains the superseded %s date for review', (id, title, language, release_date) => {
+    const item = row({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date, platform_or_distributor: null,
+      source_url: `https://www.themoviedb.org/movie/${id}` });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-13T21:00:00Z'));
+    expect(review.reasons).toContain('date_conflict');
+    expect(review.reviewSourceUrl).toMatch(/^https:\/\//);
+  });
   it('flags a TMDB source identity mismatch even when evidence is absent', () => {
     const item = row({ origin: 'tmdb_upcoming', tmdb_id: 674527, media_type: 'movie', entry_type: 'Show', title: 'Student of the Year 3', language: 'hi', platform_or_distributor: null,
       release_date: '2026-12-25', source_url: 'https://www.themoviedb.org/tv/334412', evidence: null });

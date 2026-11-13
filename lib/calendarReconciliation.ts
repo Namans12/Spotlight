@@ -8,6 +8,19 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
+    const postponed = [
+      { id: 1257973, title: 'Fauzi', language: 'te', date: '2026-12-03', source: 'India Today',
+        url: 'https://www.indiatoday.in/amp/movies/regional-cinema/story/prabhas-fauzi-release-delayed-makers-confirm-postponement-new-date-awaited-3000129-2026-09-22',
+        message: 'The producer confirmed that the announced 3 December release was postponed. This older observation remains hidden; verify any replacement date separately.' },
+      { id: 1525648, title: 'Inji Vellam', language: 'ta', date: '2027-01-08', source: 'The Indian Express',
+        url: 'https://indianexpress.com/article/entertainment/tamil/mani-ratnam-vijay-sethupathi-sai-pallavi-inji-vellam-gets-release-date-10959097/',
+        message: 'Reporting on the makers’ announcement gives 29 January for the theatrical release. This older 8 January observation remains hidden; check local showtimes separately.' },
+    ].find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language && row.release_date === item.date &&
+      row.source_url === `https://www.themoviedb.org/movie/${item.id}`);
+    if (postponed) return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-13T20:39:00Z',
+      source: postponed.source, sourceUrl: postponed.url, message: postponed.message };
+  }
   if (row.origin === 'tmdb_upcoming' && Number(row.tmdb_id) === 674527 && row.media_type === 'movie' && row.entry_type === 'Show' &&
       row.platform_or_distributor == null && row.language === 'hi' && row.title === 'Student of the Year 3' && row.release_date === '2026-12-25' &&
       row.source_url === 'https://www.themoviedb.org/tv/334412') {
