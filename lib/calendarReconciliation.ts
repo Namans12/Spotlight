@@ -10,6 +10,9 @@ export function reviewedCalendarEntry(row: {
   if (row.event_region != null || row.evidence != null) return null;
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
     const postponed = [
+      { id: 1214368, title: 'Golmaal 5', language: 'hi', date: '2026-12-04', source: 'India Today',
+        url: 'https://www.indiatoday.in/movies/bollywood/story/ajay-devgn-akshay-kumars-golmaal-5-locked-for-january-2027-see-new-poster-2998292-2026-09-19',
+        message: 'The filmmaker announced an 8 January 2027 theatrical release. This older 4 December observation remains hidden; verify current local showtimes separately.' },
       { id: 1257973, title: 'Fauzi', language: 'te', date: '2026-12-03', source: 'India Today',
         url: 'https://www.indiatoday.in/amp/movies/regional-cinema/story/prabhas-fauzi-release-delayed-makers-confirm-postponement-new-date-awaited-3000129-2026-09-22',
         message: 'The producer confirmed that the announced 3 December release was postponed. This older observation remains hidden; verify any replacement date separately.' },

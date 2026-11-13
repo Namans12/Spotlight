@@ -19,6 +19,7 @@ function db(releases: unknown[], calendar: unknown[]) {
 
 describe('calendar event identity', () => {
   it.each([
+    [1214368, 'Golmaal 5', 'hi', '2026-12-04'],
     [1257973, 'Fauzi', 'te', '2026-12-03'],
     [1525648, 'Inji Vellam', 'ta', '2027-01-08'],
   ])('keeps the superseded %s observation hidden even after matching TMDB evidence', async (id, title, language, release_date) => {

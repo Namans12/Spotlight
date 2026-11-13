@@ -22,6 +22,7 @@ describe('calendar evidence freshness', () => {
 
 describe('calendar reconciliation queue', () => {
   it.each([
+    [1214368, 'Golmaal 5', 'hi', '2026-12-04'],
     [1257973, 'Fauzi', 'te', '2026-12-03'],
     [1525648, 'Inji Vellam', 'ta', '2027-01-08'],
   ])('retains the superseded %s date for review', (id, title, language, release_date) => {
