@@ -15,6 +15,7 @@ import { useDocumentMeta, siteUrl } from '@/hooks/useDocumentMeta';
 import { staticRouteMeta } from '../../shared/seo';
 import { languageName } from '@/lib/languages';
 import { tmdbPoster } from '@/lib/tmdbImage';
+import { PrivateEvaluation } from '@/components/tonight/PrivateEvaluation';
 
 const DEFAULTS: TonightFilters = { mood: '', maxMinutes: null, language: '', services: [], includeRentBuy: false, mediaType: '' };
 const COMMON_SERVICES = ['Netflix', 'Amazon Prime', 'JioHotstar', 'ZEE5', 'SonyLIV'];
@@ -138,5 +139,7 @@ export default function Tonight() {
       <p className="text-xs text-muted-foreground">Optional feedback stays in this session. “Not for me” hides that title and gently lowers similar genres; the other options hide only that title.</p>
       {choices.length > 3 && <button type="button" className="rounded-lg border border-border px-3 py-2 text-xs" onClick={() => setOffset((offset + 3) >= choices.length ? 0 : offset + 3)}>More options</button>}
     </section>}
+    {showResults && <PrivateEvaluation candidates={candidates} filters={filters} weights={weights} feedback={feedback}
+      availability={details.data?.availability ?? {}} disabled={busy} />}
   </div>;
 }
