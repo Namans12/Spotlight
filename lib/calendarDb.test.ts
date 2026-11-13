@@ -18,6 +18,23 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('corrects a wrong Love & War identity without reusing its poster and merges matching evidence', async () => {
+    const district = editorial({ origin: 'district_in', tmdb_id: 1555752, title: 'Love & War', language: 'en', release_date: '2027-01-21',
+      source_url: 'https://www.district.in/movies/love-war-movie-tickets-in-hyderabad-MV169730', event_region: null, evidence: null,
+      platform_or_distributor: null, poster_url: 'https://example.org/wrong-poster.jpg' });
+    const tmdb = editorial({ id: 2, origin: 'tmdb_upcoming', tmdb_id: 1235057, title: 'Love & War', language: 'hi', release_date: '2027-01-21',
+      source_url: 'https://www.themoviedb.org/movie/1235057', event_region: 'IN', platform_or_distributor: null, poster_url: null,
+      evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: 'https://www.themoviedb.org/movie/1235057' } });
+    for (const rows of [[district, tmdb], [tmdb, district]]) {
+      const entries = await getCalendarMonth(db([], rows) as unknown as postgres.Sql, '2027-01', 'IN');
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({ region: 'IN', tmdbId: 1235057, language: 'hi', kind: 'theatrical', posterUrl: null });
+      expect(entries[0].dateCorroboration?.message).toContain('different film');
+    }
+    const [changed] = await getCalendarMonth(db([], [{ ...district, release_date: '2027-01-22' }]) as unknown as postgres.Sql, '2027-01', 'IN');
+    expect(changed.tmdbId).toBe(1555752);
+    expect(changed.region).toBeNull();
+  });
   it('scopes the independently reported Children of Blood and Bone cinema date to India', async () => {
     const item = editorial({ origin: 'district_in', tmdb_id: 621304, title: 'Children of Blood and Bone', language: 'en', release_date: '2027-01-15',
       source_url: 'https://www.district.in/movies/children-of-blood-and-bone-movie-tickets-in-hyderabad-MV227336', event_region: null, evidence: null, platform_or_distributor: null });

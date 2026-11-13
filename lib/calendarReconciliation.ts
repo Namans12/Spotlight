@@ -8,6 +8,14 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'district_in' && Number(row.tmdb_id) === 1555752 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.platform_or_distributor == null && row.language === 'en' && row.title === 'Love & War' && row.release_date === '2027-01-21' &&
+      row.source_url === 'https://www.district.in/movies/love-war-movie-tickets-in-hyderabad-MV169730') {
+    return { type: 'regional' as const, region: 'IN', reviewedTmdbId: 1235057, correctedLanguage: 'hi', identityMismatch: true,
+      checkedAt: '2026-11-13T18:40:00Z', source: 'The Indian Express',
+      sourceUrl: 'https://indianexpress.com/article/entertainment/bollywood/sanjay-leela-bhansali-reveals-release-date-of-ranbir-kapoor-vicky-kaushal-alia-bhatts-love-war-10641389/',
+      message: 'The makers announced a 21 January theatrical release. District and TMDB 1235057 match the director and cast; the stored TMDB link refers to a different film. Check local showtimes.' };
+  }
   if (row.origin === 'district_in' && Number(row.tmdb_id) === 621304 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
       row.platform_or_distributor == null && row.language === 'en' && row.title === 'Children of Blood and Bone' && row.release_date === '2027-01-15' &&
       row.source_url === 'https://www.district.in/movies/children-of-blood-and-bone-movie-tickets-in-hyderabad-MV227336') {

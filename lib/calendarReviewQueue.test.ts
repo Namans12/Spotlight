@@ -21,6 +21,13 @@ describe('calendar evidence freshness', () => {
 });
 
 describe('calendar reconciliation queue', () => {
+  it('flags the wrong stored Love & War identity while exposing the reviewed match', () => {
+    const item = row({ origin: 'district_in', tmdb_id: 1555752, title: 'Love & War', language: 'en', release_date: '2027-01-21',
+      source_url: 'https://www.district.in/movies/love-war-movie-tickets-in-hyderabad-MV169730', event_region: null, evidence: null, platform_or_distributor: null });
+    const [review] = buildCalendarReviewQueue([item], new Date('2026-11-13T19:00:00Z'));
+    expect(review).toMatchObject({ tmdbId: 1555752, reviewedTmdbId: 1235057, region: 'IN' });
+    expect(review.reasons).toContain('identity_conflict');
+  });
   it.each([
     [1411614, 'Raaka', 'te', 'raaka', 'MV218847', false],
     [1389373, 'Rowdy Janardhana', 'te', 'rowdy-janardhana', 'MV212225', false],
