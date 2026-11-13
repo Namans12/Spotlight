@@ -25,17 +25,22 @@ describe('calendar event identity', () => {
     [1555984, 'Prempaatta', 'ml', '2026-11-27', 'Cinema Express'],
     [1417808, 'Haindava', 'te', '2026-11-27', 'Cinema Express'],
     [1553480, 'Niram', 'ta', '2026-11-27', 'Tamil Film Active Producers Association'],
+    [1728047, 'Delivery Boy', 'ta', '2026-11-27', 'Likit Cinema / Leo Sivakumar'],
+    [1654912, 'Mayan - Chapter 1', 'ml', '2026-12-03', 'The New Indian Express'],
+    [1489396, 'Eetha', 'hi', '2026-12-04', 'Hindustan Times / Maddock Films'],
+    [1503283, 'Makkal Kaavalan', 'ta', '2026-12-04', 'The New Indian Express / Neelam Studios'],
   ])('limits independently confirmed theatrical date for %s to the matching observation and region', async (id, title, language, release_date, source) => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date,
       source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });
-    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    const month = release_date.slice(0, 7);
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, month, 'IN');
     expect(entry).toMatchObject({ tmdbId: id, region: 'IN', kind: 'theatrical' });
     expect(entry.dateCorroboration?.source).toBe(source);
     const refreshed = { ...item, event_region: 'IN', evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: `https://www.themoviedb.org/movie/${id}` } };
-    const [refreshedEntry] = await getCalendarMonth(db([], [refreshed]) as unknown as postgres.Sql, '2026-11', 'IN');
+    const [refreshedEntry] = await getCalendarMonth(db([], [refreshed]) as unknown as postgres.Sql, month, 'IN');
     expect(refreshedEntry.dateCorroboration?.source).toBe(source);
-    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
-    expect(await getCalendarMonth(db([], [{ ...item, source_url: 'https://example.org' }]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, month, 'US')).toEqual([]);
+    expect(await getCalendarMonth(db([], [{ ...item, source_url: 'https://example.org' }]) as unknown as postgres.Sql, month, 'IN')).toEqual([]);
   });
   it.each([
     [1214368, 'Golmaal 5', 'hi', '2026-12-04'],

@@ -28,6 +28,18 @@ export function reviewedCalendarEntry(row: {
       { id: 1553480, title: 'Niram', language: 'ta', date: '2026-11-27', source: 'Tamil Film Active Producers Association',
         url: 'https://tfapa.com/wp-content/uploads/2026/11/trade-guide-nov-2026.pdf',
         message: 'The producers association lists a tentative 27 November theatrical release. Check local showtimes; streaming availability is not established.' },
+      { id: 1728047, title: 'Delivery Boy', language: 'ta', date: '2026-11-27', source: 'Likit Cinema / Leo Sivakumar',
+        url: 'https://likit.in/cinema/delivery-boy-release-date',
+        message: 'The lead actor reiterated a worldwide 27 November cinema release after the earlier October date moved. Check local showtimes; streaming availability is not established.' },
+      { id: 1654912, title: 'Mayan - Chapter 1', language: 'ml', date: '2026-12-03', source: 'The New Indian Express',
+        url: 'https://www.newindianexpress.com/entertainment/2026/Oct/17/malayalamnews2026oct16jayasuryas-mayan-first-look-unveiled',
+        message: 'Reporting on the makers’ first look lists a 3 December theatrical release. Check local showtimes; streaming availability is not established.' },
+      { id: 1489396, title: 'Eetha', language: 'hi', date: '2026-12-04', source: 'Hindustan Times / Maddock Films',
+        url: 'https://www.hindustantimes.com/entertainment/bollywood/eetha-release-postponed-shraddha-kapoor-film-on-vithabai-narayangaonkar-avoids-clash-with-yash-toxic-101786448282411-amp.html',
+        message: 'The studio announced a 4 December release after moving the earlier date. Check local showtimes; streaming availability is not established.' },
+      { id: 1503283, title: 'Makkal Kaavalan', language: 'ta', date: '2026-12-04', source: 'The New Indian Express / Neelam Studios',
+        url: 'https://www.newindianexpress.com/entertainment/2026/Sep/30/tamilnews2026sep29makkal-kaavalan-gets-december-release-date',
+        message: 'The studio announced a 4 December theatrical release. Check local showtimes; streaming availability is not established.' },
     ].find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language && row.release_date === item.date &&
       row.source_url === `https://www.themoviedb.org/movie/${item.id}`);
     if (announcement) return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T20:50:00Z',
