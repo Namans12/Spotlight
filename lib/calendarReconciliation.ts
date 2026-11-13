@@ -9,6 +9,22 @@ export function reviewedCalendarEntry(row: {
 }) {
   if (row.event_region != null || row.evidence != null) return null;
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
+    const announcement = [
+      { id: 1381071, title: 'Godzilla Minus Zero', language: 'ja', date: '2026-11-20', source: 'PVR INOX Pictures / Bollywood Hungama',
+        url: 'https://www.bollywoodhungama.com/news/bollywood/exclusive-godzilla-minus-zero-to-finally-release-in-india-on-november-20-pvr-inox-pictures-nayana-bijli-confirms-imax-release/',
+        message: 'The Indian distributor confirmed a 20 November theatrical release. Check local showtimes; streaming availability is not established.' },
+      { id: 1510775, title: 'Gunmaaster G9', language: 'hi', date: '2026-11-27', source: 'Soham Rockstar Entertainment',
+        url: 'https://in.linkedin.com/company/soham-rockstar-entertainment',
+        message: 'The production company announced a 27 November cinema release. Check local showtimes; streaming availability is not established.' },
+      { id: 1504630, title: 'Mysaa', language: 'te', date: '2026-11-27', source: 'NDTV / Rashmika Mandanna',
+        url: 'https://www.ndtv.com/entertainment/after-recovery-from-hip-injury-rashmika-mandanna-announces-mysaa-release-date-11986338',
+        message: 'The lead actor announced a worldwide 27 November cinema release. Check local showtimes; streaming availability is not established.' },
+    ].find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language && row.release_date === item.date &&
+      row.source_url === `https://www.themoviedb.org/movie/${item.id}`);
+    if (announcement) return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T20:50:00Z',
+      source: announcement.source, sourceUrl: announcement.url, message: announcement.message };
+  }
+  if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
     const postponed = [
       { id: 1214368, title: 'Golmaal 5', language: 'hi', date: '2026-12-04', source: 'India Today',
         url: 'https://www.indiatoday.in/movies/bollywood/story/ajay-devgn-akshay-kumars-golmaal-5-locked-for-january-2027-see-new-poster-2998292-2026-09-19',

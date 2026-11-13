@@ -19,6 +19,22 @@ function db(releases: unknown[], calendar: unknown[]) {
 
 describe('calendar event identity', () => {
   it.each([
+    [1381071, 'Godzilla Minus Zero', 'ja', '2026-11-20', 'PVR INOX Pictures / Bollywood Hungama'],
+    [1510775, 'Gunmaaster G9', 'hi', '2026-11-27', 'Soham Rockstar Entertainment'],
+    [1504630, 'Mysaa', 'te', '2026-11-27', 'NDTV / Rashmika Mandanna'],
+  ])('limits independently confirmed theatrical date for %s to the matching observation and region', async (id, title, language, release_date, source) => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date,
+      source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });
+    const [entry] = await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(entry).toMatchObject({ tmdbId: id, region: 'IN', kind: 'theatrical' });
+    expect(entry.dateCorroboration?.source).toBe(source);
+    const refreshed = { ...item, event_region: 'IN', evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical', source_url: `https://www.themoviedb.org/movie/${id}` } };
+    const [refreshedEntry] = await getCalendarMonth(db([], [refreshed]) as unknown as postgres.Sql, '2026-11', 'IN');
+    expect(refreshedEntry.dateCorroboration?.source).toBe(source);
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'US')).toEqual([]);
+    expect(await getCalendarMonth(db([], [{ ...item, source_url: 'https://example.org' }]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+  });
+  it.each([
     [1214368, 'Golmaal 5', 'hi', '2026-12-04'],
     [1257973, 'Fauzi', 'te', '2026-12-03'],
     [1525648, 'Inji Vellam', 'ta', '2027-01-08'],
