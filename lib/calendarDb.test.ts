@@ -39,6 +39,9 @@ describe('calendar event identity', () => {
     [1503283, 'Makkal Kaavalan', 'ta', '2026-12-04', 'The New Indian Express / Neelam Studios'],
     [1395627, 'Vrushakarma', 'te', '2026-12-04', 'Cinema Express / SVCC'],
     [718833, 'Bokshi', 'hi', '2026-12-04', 'Cinema Express / Lorien Motion Pictures'],
+    [1213227, 'Train', 'ta', '2026-12-04', 'The Hollywood Reporter India / V Creations'],
+    [1596658, 'Hello Kadhal', 'ta', '2026-12-04', 'Simply Mollywood / film teaser'],
+    [1475768, 'Maatrubhumi:  May War Rest in Peace', 'hi', '2026-12-04', 'India Today / trailer launch'],
   ])('limits independently confirmed theatrical date for %s to the matching observation and region', async (id, title, language, release_date, source) => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date,
       source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });

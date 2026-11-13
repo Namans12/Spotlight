@@ -53,9 +53,18 @@ export function reviewedCalendarEntry(row: {
       { id: 718833, title: 'Bokshi', language: 'hi', date: '2026-12-04', source: 'Cinema Express / Lorien Motion Pictures',
         url: 'https://www.cinemaexpress.com/hindi/news/2026/Oct/08/bokshi-critically-appreciated-horror-film-gets-new-release-date',
         message: 'The producer announced an India theatrical release on 4 December after postponement. Check local showtimes; streaming availability is not established.' },
+      { id: 1213227, title: 'Train', language: 'ta', date: '2026-12-04', checkedAt: '2026-11-13T21:12:00Z', source: 'The Hollywood Reporter India / V Creations',
+        url: 'https://www.hollywoodreporterindia.com/features/insight/train-mysskin-vijay-sethupathi-action-thriller-locks-december-2026-release',
+        message: 'The producer announced a worldwide theatrical release on 4 December. Check local showtimes; streaming availability is not established.' },
+      { id: 1596658, title: 'Hello Kadhal', language: 'ta', date: '2026-12-04', checkedAt: '2026-11-13T21:12:00Z', source: 'Simply Mollywood / film teaser',
+        url: 'https://simplymollywood.com/trailers/hello-kadhal-title-teaser-arya-40-nikhila-vimal-nikhil-muraly-december-4',
+        message: 'The title teaser announced a 4 December theatrical release. Check local showtimes; streaming availability is not established.' },
+      { id: 1475768, title: 'Maatrubhumi:  May War Rest in Peace', language: 'hi', date: '2026-12-04', checkedAt: '2026-11-13T21:12:00Z', source: 'India Today / trailer launch',
+        url: 'https://www.indiatoday.in/movies/bollywood/story/salman-khan-maatrubhumi-november-20-release-date-3033620-2026-11-06',
+        message: 'The makers announced a 4 December theatrical release at the trailer launch, after earlier dates moved. Check local showtimes; streaming availability is not established.' },
     ].find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language && row.release_date === item.date &&
       row.source_url === `https://www.themoviedb.org/movie/${item.id}`);
-    if (announcement) return { type: 'regional' as const, region: 'IN', checkedAt: '2026-11-13T20:50:00Z',
+    if (announcement) return { type: 'regional' as const, region: 'IN', checkedAt: announcement.checkedAt ?? '2026-11-13T20:50:00Z',
       source: announcement.source, sourceUrl: announcement.url, message: announcement.message };
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
