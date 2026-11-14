@@ -38,6 +38,9 @@ describe('calendar event identity', () => {
     expect(await getCalendarMonth(db([], [refreshed]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
   });
   it.each([
+    [1533928, "Bachelor Party D'eux", 'ml', '2026-11-19', 'Simply Mollywood / KRG Studios'],
+    [1680033, 'Appa Kutty', 'ta', '2026-11-20', 'Likit Cinema / Vijay Antony'],
+    [1384528, 'OM: Chapter 1', 'ta', '2026-11-20', 'Hindustan Times / film makers'],
     [1698932, 'Kaali Kheti', 'hi', '2026-11-20', 'NDTV / BlackCanvas Studio'],
     [1522938, 'Suryaa', 'hi', '2026-11-20', 'The Times of India / PTI'],
     [1436202, 'Legacy', 'te', '2026-12-04', 'The Times of India / film makers'],
@@ -86,6 +89,7 @@ describe('calendar event identity', () => {
     [1569625, 'Mauja Hi Mauja', 'hi', '2026-12-04'],
     [1569041, 'Padayaatra', 'ml', '2026-12-04'],
     [1733518, 'Bouma', 'ml', '2026-12-04'],
+    [1376592, 'Nazarbandi', 'bn', '2026-11-19'],
   ])('keeps the superseded %s observation hidden even after matching TMDB evidence', async (id, title, language, release_date) => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: id, title, language, release_date,
       source_url: `https://www.themoviedb.org/movie/${id}`, event_region: null, evidence: null, platform_or_distributor: null });

@@ -8,6 +8,13 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'tmdb_upcoming' && Number(row.tmdb_id) === 1376592 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
+      row.title === 'Nazarbandi' && row.language === 'bn' && row.release_date === '2026-11-19' && row.platform_or_distributor == null &&
+      row.source_url === 'https://www.themoviedb.org/movie/1376592') {
+    return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-14T08:44:00Z', source: 'BookMyShow / District',
+      sourceUrl: 'https://in.bookmyshow.com/movies/mumbai/nazarbandi/ET00526256',
+      message: 'BookMyShow lists 20 November, while District lists 19 November for the same cast and director. This 19 November observation remains hidden pending clarification; the listings may represent different release events.' };
+  }
   if (row.origin === 'tmdb_upcoming' && row.tmdb_id == null && row.media_type == null && row.entry_type === 'Movie' &&
       row.title === 'Idupu kaayitham' && row.language === 'te' && row.release_date === '2026-11-20' && row.platform_or_distributor == null &&
       row.source_url === 'https://www.themoviedb.org/movie/1619638') {
@@ -38,6 +45,15 @@ export function reviewedCalendarEntry(row: {
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
     const announcement = [
+      { id: 1533928, title: "Bachelor Party D'eux", language: 'ml', date: '2026-11-19', checkedAt: '2026-11-14T08:44:00Z', source: 'Simply Mollywood / KRG Studios',
+        url: 'https://simplymollywood.com/news/bachelor-party-deux-krg-karnataka-uzbekistan-release-november-19',
+        message: 'The Karnataka distributor announced a 19 November cinema release. Check local showtimes; streaming availability is not established.' },
+      { id: 1680033, title: 'Appa Kutty', language: 'ta', date: '2026-11-20', checkedAt: '2026-11-14T08:44:00Z', source: 'Likit Cinema / Vijay Antony',
+        url: 'https://likit.in/cinema/vijay-announcement-370',
+        message: 'The lead actor’s poster lists a 20 November theatrical release after earlier postponements. Check local showtimes; streaming availability is not established.' },
+      { id: 1384528, title: 'OM: Chapter 1', language: 'ta', date: '2026-11-20', checkedAt: '2026-11-14T08:44:00Z', source: 'Hindustan Times / film makers',
+        url: 'https://www.hindustantimes.com/entertainment/tamil-cinema/om-release-date-makers-announce-new-date-for-mammootty-dhanushs-pan-india-actioner-after-avoiding-clash-with-rajinikanths-jailer-2-101790995565062-amp.html',
+        message: 'The makers announced a 20 November theatrical release after postponement. Check local showtimes; streaming availability is not established.' },
       { id: 1698932, title: 'Kaali Kheti', language: 'hi', date: '2026-11-20', checkedAt: '2026-11-13T21:35:00Z', source: 'NDTV / BlackCanvas Studio',
         url: 'https://www.ndtv.com/entertainment/kaali-kheti-trailer-jackie-shroff-and-sharad-kelkar-headline-a-chilling-rural-horror-tale-12318215',
         message: 'Reporting on the studio’s trailer gives a 20 November theatrical release after a postponement. Check local showtimes; streaming availability is not established.' },
