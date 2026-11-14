@@ -123,6 +123,9 @@ export default function Browse() {
 
   const nothingInScope =
     suggestions.length === 0 && trending.length === 0 && popularMovies.length === 0 && popularTV.length === 0;
+  const catalogueError = trendingQuery.isError ||
+    (mediaType !== 'tv' && popularMoviesQuery.isError) ||
+    (mediaType !== 'movie' && popularTVQuery.isError);
 
   return (
     <div className="space-y-8 animate-[fade-in_0.3s_ease-out]">
@@ -146,6 +149,12 @@ export default function Browse() {
           {refreshState === 'spinning' ? 'Refreshing…' : refreshState === 'done' ? 'Refreshed' : 'Refresh'}
         </button>
       </div>
+
+      {catalogueError && (
+        <p role="alert" className="rounded-xl bg-secondary p-4 text-sm text-muted-foreground">
+          Some catalogue titles could not be loaded. Use Refresh to try again.
+        </p>
+      )}
 
       {heroMovie && heroBackdrop && (
         <div className="relative rounded-2xl overflow-hidden -mx-1">
@@ -258,7 +267,7 @@ export default function Browse() {
         </section>
       )}
 
-      {nothingInScope && (
+      {nothingInScope && !catalogueError && (
         <p className="py-20 text-center text-sm text-muted-foreground">
           Nothing here for this media type - switch back to All in the topbar.
         </p>

@@ -1,6 +1,8 @@
 # Watch-night editorial content
 
-Reviewed 14 November 2026. Trivia packs are scoped by TMDB media type and ID, not title text. Current packs: Doctor Strange (2016), Ratatouille, Kuch Kuch Hota Hai; three questions each. There is no catalogue-year fallback. Other title pages explicitly offer a different film quiz.
+Trivia is disabled on title pages as of 15 November 2026: the unrelated-film fallback did not meet the product requirement. Re-enable only when questions match the selected title or an explicitly verified relationship, with watched confirmation before spoilers. No universal, verified trivia-fetch service is currently integrated.
+
+Reviewed 14 November 2026. Retained trivia packs are scoped by TMDB media type and ID, not title text. Current packs: Doctor Strange (2016), Ratatouille, Kuch Kuch Hota Hai; three questions each. There is no catalogue-year fallback.
 
 ## Evidence
 
