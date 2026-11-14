@@ -38,6 +38,7 @@ describe('calendar event identity', () => {
     expect(await getCalendarMonth(db([], [refreshed]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
   });
   it.each([
+    [1665741, 'Beparwah', 'pa', '2026-11-20', 'District'],
     [1003596, 'Avengers: Doomsday', 'en', '2026-12-17', 'Marvel India'],
     [1704200, 'Hail Mary', 'ml', '2026-11-26', 'Cinema Express / film makers'],
     [1179380, 'Cosmic Samson', 'ml', '2026-11-27', 'Cinema Express / Weekend Blockbusters'],

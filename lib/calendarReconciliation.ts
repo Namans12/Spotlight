@@ -45,6 +45,9 @@ export function reviewedCalendarEntry(row: {
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
     const announcement = [
+      { id: 1665741, title: 'Beparwah', language: 'pa', date: '2026-11-20', checkedAt: '2026-11-14T13:51:00Z', source: 'District',
+        url: 'https://www.district.in/movies/beparwah-movie-tickets-in-mukhed-MV218447',
+        message: 'District lists the Punjabi film starring Dev Kharoud for 20 November. The makers’ date and local showtimes remain unconfirmed; streaming availability is not established.' },
       { id: 1003596, title: 'Avengers: Doomsday', language: 'en', date: '2026-12-17', checkedAt: '2026-11-14T13:06:00Z', source: 'Marvel India',
         url: 'https://www.youtube.com/watch?v=nJO743QLtog',
         message: 'Marvel India announced a 17 December theatrical release in India. Check local showtimes; streaming availability is not established.' },
