@@ -45,6 +45,21 @@ export function reviewedCalendarEntry(row: {
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
     const announcement = [
+      { id: 1441306, title: 'Sadhak Bamakhyapa', language: 'bn', date: '2026-11-20', checkedAt: '2026-11-14T13:01:00Z', source: 'The Telegraph / SVF',
+        url: 'https://www.telegraphindia.com/entertainment/sadhak-bamakhyapa-avoids-clash-with-ramayana-release-postponed-to-november-20/cid/2187808',
+        message: 'The makers announced a 20 November theatrical release after postponement. Check local showtimes; streaming availability is not established.' },
+      { id: 1808244, title: 'Pratap', language: 'hi', date: '2026-11-20', checkedAt: '2026-11-14T13:01:00Z', source: 'NDTV / UV Films',
+        url: 'https://www.ndtv.com/entertainment/pratap-trailer-amit-sadhs-encounter-specialist-turned-prisoner-faces-his-biggest-battle-12237813',
+        message: 'The makers’ trailer announces a 20 November theatrical release. Check local showtimes; streaming availability is not established.' },
+      { id: 1318314, title: 'Irandu Vaanam', language: 'ta', date: '2026-12-11', checkedAt: '2026-11-14T13:01:00Z', source: 'Tamil Film Active Producers Association',
+        url: 'https://tfapa.com/wp-content/uploads/2026/11/trade-guide-nov-2026.pdf',
+        message: 'The producers association lists an expected 11 December theatrical release. Check local showtimes; streaming availability is not established.' },
+      { id: 1494621, title: 'Dada', language: 'te', date: '2026-12-24', checkedAt: '2026-11-14T13:01:00Z', source: 'Deccan Chronicle / film makers',
+        url: 'https://www.deccanchronicle.com/entertainment/television/balakrishnas-dada-team-debunks-postponement-rumours-2001887',
+        message: 'The makers reaffirmed a 24 December theatrical release. Check local showtimes; streaming availability is not established.' },
+      { id: 1518104, title: 'Pocket Novel', language: 'ta', date: '2027-01-14', checkedAt: '2026-11-14T13:01:00Z', source: 'Cinema Express / film makers',
+        url: 'https://www.cinemaexpress.com/tamil/news/2026/Nov/06/thiagarajan-kumararaja-vijay-sethupathis-pocket-novel-to-have-festive-release',
+        message: 'The makers announced a 14 January theatrical release. Check local showtimes; streaming availability is not established.' },
       { id: 1533928, title: "Bachelor Party D'eux", language: 'ml', date: '2026-11-19', checkedAt: '2026-11-14T08:44:00Z', source: 'Simply Mollywood / KRG Studios',
         url: 'https://simplymollywood.com/news/bachelor-party-deux-krg-karnataka-uzbekistan-release-november-19',
         message: 'The Karnataka distributor announced a 19 November cinema release. Check local showtimes; streaming availability is not established.' },
@@ -139,6 +154,9 @@ export function reviewedCalendarEntry(row: {
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
     const postponed = [
+      { id: 1518104, title: 'Pocket Novel', language: 'ta', date: '2026-12-24', checkedAt: '2026-11-14T13:01:00Z', source: 'Cinema Express / film makers',
+        url: 'https://www.cinemaexpress.com/tamil/news/2026/Nov/06/thiagarajan-kumararaja-vijay-sethupathis-pocket-novel-to-have-festive-release',
+        message: 'The makers announced a 14 January 2027 theatrical release. This older 24 December observation remains hidden; verify current local showtimes separately.' },
       { id: 1214368, title: 'Golmaal 5', language: 'hi', date: '2026-12-04', source: 'India Today',
         url: 'https://www.indiatoday.in/movies/bollywood/story/ajay-devgn-akshay-kumars-golmaal-5-locked-for-january-2027-see-new-poster-2998292-2026-09-19',
         message: 'The filmmaker announced an 8 January 2027 theatrical release. This older 4 December observation remains hidden; verify current local showtimes separately.' },
@@ -159,7 +177,7 @@ export function reviewedCalendarEntry(row: {
         message: 'The distributor described a different release window after the earlier 4 December date. Later reports differ about the replacement, so this date remains hidden pending a current announcement.' },
     ].find(item => Number(row.tmdb_id) === item.id && row.title === item.title && row.language === item.language && row.release_date === item.date &&
       row.source_url === `https://www.themoviedb.org/movie/${item.id}`);
-    if (postponed) return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-13T20:39:00Z',
+    if (postponed) return { type: 'conflict' as const, suppressEvent: true, checkedAt: postponed.checkedAt ?? '2026-11-13T20:39:00Z',
       source: postponed.source, sourceUrl: postponed.url, message: postponed.message };
   }
   if (row.origin === 'tmdb_upcoming' && Number(row.tmdb_id) === 674527 && row.media_type === 'movie' && row.entry_type === 'Show' &&
