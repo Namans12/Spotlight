@@ -54,10 +54,10 @@ describe('calendar reconciliation queue', () => {
     expect(matching.reasons).not.toContain('identity_conflict');
   });
   it('surfaces evidence for the same TMDB identity and date without assigning its region', () => {
-    const candidate = row({ id: 1, origin: 'tmdb_upcoming', tmdb_id: 1704200, title: 'Hail Mary', language: 'ml', release_date: '2026-11-26',
-      source_url: 'https://www.themoviedb.org/movie/1704200', platform_or_distributor: null, event_region: null, evidence: null });
+    const candidate = row({ id: 1, origin: 'tmdb_upcoming', tmdb_id: 900000001, title: 'Unreviewed example', language: 'ml', release_date: '2026-11-26',
+      source_url: 'https://www.themoviedb.org/movie/900000001', platform_or_distributor: null, event_region: null, evidence: null });
     const verified = { ...candidate, id: 2, event_region: 'IN', evidence: { region: 'IN', date_source: 'tmdb_regional_theatrical',
-      source_url: 'https://www.themoviedb.org/movie/1704200', observed_at: '2026-11-13T01:00:00Z' } };
+      source_url: 'https://www.themoviedb.org/movie/900000001', observed_at: '2026-11-13T01:00:00Z' } };
     const rows = [candidate, verified, { ...verified, id: 3, release_date: '2026-11-27' },
       { ...verified, id: 4, evidence: { ...verified.evidence, source_url: 'https://www.themoviedb.org/movie/999' } }];
     const [item] = buildCalendarReviewQueue(rows, new Date('2026-11-13T16:00:00Z')).filter(x => x.id === '1');

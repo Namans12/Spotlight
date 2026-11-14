@@ -45,6 +45,15 @@ export function reviewedCalendarEntry(row: {
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
     const announcement = [
+      { id: 1003596, title: 'Avengers: Doomsday', language: 'en', date: '2026-12-17', checkedAt: '2026-11-14T13:06:00Z', source: 'Marvel India',
+        url: 'https://www.youtube.com/watch?v=nJO743QLtog',
+        message: 'Marvel India announced a 17 December theatrical release in India. Check local showtimes; streaming availability is not established.' },
+      { id: 1704200, title: 'Hail Mary', language: 'ml', date: '2026-11-26', checkedAt: '2026-11-14T13:06:00Z', source: 'Cinema Express / film makers',
+        url: 'https://www.cinemaexpress.com/malayalam/news/2026/Nov/05/kunchacko-bobans-hail-mary-gets-a-release-date',
+        message: 'The makers announced a 26 November worldwide theatrical release. Check local showtimes; streaming availability is not established.' },
+      { id: 1179380, title: 'Cosmic Samson', language: 'ml', date: '2026-11-27', checkedAt: '2026-11-14T13:06:00Z', source: 'Cinema Express / Weekend Blockbusters',
+        url: 'https://www.cinemaexpress.com/malayalam/news/2026/Oct/20/cosmic-samson-starring-sandeep-pradeep-gets-release-date',
+        message: 'The producer announced a 27 November worldwide theatrical release. Check local showtimes; streaming availability is not established.' },
       { id: 1441306, title: 'Sadhak Bamakhyapa', language: 'bn', date: '2026-11-20', checkedAt: '2026-11-14T13:01:00Z', source: 'The Telegraph / SVF',
         url: 'https://www.telegraphindia.com/entertainment/sadhak-bamakhyapa-avoids-clash-with-ramayana-release-postponed-to-november-20/cid/2187808',
         message: 'The makers announced a 20 November theatrical release after postponement. Check local showtimes; streaming availability is not established.' },
