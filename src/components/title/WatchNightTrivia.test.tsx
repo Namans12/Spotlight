@@ -2,86 +2,58 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { WatchNightTrivia } from './WatchNightTrivia';
+import { TRIVIA_PACKS } from '@/lib/watchNightTrivia';
 
-describe('watch-night trivia', () => {
-  it('reveals a sourced answer after an optional choice', async () => {
-    render(<WatchNightTrivia mediaType="tv" id={1668} />);
-    expect(screen.queryByText(/Which café/)).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Try trivia' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Central Park' }));
-    expect(screen.getByRole('status')).toHaveTextContent('The answer is Central Perk.');
-    expect(screen.getByRole('link', { name: 'Source: Warner Bros. Discovery' })).toHaveAttribute('href', 'https://press.wbd.com/na/media-release/hbo-max/max-watch-lists/whats-new-max-december-0');
-    await userEvent.click(screen.getByRole('button', { name: 'Central Perk' }));
-    expect(screen.getByRole('status')).toHaveTextContent('Correct!');
-  });
-  it('uses media type in the key and does not invent trivia for other titles', () => {
-    const { container, rerender } = render(<WatchNightTrivia mediaType="movie" id={1668} />);
-    expect(container).toBeEmptyDOMElement();
-    rerender(<WatchNightTrivia mediaType="tv" id={1399} />);
-    expect(screen.getByRole('button', { name: 'Try trivia' })).toBeInTheDocument();
-    rerender(<WatchNightTrivia mediaType="tv" id={123} />);
-    expect(container).toBeEmptyDOMElement();
-  });
-  it('advances through sourced questions without revealing the next answer', async () => {
-    const user = userEvent.setup();
-    render(<WatchNightTrivia mediaType="tv" id={1668} />);
-    await user.click(screen.getByRole('button', { name: 'Try trivia' }));
-    expect(screen.getByText('Question 1 of 2')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Central Perk' }));
-    await user.click(screen.getByRole('button', { name: 'Next question' }));
-    expect(screen.getByText('Question 2 of 2')).toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Rachel and Monica' }));
-    expect(screen.getByRole('status')).toHaveTextContent('Correct!');
-    expect(screen.getByRole('link', { name: 'Source: Warner Bros. Discovery' })).toHaveAttribute('href', 'https://press.wbd.com/na/media-release/hbo-max/max-watch-lists/whats-new-max-december-0');
-    expect(screen.queryByRole('button', { name: 'Next question' })).not.toBeInTheDocument();
-  });
-  it('resets the quiz when the title changes', async () => {
-    const user = userEvent.setup();
-    const { rerender } = render(<WatchNightTrivia mediaType="tv" id={1668} />);
-    await user.click(screen.getByRole('button', { name: 'Try trivia' }));
-    await user.click(screen.getByRole('button', { name: 'Central Perk' }));
-    await user.click(screen.getByRole('button', { name: 'Next question' }));
-    rerender(<WatchNightTrivia mediaType="movie" id={2062} />);
-    expect(screen.getByRole('button', { name: 'Try trivia' })).toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Try trivia' }));
-    expect(screen.getByText('What is the title of Gusteau’s cookbook?')).toBeInTheDocument();
-  });
-  it('offers a clearly attributed catalogue-year question only for a valid date', async () => {
-    const user = userEvent.setup();
-    const { container, rerender } = render(<WatchNightTrivia mediaType="movie" id={123} releaseDate="2020-02-30" />);
-    expect(container).toBeEmptyDOMElement();
-    rerender(<WatchNightTrivia mediaType="movie" id={123} releaseDate="2020-02-29" />);
-    await user.click(screen.getByRole('button', { name: 'Try trivia' }));
-    expect(screen.getByText('Which year does TMDB list for this title?')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '2020' }));
-    expect(screen.getByRole('status')).toHaveTextContent('Correct!');
-    expect(screen.getByRole('link', { name: 'Source: TMDB' })).toHaveAttribute('href', 'https://www.themoviedb.org/movie/123');
-  });
-  it.each([
-    ['movie', 2062, 'Paris'], ['tv', 2316, 'Pretzels'], ['movie', 673, 'The Three Broomsticks'],
-    ['tv', 66732, 'Waffles'], ['movie', 10198, 'Beignets'], ['movie', 10340, 'Spaghetti and meatballs'], ['movie', 116149, 'Marmalade'],
-  ] as const)('checks the sourced answer for %s:%i', async (mediaType, id, answer) => {
-    render(<WatchNightTrivia mediaType={mediaType} id={id} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Try trivia' }));
-    const includeStory = screen.queryByLabelText('Include story-detail questions');
-    if (includeStory) await userEvent.click(includeStory);
-    await userEvent.click(screen.getByRole('button', { name: answer }));
-    expect(screen.getByRole('status')).toHaveTextContent('Correct!');
-    expect(screen.getByRole('link', { name: /^Source:/ })).toHaveAttribute('href', expect.stringMatching(/^https:\/\//));
-  });
-  it('hides story-detail questions until requested and clears answers when disabled', async () => {
-    const user = userEvent.setup();
-    render(<WatchNightTrivia mediaType="movie" id={673} />);
-    await user.click(screen.getByRole('button', { name: 'Try trivia' }));
-    expect(screen.queryByText(/Where does Harry/)).not.toBeInTheDocument();
-    expect(screen.getByText('No general questions for this title yet.')).toBeInTheDocument();
-    await user.click(screen.getByLabelText('Include story-detail questions'));
-    await user.click(screen.getByRole('button', { name: 'The Three Broomsticks' }));
-    expect(screen.getByRole('status')).toHaveTextContent('Correct!');
-    await user.click(screen.getByLabelText('Include story-detail questions'));
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Where does Harry/)).not.toBeInTheDocument();
-  });
+describe('movie trivia', () => {
+ it('requires watched confirmation, locks answers, advances and scores', async () => {
+  const user = userEvent.setup(); render(<WatchNightTrivia mediaType="movie" id={284052} />);
+  await user.click(screen.getByRole('button', { name: 'Try trivia' }));
+  expect(screen.queryByText(/Wi-Fi password/)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Start quiz' })).toBeDisabled();
+  await user.click(screen.getByRole('checkbox')); await user.click(screen.getByRole('button', { name: 'Start quiz' }));
+  expect(screen.getByText('Question 1 of 3')).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /Source:/ })).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Shamballa' }));
+  expect(screen.getByRole('status')).toHaveTextContent('Correct!');
+  expect(screen.getByRole('button', { name: 'Agamotto' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: 'Next question' }));
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Heart surgeon' }));
+  await user.click(screen.getByRole('button', { name: 'Next question' }));
+  await user.click(screen.getByRole('button', { name: 'The Ancient One' }));
+  await user.click(screen.getByRole('button', { name: 'See score' }));
+  expect(screen.getByRole('status')).toHaveTextContent('2 / 3 correct');
+  await user.click(screen.getByRole('button', { name: 'Change film or restart' }));
+  expect(screen.getByRole('checkbox')).not.toBeChecked();
+  expect(screen.queryByText(/Wi-Fi password/)).not.toBeInTheDocument();
+ });
+ it('requires new consent when changing films or navigating to another title', async () => {
+  const user = userEvent.setup(); const view = render(<WatchNightTrivia mediaType="movie" id={284052} />);
+  await user.click(screen.getByRole('button', { name: 'Try trivia' }));
+  await user.click(screen.getByRole('checkbox'));
+  await user.selectOptions(screen.getByRole('combobox'), 'movie:11854');
+  expect(screen.getByRole('checkbox')).not.toBeChecked();
+  expect(screen.queryByText('Who is Rahul’s first wife?')).not.toBeInTheDocument();
+  view.rerender(<WatchNightTrivia mediaType="movie" id={2062} />);
+  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+ });
+ it('offers explicitly different films for an uncovered title without a year question', async () => {
+  const user = userEvent.setup(); render(<WatchNightTrivia mediaType="tv" id={284052} releaseDate="2026-11-14" />);
+  await user.click(screen.getByRole('button', { name: 'Try trivia' }));
+  expect(screen.getByText(/don’t have a reviewed quiz/)).toBeInTheDocument();
+  expect(screen.getByRole('combobox')).toHaveValue('');
+  expect(screen.queryByText(/Which year/)).not.toBeInTheDocument();
+ });
+ it('has multiple valid, sourced questions in every pack', () => {
+  expect(new Set(TRIVIA_PACKS.map(pack => pack.key)).size).toBe(TRIVIA_PACKS.length);
+  for (const pack of TRIVIA_PACKS) {
+   expect(pack.questions.length).toBeGreaterThanOrEqual(3);
+   for (const q of pack.questions) {
+    expect(new Set(q.choices).size).toBe(q.choices.length);
+    expect(q.choices.filter(choice => choice === q.answer)).toHaveLength(1);
+    expect(q.sourceUrl).toMatch(/^https:\/\//);
+    expect(q.explanation.length).toBeGreaterThan(10);
+   }
+  }
+ });
 });

@@ -44,7 +44,8 @@ describe('title watch-night sections', () => {
     view.rerender(app(1));
     view.rerender(app(2));
     await waitFor(() => expect(screen.getAllByRole('region', { name: 'Watch-night ideas' })).toHaveLength(1));
-    expect(screen.queryByRole('region', { name: 'Quick trivia' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('region', { name: 'Movie trivia' })).toHaveLength(1);
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     client.clear();
   });
 });

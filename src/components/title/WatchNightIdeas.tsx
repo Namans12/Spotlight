@@ -1,47 +1,41 @@
 import { useState } from 'react';
-import { VIBE_IDEAS, filteredVibeIdeas, watchNightIdeas, type WatchNightDiet, type WatchNightVibe } from '@/lib/watchNightIdeas';
+import { foodPairings, watchNightIdeas, type WatchNightDiet } from '@/lib/watchNightIdeas';
 import { ShareWatchNight } from './ShareWatchNight';
 
-export function WatchNightIdeas({ mediaType, id, title = 'Watch night' }: { mediaType: 'movie' | 'tv'; id: number; title?: string }) {
-  const [open, setOpen] = useState(false);
-  const [vibe, setVibe] = useState<WatchNightVibe | ''>('');
-  const [diet, setDiet] = useState<WatchNightDiet>('');
-  const [budget, setBudget] = useState(false);
-  const [sharing, setSharing] = useState(false);
-  const ideas = watchNightIdeas(mediaType, id);
-  const availableFoods = [...new Set([...(diet || budget ? [] : ideas.map(idea => idea.food)), ...(vibe ? filteredVibeIdeas(vibe, diet, budget) : [])])];
-  if (!ideas.length) return null;
-  return <section className="rounded-xl border border-border bg-card p-4 space-y-3" aria-label="Watch-night ideas">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <div><h2 className="font-semibold">Make a night of it</h2><p className="text-xs text-muted-foreground">Food inspired by {title}.</p></div>
-      <button type="button" aria-expanded={open} onClick={() => setOpen(value => !value)} className="rounded-lg border border-border px-3 py-2 text-xs font-medium">{open ? 'Hide food ideas' : 'Show food ideas'}</button>
-    </div>
-    {open && <div className="space-y-4">{!diet && !budget && ideas.map(idea => <div key={idea.food} className="space-y-1">
-      <p className="text-sm font-medium">{idea.food}</p>
-      <p className="text-xs text-muted-foreground">{idea.reason}</p>
-      <a href={idea.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs underline">Source: {idea.source}</a>
-    </div>)}
-      <div className="space-y-2">
-        <label className="block text-xs font-medium">Dietary preference
-          <select value={diet} onChange={event => setDiet(event.target.value as WatchNightDiet)} className="mt-1 block w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm">
-            <option value="">No preference</option><option value="vegetarian">Vegetarian</option><option value="vegan">Vegan</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={budget} onChange={event => setBudget(event.target.checked)} /> Prefer simple, budget-conscious ideas</label>
-        {(diet || budget) && <p className="text-xs text-muted-foreground">Choose a vibe for general ideas. Check ingredients and allergens; prices vary by location. Title-specific ideas are hidden while preferences are selected.</p>}
-        <label className="block text-xs font-medium">Pick a vibe for more ideas
-          <select value={vibe} onChange={event => setVibe(event.target.value as WatchNightVibe | '')} className="mt-1 block w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm">
-            <option value="">Choose a vibe</option>
-            {Object.entries(VIBE_IDEAS).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}
-          </select>
-        </label>
-        {vibe && <div role="status" className="space-y-1 text-xs text-muted-foreground">
-          <p>General ideas for your chosen vibe:</p>
-          <ul className="list-disc pl-4">{filteredVibeIdeas(vibe, diet, budget).map(food => <li key={food}>{food}</li>)}</ul>
-        </div>}
-      </div>
-      <button type="button" aria-expanded={sharing} onClick={() => setSharing(value => !value)} className="rounded-lg border border-border px-3 py-2 text-xs">{sharing ? 'Hide sharing' : 'Make a shareable plan'}</button>
-      {sharing && <ShareWatchNight title={title} mediaType={mediaType} id={id} foods={availableFoods} />}
-    </div>}
-  </section>;
+type Props = { mediaType: 'movie' | 'tv'; id: number; title?: string };
+export function WatchNightIdeas(props: Props) {
+ return <FoodSession key={`${props.mediaType}:${props.id}`} {...props} />;
+}
+function FoodSession({ mediaType, id, title = 'this title' }: Props) {
+ const [open, setOpen] = useState(false);
+ const [watched, setWatched] = useState<boolean | null>(null);
+ const [diet, setDiet] = useState<WatchNightDiet>('');
+ const [quick, setQuick] = useState(false);
+ const [sharing, setSharing] = useState(false);
+ if (!watchNightIdeas(mediaType, id).length) return null;
+ const foods = watched === null ? [] : foodPairings(mediaType, id, watched, diet, quick);
+ const button = 'rounded-xl border border-border px-3 py-2 text-sm hover:border-accent focus-visible:outline focus-visible:outline-accent';
+ return <section className="rounded-2xl border border-border bg-card p-5 space-y-4" aria-label="Watch-night ideas">
+  <div className="flex flex-wrap justify-between gap-3"><div><h2 className="font-display text-xl font-semibold">Make a night of it</h2><p className="text-sm text-muted-foreground">Food inspired by {title}.</p></div>
+   <button type="button" className={button} aria-expanded={open} onClick={() => { setOpen(!open); setWatched(null); setSharing(false); }}>{open ? 'Hide food ideas' : 'Show food ideas'}</button></div>
+  {open && <div className="space-y-4">
+   <fieldset className="space-y-2"><legend className="text-sm font-medium">Have you finished {title}?</legend>
+    <div className="flex flex-wrap gap-2"><button type="button" className={button} aria-pressed={watched === true} onClick={() => { setWatched(true); setSharing(false); }}>Yes, show the connections</button><button type="button" className={button} aria-pressed={watched === false} onClick={() => { setWatched(false); setSharing(false); }}>Not yet — avoid story details</button></div>
+   </fieldset>
+   {watched !== null && <>
+    <div className="flex flex-wrap items-center gap-4"><label className="text-sm">Food preference<select className="ml-2 rounded-lg bg-secondary p-2" value={diet} onChange={event => setDiet(event.target.value as WatchNightDiet)}><option value="">No preference</option><option value="vegetarian">Vegetarian</option><option value="vegan">Vegan</option></select></label>
+     <label className="flex gap-2 text-sm"><input type="checkbox" checked={quick} onChange={event => setQuick(event.target.checked)} />About 20 minutes or less</label></div>
+    {!foods.length && <p role="status" className="text-sm text-muted-foreground">{watched ? 'No pairings fit that preparation time. Try turning off the time filter.' : 'We’re keeping scene-based food connections hidden. No spoiler-light pairing fits these choices yet.'}</p>}
+    <div className="grid gap-3 sm:grid-cols-2">{foods.map(food => <article key={food.food} className="rounded-xl bg-secondary p-4 space-y-2">
+     <h3 className="font-semibold">{food.food}</h3><p className="text-sm text-muted-foreground">{food.reason}</p>
+     <p className="text-sm">{diet ? food.adaptation : food.preparation}</p>
+     <p className="text-xs text-muted-foreground">About {food.minutes} min · Our serving suggestion, not an official recipe.</p>
+     <details className="text-xs"><summary className="cursor-pointer">Why this pairing?</summary><a className="underline" href={food.sourceUrl} target="_blank" rel="noopener noreferrer">Source: {food.source}</a><p>Source pages may contain story details.</p></details>
+    </article>)}</div>
+    {foods.length > 0 && <><p className="text-xs text-muted-foreground">Times are estimates using ready-made ingredients where suggested. Check ingredients and allergens, including in vegetarian or vegan substitutions.</p>
+     <button type="button" className={button} onClick={() => setSharing(!sharing)}>{sharing ? 'Hide sharing' : 'Make a shareable plan'}</button>
+     {sharing && <ShareWatchNight title={title} mediaType={mediaType} id={id} foods={foods.map(food => diet ? `${food.food} (${diet} adaptation)` : food.food)} />}</>}
+   </>}
+  </div>}
+ </section>;
 }
