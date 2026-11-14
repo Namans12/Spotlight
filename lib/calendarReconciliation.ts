@@ -8,6 +8,13 @@ export function reviewedCalendarEntry(row: {
   language?: string | null;
 }) {
   if (row.event_region != null || row.evidence != null) return null;
+  if (row.origin === 'tmdb_upcoming' && row.tmdb_id == null && row.media_type == null && row.entry_type === 'Movie' &&
+      row.title === 'Idupu kaayitham' && row.language === 'te' && row.release_date === '2026-11-20' && row.platform_or_distributor == null &&
+      row.source_url === 'https://www.themoviedb.org/movie/1619638') {
+    return { type: 'conflict' as const, suppressEvent: true, checkedAt: '2026-11-13T21:35:00Z', source: 'Suryaa Now / film makers',
+      sourceUrl: 'https://suryaanow.com/article/priyadarshi-idupu-kaayitham-teaser-released-december-11-release',
+      message: 'The makers announced an 11 December worldwide theatrical release. This earlier 20 November observation remains hidden; check local showtimes separately.' };
+  }
   if (row.origin === 'tmdb_upcoming' && Number(row.tmdb_id) === 1733518 && row.media_type === 'movie' && row.entry_type === 'Movie' &&
       row.title === 'Bouma' && row.language === 'ml' && row.release_date === '2026-12-04' && row.platform_or_distributor == null &&
       row.source_url === 'https://www.themoviedb.org/movie/1733518') {
@@ -31,6 +38,12 @@ export function reviewedCalendarEntry(row: {
   }
   if (row.origin === 'tmdb_upcoming' && row.media_type === 'movie' && row.entry_type === 'Movie' && row.platform_or_distributor == null) {
     const announcement = [
+      { id: 1698932, title: 'Kaali Kheti', language: 'hi', date: '2026-11-20', checkedAt: '2026-11-13T21:35:00Z', source: 'NDTV / BlackCanvas Studio',
+        url: 'https://www.ndtv.com/entertainment/kaali-kheti-trailer-jackie-shroff-and-sharad-kelkar-headline-a-chilling-rural-horror-tale-12318215',
+        message: 'Reporting on the studio’s trailer gives a 20 November theatrical release after a postponement. Check local showtimes; streaming availability is not established.' },
+      { id: 1522938, title: 'Suryaa', language: 'hi', date: '2026-11-20', checkedAt: '2026-11-13T21:35:00Z', source: 'The Times of India / PTI',
+        url: 'https://timesofindia.indiatimes.com/entertainment/hindi/bollywood/news/sunny-deols-suryaa-gets-november-20-release-date-as-makers-promise-a-never-before-seen-avatar/amp_articleshow/134911075.cms',
+        message: 'The lead actor announced a 20 November theatrical release. Check local showtimes; streaming availability is not established.' },
       { id: 1436202, title: 'Legacy', language: 'te', date: '2026-12-04', checkedAt: '2026-11-13T21:29:00Z', source: 'The Times of India / film makers',
         url: 'https://timesofindia.indiatimes.com/entertainment/telugu/movies/news/legacy-vishwak-sen-announces-december-4-release-date-for-political-action-drama-says-politics-is-personal/articleshow/133837154.cms',
         message: 'The makers announced a 4 December theatrical release. Check local showtimes; streaming availability is not established.' },

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type postgres from 'postgres';
 import { getCalendarMonth } from './calendarDb';
+import { reviewedCalendarEntry } from './calendarReconciliation';
 
 const release = (overrides: Record<string, unknown> = {}) => ({
   tmdb_id: 1, media_type: 'movie', title: 'Title', language: 'en', release_date: '2026-11-10',
@@ -18,6 +19,16 @@ function db(releases: unknown[], calendar: unknown[]) {
 }
 
 describe('calendar event identity', () => {
+  it('hides the old Idupu kaayitham observation with a missing identity after the makers announce December', async () => {
+    const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: null, media_type: null, entry_type: 'Movie', title: 'Idupu kaayitham',
+      language: 'te', release_date: '2026-11-20', platform_or_distributor: null, source_url: 'https://www.themoviedb.org/movie/1619638',
+      event_region: null, evidence: null });
+    expect(await getCalendarMonth(db([], [item]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
+    const reviewInput = { ...item, origin: 'tmdb_upcoming', tmdb_id: null, media_type: null, event_region: null, evidence: null,
+      platform_or_distributor: null, source_url: 'https://www.themoviedb.org/movie/1619638' };
+    expect(reviewedCalendarEntry(reviewInput)).toMatchObject({ type: 'conflict', suppressEvent: true });
+    expect(reviewedCalendarEntry({ ...reviewInput, source_url: 'https://example.org' })).toBeNull();
+  });
   it('keeps the disputed BBC Cunk observation hidden after a matching global-air refresh', async () => {
     const item = editorial({ origin: 'tmdb_upcoming', tmdb_id: 335981, media_type: 'tv', entry_type: 'Show', title: 'Cunk on Cinema',
       language: 'en', release_date: '2026-11-30', platform_or_distributor: 'BBC Two', source_url: 'https://www.themoviedb.org/tv/335981',
@@ -27,6 +38,8 @@ describe('calendar event identity', () => {
     expect(await getCalendarMonth(db([], [refreshed]) as unknown as postgres.Sql, '2026-11', 'IN')).toEqual([]);
   });
   it.each([
+    [1698932, 'Kaali Kheti', 'hi', '2026-11-20', 'NDTV / BlackCanvas Studio'],
+    [1522938, 'Suryaa', 'hi', '2026-11-20', 'The Times of India / PTI'],
     [1436202, 'Legacy', 'te', '2026-12-04', 'The Times of India / film makers'],
     [1511403, 'King 100', 'te', '2026-12-24', 'The Indian Express / Annapurna Studios'],
     [1713187, 'Thagappan', 'ta', '2026-12-24', 'Cinema Express / film makers'],
