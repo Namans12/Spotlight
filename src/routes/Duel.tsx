@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Clapperboard, Loader2, Plus, RotateCcw, Sparkles, Swords, Tv } from 'lucide-react';
-import { getTrending, getPopularMovies, getPopularTV, getYouMayAlsoLike, type MediaType } from '@/lib/tmdb';
+import { discover, getTrending, getPopularMovies, getPopularTV, getYouMayAlsoLike, type MediaType } from '@/lib/tmdb';
 import { useWatchlistContext } from '@/contexts/watchlist-context';
-import { useGenres, useRuntimes } from '@/hooks/useProviders';
+import { fetchProvidersBatch, providerKey, providerStaleTime } from '@/lib/providers';
 import { buildPool, type PoolSource } from '@/lib/duelPool';
 import {
   nextPair,
   recordPick,
-  duelWinner,
+  scoreCandidate,
   explainWinner,
   DUEL_ROUNDS,
   type DuelCandidate,
@@ -22,7 +22,7 @@ import { staticRouteMeta } from '../../shared/seo';
 
 /** Big enough that five rounds never run it dry, small enough that one
  *  providers batch covers it. */
-const POOL_SIZE = 20;
+const POOL_SIZE = 40;
 
 /**
  * "I don't know what to watch."
@@ -44,15 +44,29 @@ export default function Duel() {
   const [weights, setWeights] = useState<Weights>({});
   const [picks, setPicks] = useState<DuelPick[]>([]);
   const [seen, setSeen] = useState<Set<string>>(new Set());
-  // Bumped by "Again", which is what re-runs the pool memo below. Without it
-  // a replay would deal the same twenty posters from the same cached queries.
+  // A replay deals a new pool and samples another catalogue page.
   const [run, setRun] = useState(0);
+  const lastChoice = useRef<string | null>(null);
+  const [page, setPage] = useState(() => 1 + Math.floor(Math.random() * 20));
+  const discovery = useQuery({ queryKey: ['duel-discover', mediaFilter, page],
+    queryFn: () => discover(mediaFilter!, { page, releasedOnly: true }), enabled: mediaFilter !== null, retry: false });
+  const completed = picks.length >= DUEL_ROUNDS;
+  const expansion = useQuery({ queryKey: ['duel-expand', picks.map(p => `${p.winner.mediaType}:${p.winner.id}`).join(',')],
+    queryFn: async () => {
+      const results = await Promise.allSettled(picks.slice(-3).map(p => getYouMayAlsoLike(p.winner.mediaType, p.winner.id)));
+      return results.flatMap(result => result.status === 'fulfilled' ? result.value : []);
+    }, enabled: completed, retry: false });
+  const expanded = useMemo(() => buildPool([{ name: 'taste', items: expansion.data ?? [] }],
+    { watchedKeys: wl.watchedKeys, limit: 40, random: () => 0.5 }).filter(item => item.mediaType === mediaFilter),
+    [expansion.data, wl.watchedKeys, mediaFilter]);
+  const expandedDetails = useQuery({ queryKey: ['providers', expanded.map(item => providerKey(item.mediaType, item.id)).sort().join(',')],
+    queryFn: () => fetchProvidersBatch(expanded), enabled: expanded.length > 0, retry: false, staleTime: providerStaleTime });
 
   useDocumentMeta(staticRouteMeta('/duel', siteUrl()));
 
-  const trending = useQuery({ queryKey: ['tmdb', 'trending'], queryFn: getTrending, staleTime: 60 * 60_000 });
-  const films = useQuery({ queryKey: ['tmdb', 'popular-movies'], queryFn: getPopularMovies, staleTime: 60 * 60_000 });
-  const shows = useQuery({ queryKey: ['tmdb', 'popular-tv'], queryFn: getPopularTV, staleTime: 60 * 60_000 });
+  const trending = useQuery({ queryKey: ['tmdb', 'trending'], queryFn: getTrending, staleTime: 60 * 60_000, retry: false });
+  const films = useQuery({ queryKey: ['tmdb', 'popular-movies'], queryFn: getPopularMovies, staleTime: 60 * 60_000, retry: false });
+  const shows = useQuery({ queryKey: ['tmdb', 'popular-tv'], queryFn: getPopularTV, staleTime: 60 * 60_000, retry: false });
 
   // Seeded from the most recently saved title, which is the freshest statement
   // of taste this app has. Nothing to seed from is fine — the pool just draws
@@ -62,7 +76,7 @@ export default function Duel() {
     queryKey: ['tmdb', 'you-may-also-like', seed?.mediaType, seed?.id],
     queryFn: () => getYouMayAlsoLike(seed.mediaType as MediaType, seed.id),
     enabled: Boolean(seed),
-    staleTime: 60 * 60_000,
+    staleTime: 60 * 60_000, retry: false,
   });
 
   // Every source is in, or is never coming. Recommendations are only waited
@@ -71,6 +85,7 @@ export default function Duel() {
   // between "Movies" and "Shows" costs a re-deal, never a re-fetch.
   const ready =
     mediaFilter !== null &&
+    !discovery.isLoading &&
     !trending.isLoading &&
     !films.isLoading &&
     !shows.isLoading &&
@@ -100,6 +115,7 @@ export default function Duel() {
     const onlyChosenType = <T extends { mediaType: string }>(items: T[]) =>
       items.filter((item) => item.mediaType === mediaFilter);
     const sources: PoolSource[] = [
+      { name: 'discovery', items: discovery.data ?? [] },
       // Saved and never watched leads deliberately: the reader has already
       // said they want to see these, so the only thing standing between them
       // and a decision is the decision.
@@ -119,24 +135,29 @@ export default function Duel() {
   // grids already use, which carries both for free (lib/tmdbProxy.ts). These
   // are what the scoring is actually about, so a pool without them still
   // works but has only language, media type and decade to reason over.
-  const genresFor = useGenres(rawPool ?? []);
-  const runtimeFor = useRuntimes(rawPool ?? []);
+  const details = useQuery({ queryKey: ['providers', (rawPool ?? []).map(item => providerKey(item.mediaType, item.id)).sort().join(',')],
+    queryFn: () => fetchProvidersBatch(rawPool ?? []), enabled: Boolean(rawPool?.length), retry: false, staleTime: providerStaleTime });
 
   const pool: DuelCandidate[] = useMemo(
     () =>
       (rawPool ?? []).map((candidate) => ({
         ...candidate,
-        genres: genresFor(candidate.mediaType, candidate.id),
-        runtime: runtimeFor(candidate.mediaType, candidate.id),
+        genres: details.data?.genres[providerKey(candidate.mediaType, candidate.id)],
+        runtime: details.data?.runtimes[providerKey(candidate.mediaType, candidate.id)],
       })),
-    [rawPool, genresFor, runtimeFor],
+    [rawPool, details.data],
   );
 
   const pair = picks.length < DUEL_ROUNDS ? nextPair(pool, weights, seen) : null;
   const finished = picks.length > 0 && !pair;
-  const winner = finished ? duelWinner(picks, weights) : null;
+  const resultPool = [...expanded.map(item => ({ ...item, genres: expandedDetails.data?.genres[providerKey(item.mediaType, item.id)], runtime: expandedDetails.data?.runtimes[providerKey(item.mediaType, item.id)] })), ...pool]
+    .filter(item => !seen.has(`${item.mediaType}:${item.id}`) && !wl.watchedKeys.has(`${item.mediaType}:${item.id}`));
+  const winner = finished ? resultPool.sort((a, b) => scoreCandidate(b, weights) - scoreCandidate(a, weights))[0] ?? null : null;
 
   function choose(winnerCandidate: DuelCandidate, loserCandidate: DuelCandidate) {
+    const choiceKey = [winnerCandidate, loserCandidate].map(c => `${c.mediaType}:${c.id}`).sort().join(',');
+    if (lastChoice.current === choiceKey) return;
+    lastChoice.current = choiceKey;
     const pick = { winner: winnerCandidate, loser: loserCandidate };
     setWeights((current) => recordPick(current, pick));
     setPicks((current) => [...current, pick]);
@@ -149,6 +170,8 @@ export default function Duel() {
   }
 
   function restart() {
+    lastChoice.current = null;
+    setPage(1 + Math.floor(Math.random() * 20));
     setWeights({});
     setPicks([]);
     setSeen(new Set());
@@ -172,7 +195,7 @@ export default function Duel() {
     );
   }
 
-  if (loading) {
+  if (loading || (Boolean(rawPool?.length) && details.isLoading)) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="animate-spin text-accent" size={28} />
@@ -213,6 +236,8 @@ export default function Duel() {
             <PosterChoice candidate={pair[1]} onChoose={() => choose(pair[1], pair[0])} />
           </div>
         </>
+      ) : completed && (expansion.isFetching || (expanded.length > 0 && expandedDetails.isLoading)) ? (
+        <p role="status">Finding a fresh match for your taste…</p>
       ) : winner ? (
         <Result winner={winner} weights={weights} onAgain={restart} onAdd={() => wl.addToWatchlist(winner)} />
       ) : (
@@ -230,7 +255,7 @@ function Header() {
       </p>
       <h1 className="font-display text-3xl sm:text-4xl font-bold text-foreground">Can&rsquo;t decide?</h1>
       <p className="text-sm text-muted-foreground">
-        Two posters, five times. No right answer, just pick whichever you&rsquo;d rather watch tonight.
+        Choose between five pairs. We use your picks to find a different title you might love.
       </p>
     </header>
   );
@@ -328,7 +353,7 @@ function Result({
         </div>
         <div className="min-w-0 flex flex-col">
           <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-accent">
-            <Sparkles size={13} /> Watch this
+            <Sparkles size={13} /> Your discovery
           </p>
           <h2 className="mt-1 font-display text-xl sm:text-2xl font-bold text-foreground leading-tight">
             {winner.title}
@@ -378,7 +403,7 @@ function NothingToOffer({ signedIn }: { signedIn: boolean }) {
       <p className="text-sm text-muted-foreground leading-relaxed">
         {signedIn
           ? 'Almost everything on offer is already marked seen. Browse a little and this fills back up.'
-          : 'This works best once there is something to go on - save a few titles and it gets sharper.'}
+          : 'We could not find enough released titles. Try again shortly or browse for a title.'}
       </p>
       <Link
         to="/browse"

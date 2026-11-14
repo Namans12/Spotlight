@@ -506,9 +506,12 @@ export interface DiscoverParams {
   genres?: string;
   cast?: string;
   crew?: string;
+  page?: number;
+  language?: string;
+  releasedOnly?: boolean;
 }
 
-export async function tmdbDiscover({ mediaType, genres, cast, crew }: DiscoverParams): Promise<TmdbMovieResult[]> {
+export async function tmdbDiscover({ mediaType, genres, cast, crew, page, language, releasedOnly }: DiscoverParams): Promise<TmdbMovieResult[]> {
   // /discover/tv has no person filter at all. with_cast and with_crew are
   // movie-only, and with_people — which this used to fall back to — is not a
   // /discover/tv parameter either: TMDB accepts it, ignores it, and answers
@@ -527,6 +530,11 @@ export async function tmdbDiscover({ mediaType, genres, cast, crew }: DiscoverPa
   }
 
   const qs = new URLSearchParams({ sort_by: "popularity.desc", include_adult: "false" });
+  if (page) qs.set("page", String(Math.max(1, Math.min(50, Math.floor(page)))));
+  if (language && /^[a-z]{2}$/.test(language)) qs.set("with_original_language", language);
+  if (releasedOnly) {
+    qs.set(mediaType === 'movie' ? 'primary_release_date.lte' : 'first_air_date.lte', new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
+  }
   if (genres) qs.set("with_genres", genres);
   if (cast) qs.set("with_cast", cast);
   if (crew) qs.set("with_crew", crew);

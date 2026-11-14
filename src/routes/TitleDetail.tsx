@@ -25,7 +25,6 @@ import { FactsPanel } from '@/components/title/FactsPanel';
 import { SeasonProgress } from '@/components/title/SeasonProgress';
 import { TrailerCard } from '@/components/title/TrailerCard';
 import { WatchNightIdeas } from '@/components/title/WatchNightIdeas';
-import { WatchNightTrivia } from '@/components/title/WatchNightTrivia';
 import {
   ArrowLeft,
   Star,
@@ -303,9 +302,9 @@ export default function TitleDetail() {
       <div className="px-1">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Where to watch in India</p>
         <p className="text-sm text-accent font-medium">{data.availability === undefined
-          ? data.providers.length ? data.providers.map(name => `${name} (type unknown)`).join(' · ') : 'Availability unknown'
-          : data.availability.length ? data.availability.map(offer => `${offer.provider} (${offer.type === 'ads' ? 'with ads' : offer.type})`).join(' · ') : 'Availability unknown'}</p>
-        <p className="mt-1 text-xs text-muted-foreground">Source: JustWatch via TMDB. Availability may change.{data.watchUrl && <> <a href={data.watchUrl} target="_blank" rel="noopener noreferrer" className="underline">Open TMDB watch options</a></>}</p>
+          ? data.providers.length ? data.providers.join(' · ') : 'Availability unknown'
+          : data.availability.length ? [...new Set(data.availability.map(offer => `${offer.provider}${offer.type === 'rent' ? ' · Rent' : offer.type === 'buy' ? ' · Buy' : ''}`))].join(' · ') : 'Availability unknown'}</p>
+        <p className="mt-1 text-xs text-muted-foreground">Watch options by JustWatch.{data.watchUrl && <> <a href={data.watchUrl} target="_blank" rel="noopener noreferrer" className="underline">Check watch options</a></>}</p>
       </div>
 
       {data.tagline && (
@@ -411,7 +410,6 @@ export default function TitleDetail() {
       <FactsPanel detail={data} />
 
       <WatchNightIdeas key={`ideas:${mediaType}:${tmdbId}`} mediaType={mediaType} id={tmdbId} title={data.title} />
-      <WatchNightTrivia key={`trivia:${mediaType}:${tmdbId}`} mediaType={mediaType} id={tmdbId} releaseDate={data.releaseDate} />
 
       {data.trailer && <TrailerCard trailer={data.trailer} />}
 

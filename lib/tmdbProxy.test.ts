@@ -14,6 +14,7 @@ import {
   tmdbCollectionParts,
   tmdbPerson,
   tmdbDetail,
+  tmdbDiscover,
 } from './tmdbProxy';
 
 function watchProvidersPayload(region: string, buckets: Record<string, { provider_name: string }[]>) {
@@ -615,4 +616,13 @@ it('accepts only the requested title and region’s official TMDB watch link', (
   expect(regionalWatchLink(data('https://www.themoviedb.org/tv/123-example/watch?locale=US'), 'IN', key)).toBeNull();
   expect(regionalWatchLink(data('https://www.themoviedb.org/tv/456-example/watch?locale=IN'), 'IN', key)).toBeNull();
   expect(regionalWatchLink(data('https://evil.example/tv/123/watch?locale=IN'), 'IN', key)).toBeNull();
+});
+
+it('bounds discovery pages and passes language and release cutoff to TMDB', async () => {
+  vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { results: [] }));
+  await tmdbDiscover({ mediaType: 'movie', page: 999, language: 'hi', releasedOnly: true });
+  const url = new URL(String(vi.mocked(fetch).mock.calls[0][0]));
+  expect(url.searchParams.get('page')).toBe('50');
+  expect(url.searchParams.get('with_original_language')).toBe('hi');
+  expect(url.searchParams.get('primary_release_date.lte')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 });

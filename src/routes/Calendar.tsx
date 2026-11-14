@@ -129,7 +129,8 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
         <p className="text-sm font-medium text-foreground truncate">{entry.title}</p>
         <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
           {(entry.platforms?.length ? entry.platforms.join(', ') : entry.platform) && <span>{entry.platforms?.length ? entry.platforms.join(', ') : entry.platform}</span>}
-          {entry.region === null && <span className="shrink-0">Region unknown</span>}
+          {entry.kind === 'theatrical' && <span>Theatrical</span>}
+          {(entry.dateConflict || entry.kind === 'unknown') && <span>Date to be confirmed</span>}
           {entry.seasonPremiere && <span className="shrink-0">Season {entry.seasonPremiere.season} premiere</span>}
           {entry.mediaType === 'tv' && seasons != null && (
             <span className="opacity-60 shrink-0">
@@ -143,13 +144,6 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
             </span>
           )}
         </div>
-        <p className="mt-1 text-[10px] text-muted-foreground leading-snug">
-          Source: {entry.source || 'unknown'} · Region: {entry.region || 'unknown'} · {evidenceDate(entry.observedAt)}
-        </p>
-        <p className="text-[10px] text-muted-foreground leading-snug">
-          {entry.seasonPremiere ? `${entry.seasonPremiere.coverage} · Local date and availability unknown` : entry.kind === 'streaming' ? providerDetails(entry.platforms ?? [], entry.availabilityTypes) : entry.kind === 'theatrical' ? 'Theatrical' : entry.kind === 'global_premiere' ? 'Global first-air date · Local availability unknown' : entry.kind === 'unknown' ? 'Release type unknown' : 'TV network'}
-          {' · '}{entry.seasonPremiere || entry.evidenceStatus === 'regional' || entry.evidenceStatus === 'global' ? 'Date reported by source; may change' : entry.dateCorroboration ? 'Regional date and release type unverified' : 'Date and release type unverified'}
-        </p>
       </div>
       {entry.rating != null && (
         <span className="inline-flex items-center gap-0.5 text-xs text-gold font-semibold shrink-0">
@@ -165,6 +159,9 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
   for (const offer of offers ?? []) offerTypes[offer.provider] = [...new Set([...(offerTypes[offer.provider] ?? []), offer.type])];
   return <div>
     {entry.tmdbId && entry.mediaType ? <Link to={`/title/${entry.mediaType}/${entry.tmdbId}`}>{body}</Link> : body}
+    <details className="px-3 pt-1 text-xs text-muted-foreground"><summary className="cursor-pointer">Release details</summary>
+    <p>{entry.seasonPremiere ? `${entry.seasonPremiere.coverage} · Local date and availability unknown` : entry.kind === 'unknown' ? 'Release type unknown' : entry.kind === 'theatrical' ? 'Theatrical' : entry.kind === 'streaming' ? providerDetails(entry.platforms ?? [], entry.availabilityTypes) : 'TV premiere'}</p>
+    <p>Source: {entry.source || 'unknown'} · Region: {entry.region || 'unknown'} · {evidenceDate(entry.observedAt)}</p>
     {entry.additionalSources?.map((item, index) => {
       const url = httpsSource(item.sourceUrl);
       return <p key={`${item.source ?? ''}:${item.sourceUrl ?? ''}:${index}`} className="px-3 pb-2 text-xs text-muted-foreground">Additional source: {url ? <a className="underline" href={url} target="_blank" rel="noopener noreferrer">{item.source || 'source'}</a> : item.source || 'unknown'} · {evidenceDate(item.observedAt)}</p>;
@@ -191,6 +188,7 @@ function EntryRow({ entry, seasons }: { entry: CalendarEntryDTO; seasons: number
         Open TMDB watch options
       </a>}
     </div>}
+    </details>
   </div>;
 }
 

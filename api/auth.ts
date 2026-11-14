@@ -32,6 +32,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     // (or never existed, if the signing secret rotated). Treat that as
     // logged-out rather than erroring the whole app.
     const user = await getUserById(getDb(), userId);
+    if (user?.email === 'guest@spotlight.demo' && !guestSessionsEnabled()) {
+      res.setHeader('Set-Cookie', clearSessionCookie());
+      res.statusCode = 200;
+      res.end(JSON.stringify({ authenticated: false, user: null }));
+      return;
+    }
     res.statusCode = 200;
     res.end(JSON.stringify({ authenticated: user !== null, user }));
     return;

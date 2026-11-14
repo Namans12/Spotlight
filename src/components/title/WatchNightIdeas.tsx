@@ -10,9 +10,10 @@ export function WatchNightIdeas({ mediaType, id, title = 'Watch night' }: { medi
   const [sharing, setSharing] = useState(false);
   const ideas = watchNightIdeas(mediaType, id);
   const availableFoods = [...new Set([...(diet || budget ? [] : ideas.map(idea => idea.food)), ...(vibe ? filteredVibeIdeas(vibe, diet, budget) : [])])];
+  if (!ideas.length) return null;
   return <section className="rounded-xl border border-border bg-card p-4 space-y-3" aria-label="Watch-night ideas">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <div><h2 className="font-semibold">Make a night of it</h2><p className="text-xs text-muted-foreground">A little inspiration for your watch.</p></div>
+      <div><h2 className="font-semibold">Make a night of it</h2><p className="text-xs text-muted-foreground">Food inspired by {title}.</p></div>
       <button type="button" aria-expanded={open} onClick={() => setOpen(value => !value)} className="rounded-lg border border-border px-3 py-2 text-xs font-medium">{open ? 'Hide food ideas' : 'Show food ideas'}</button>
     </div>
     {open && <div className="space-y-4">{!diet && !budget && ideas.map(idea => <div key={idea.food} className="space-y-1">

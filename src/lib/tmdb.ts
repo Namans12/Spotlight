@@ -115,9 +115,12 @@ export async function getPerson(id: number): Promise<Person> {
 
 export async function discover(
   type: MediaType,
-  opts: { genres?: string; cast?: string; crew?: string },
+  opts: { genres?: string; cast?: string; crew?: string; page?: number; language?: string; releasedOnly?: boolean },
 ): Promise<Movie[]> {
   const qs = new URLSearchParams({ type });
+  if (opts.page) qs.set('page', String(opts.page));
+  if (opts.language) qs.set('language', opts.language);
+  if (opts.releasedOnly) qs.set('releasedOnly', 'true');
   if (opts.genres) qs.set('genres', opts.genres);
   if (opts.cast) qs.set('cast', opts.cast);
   if (opts.crew) qs.set('crew', opts.crew);

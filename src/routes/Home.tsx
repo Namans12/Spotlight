@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { fetchDigest } from '@/lib/api';
 import { fromDigestDTO } from '@/types/digest';
 import { SECTION_ORDER, allProviders, matchesFilters } from '@/lib/digest';
@@ -116,6 +116,12 @@ export default function Home() {
 
   return (
     <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4 rounded-2xl bg-gradient-to-br from-accent/10 to-transparent p-5 sm:p-7">
+        <div className="space-y-2"><p className="text-xs uppercase tracking-widest text-accent">Your next watch starts here</p>
+        <h1 className="font-display text-3xl font-bold">Fresh releases. Great nights.</h1>
+        <p className="text-sm text-muted-foreground">Explore this week, or find something that fits your mood.</p></div>
+        <Link to="/tonight" className="rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-accent-foreground">Find my next watch</Link>
+      </header>
       {/* Filters stay mounted through loading and error states, so the strip
           under the topbar never appears and disappears between fetches. */}
       <Toolbar>
@@ -150,9 +156,6 @@ export default function Home() {
 
       {data && win && (
         <>
-          {/* "Generated ..." now lives in the sidebar (visible from every
-              page); this line keeps just what's specific to the window being
-              viewed on this page. */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
             <span className="tabular-nums">
               {formatDayMonthYear(win.start) && formatDayMonthYear(win.end)

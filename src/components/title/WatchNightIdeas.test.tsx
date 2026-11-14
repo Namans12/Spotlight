@@ -14,18 +14,13 @@ describe('watch-night ideas', () => {
     expect(screen.getAllByRole('link', { name: 'Source: Warner Bros. Studio Tour' })[0]).toHaveAttribute('href', 'https://www.wbstudiotour.com/it/info/dining/');
     expect(screen.getByRole('button', { name: 'Hide food ideas' })).toHaveAttribute('aria-expanded', 'true');
   });
-  it('offers creative vibe ideas without claiming an unsupported title association', async () => {
+  it('hides the section when there are no title-specific ideas', () => {
     const { container, rerender } = render(<WatchNightIdeas mediaType="movie" id={1668} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Show food ideas' }));
-    expect(screen.queryByText('Pizza')).not.toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText('Pick a vibe for more ideas'), 'fresh');
-    expect(screen.getByRole('status')).toHaveTextContent('General ideas for your chosen vibe');
-    expect(screen.getByText('Fruit or vegetable sticks')).toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
     rerender(<WatchNightIdeas mediaType="tv" id={1399} />);
-    expect(screen.getByText('Lemon cakes')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show food ideas' })).toBeInTheDocument();
     rerender(<WatchNightIdeas mediaType="tv" id={123} />);
-    expect(screen.queryByText('Lemon cakes')).not.toBeInTheDocument();
-    expect(container).not.toBeEmptyDOMElement();
+    expect(container).toBeEmptyDOMElement();
   });
   it('links the Game of Thrones idea to its source', async () => {
     render(<WatchNightIdeas mediaType="tv" id={1399} />);

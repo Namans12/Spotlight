@@ -157,6 +157,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         body = await tmdbDiscover({
           mediaType: type,
           genres: url.searchParams.get("genres") ?? undefined,
+          page: Math.max(1, Math.min(50, Number(url.searchParams.get("page")) || 1)),
+          language: url.searchParams.get("language") ?? undefined,
+          releasedOnly: url.searchParams.get("releasedOnly") === 'true',
           cast: url.searchParams.get("cast") ?? undefined,
           crew: url.searchParams.get("crew") ?? undefined,
         });

@@ -29,6 +29,7 @@ export interface BuildPoolOptions {
   limit: number;
   /** Injected so a test can be deterministic. */
   random?: () => number;
+  today?: string;
 }
 
 function key(candidate: DuelCandidate): string {
@@ -59,6 +60,7 @@ function shuffle<T>(items: T[], random: () => number): T[] {
  */
 export function buildPool(sources: PoolSource[], options: BuildPoolOptions): DuelCandidate[] {
   const random = options.random ?? Math.random;
+  const today = options.today ?? new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
   const queues = sources.map((source) => shuffle(source.items, random));
   const pool: DuelCandidate[] = [];
   const taken = new Set<string>();
@@ -86,6 +88,8 @@ export function buildPool(sources: PoolSource[], options: BuildPoolOptions): Due
       // A poster is the entire interface. A title without one cannot be
       // chosen between.
       if (!candidate.posterPath) continue;
+      const date = candidate.releaseDate;
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date || date > today) continue;
 
       taken.add(candidateKey);
       pool.push(candidate);

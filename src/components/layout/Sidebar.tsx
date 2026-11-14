@@ -1,13 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import * as SheetPrimitive from '@radix-ui/react-dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { SpotlightLogo } from '@/components/brand/SpotlightLogo';
 import { useWatchlistContext } from '@/contexts/watchlist-context';
 import { useAuth } from '@/hooks/useAuth';
-import { fetchDigest } from '@/lib/api';
 import { useSidebar } from './sidebar-context';
-import { cn, formatDayMonthYearTime } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import {
   Home as HomeIcon,
   CalendarDays,
@@ -19,7 +17,6 @@ import {
   FolderOpen,
   Sparkles,
   Swords,
-  Radio,
   LogIn,
 } from 'lucide-react';
 
@@ -129,28 +126,6 @@ function SidebarLink({ item, expanded, onNavigate }: { item: NavItem; expanded: 
   );
 }
 
-/** Digest freshness, promoted from a Home-only line to sidebar chrome so it's
- *  visible from every page. Reuses the same ['digest','current'] query Home
- *  fetches — same cache entry, so on Home this costs nothing extra, and
- *  elsewhere it's one small cached read, not a live TMDB call. Renders
- *  nothing until the digest has loaded at least once this session, rather
- *  than reserving space for it up front. */
-function GeneratedLine() {
-  const { data } = useQuery({
-    queryKey: ['digest', 'current'],
-    queryFn: fetchDigest,
-    staleTime: 10 * 60_000,
-  });
-  if (!data?.generated_at) return null;
-
-  return (
-    <p className="mb-3 flex items-center gap-1.5 truncate px-1 text-[11px] text-muted-foreground">
-      <Radio size={11} className="shrink-0 text-accent" />
-      <span className="truncate">Generated {formatDayMonthYearTime(data.generated_at)}</span>
-    </p>
-  );
-}
-
 /** The drawer body, shared by the desktop column and the mobile sheet. */
 function SidebarBody({ expanded, onNavigate }: { expanded: boolean; onNavigate?: () => void }) {
   const groups = useNavGroups();
@@ -199,10 +174,7 @@ function SidebarBody({ expanded, onNavigate }: { expanded: boolean; onNavigate?:
         ))}
       </nav>
 
-      <div className={cn('shrink-0 border-t border-border py-4', expanded ? 'px-4' : 'px-4')}>
-        {expanded && <GeneratedLine />}
-
-        {!isAuthenticated && (
+      {!isAuthenticated && <div className="shrink-0 px-4 py-4">
           <NavLink
             to="/login"
             onClick={onNavigate}
@@ -213,8 +185,7 @@ function SidebarBody({ expanded, onNavigate }: { expanded: boolean; onNavigate?:
             </span>
             <span className="truncate">Sign in</span>
           </NavLink>
-        )}
-      </div>
+      </div>}
     </div>
   );
 }

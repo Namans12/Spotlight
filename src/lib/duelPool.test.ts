@@ -132,3 +132,9 @@ describe('buildPool', () => {
     expect(trending.items).toHaveLength(3);
   });
 });
+
+ it('excludes future, missing and invalid dates before dealing a watch-tonight pool', () => {
+   const items = [candidate(1, { releaseDate: '2026-11-14' }), candidate(2, { releaseDate: '2026-12-18' }),
+     candidate(3, { releaseDate: '' }), candidate(4, { releaseDate: '2026-02-30' })];
+   expect(buildPool([{ name: 'catalogue', items }], { watchedKeys: NONE, limit: 20, today: '2026-11-14' }).map(item => item.id)).toEqual([1]);
+ });

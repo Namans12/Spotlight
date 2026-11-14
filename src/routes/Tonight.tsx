@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Sparkles } from 'lucide-react';
-import { getTrending, getPopularMovies, getPopularTV, getYouMayAlsoLike } from '@/lib/tmdb';
+import { discover, getTrending, getPopularMovies, getPopularTV, getYouMayAlsoLike } from '@/lib/tmdb';
 import { fetchProvidersBatch, providerKey, providerStaleTime } from '@/lib/providers';
 import { buildPool } from '@/lib/duelPool';
 import { nextPair, recordPick, type DuelPick, type Weights } from '@/lib/duel';
@@ -40,15 +40,27 @@ export default function Tonight() {
   const seed = [...wl.watchlist, ...wl.watchLater].sort((a, b) => b.addedAt - a.addedAt)[0];
   const recommended = useQuery({ queryKey: ['tmdb', 'you-may-also-like', seed?.mediaType, seed?.id],
     queryFn: () => getYouMayAlsoLike(seed.mediaType, seed.id), enabled: Boolean(seed), staleTime: 60 * 60_000, retry: false });
-  const sourcesReady = !trending.isLoading && !films.isLoading && !shows.isLoading && (!seed || !recommended.isLoading);
+  const discovery = useQuery({ queryKey: ['tonight-discover', filters.mediaType, filters.language, filters.mood],
+    queryFn: async () => {
+      const genres = { light: '35|10751', suspense: '9648|80', adventure: '10759|14', thoughtful: '18|99' };
+      const types = filters.mediaType ? [filters.mediaType] : ['movie', 'tv'] as const;
+      const results = await Promise.allSettled(types.flatMap(type => [1, 2, 3].map(page => discover(type, {
+        page, language: filters.language, releasedOnly: true,
+        genres: filters.mood === 'adventure' && type === 'movie' ? '12|28|14' : filters.mood ? genres[filters.mood] : undefined,
+      }))));
+      if (results.every(result => result.status === 'rejected')) throw new Error('Discovery unavailable');
+      return results.flatMap(result => result.status === 'fulfilled' ? result.value : []);
+    }, staleTime: 60 * 60_000, retry: false });
+  const sourcesReady = !discovery.isLoading && !trending.isLoading && !films.isLoading && !shows.isLoading && (!seed || !recommended.isLoading);
   const pool = useMemo(() => !sourcesReady ? [] : buildPool([
+    { name: 'discovery', items: discovery.data ?? [] },
     { name: 'saved', items: [...wl.watchlist, ...wl.watchLater] },
     { name: 'recommended', items: recommended.data ?? [] },
     { name: 'trending', items: trending.data ?? [] },
     { name: 'films', items: films.data ?? [] },
     { name: 'shows', items: shows.data ?? [] },
-  ], { watchedKeys: wl.watchedKeys, limit: 40, random: () => 0.5 }),
-  [sourcesReady, wl.watchlist, wl.watchLater, wl.watchedKeys, recommended.data, trending.data, films.data, shows.data]);
+  ], { watchedKeys: wl.watchedKeys, limit: 80, random: () => 0.5 }),
+  [sourcesReady, discovery.data, wl.watchlist, wl.watchLater, wl.watchedKeys, recommended.data, trending.data, films.data, shows.data]);
   const cacheKey = pool.map(item => providerKey(item.mediaType, item.id)).sort().join(',');
   const details = useQuery({ queryKey: ['providers', cacheKey], queryFn: () => fetchProvidersBatch(pool),
     enabled: pool.length > 0, staleTime: providerStaleTime, retry: false });
@@ -59,11 +71,11 @@ export default function Tonight() {
   const remaining = candidates.filter(item => !feedback[providerKey(item.mediaType, item.id)]);
   const choices = rankTonight(remaining, filters, weights,
     (type, id) => details.data?.availability?.[providerKey(type, id)], feedbackWeights(feedback));
-  const pair = nextPair(remaining, {}, new Set());
+  const pair = nextPair(choices.map(choice => choice.candidate), {}, new Set());
   const services = [...new Set([...COMMON_SERVICES, ...Object.values(details.data?.availability ?? {}).flat().map(offer => offer.provider)])].sort();
-  const languages = [...new Set(candidates.map(candidate => candidate.originalLanguage?.toLowerCase()).filter(Boolean))].sort((a, b) => languageName(a).localeCompare(languageName(b)));
+  const languages = [...new Set(['en', 'hi', 'ta', 'te', 'ml', 'kn', 'bn', ...candidates.map(candidate => candidate.originalLanguage?.toLowerCase()).filter(Boolean)])].sort((a, b) => languageName(a).localeCompare(languageName(b)));
   const busy = !sourcesReady || (pool.length > 0 && details.isLoading);
-  const discoveryFailed = trending.isError || films.isError || shows.isError || (Boolean(seed) && recommended.isError);
+  const discoveryFailed = discovery.isError || trending.isError || films.isError || shows.isError || (Boolean(seed) && recommended.isError);
   const saved = new Set([...wl.watchlist, ...wl.watchLater, ...Object.values(wl.customListItems).flat()].map(item => providerKey(item.mediaType, item.id)));
   const update = (change: Partial<TonightFilters>) => { setFilters(current => ({ ...current, ...change })); setOffset(0); };
   const pick = (choice: DuelPick) => { setWeights(recordPick({}, choice)); setPicked(providerKey(choice.winner.mediaType, choice.winner.id)); setOffset(0); };
@@ -115,7 +127,7 @@ export default function Tonight() {
       </fieldset>}
       <button type="button" disabled={busy} onClick={() => { setOffset(0); setShowResults(true); }} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground disabled:opacity-50">{busy ? 'Finding options…' : 'Find something to watch'}</button>
     </div>
-    {discoveryFailed && <div role="status" className="text-sm text-muted-foreground">Some discovery sources could not load. Available sources are still included. <button type="button" className="underline" onClick={() => { if (trending.isError) void trending.refetch(); if (films.isError) void films.refetch(); if (shows.isError) void shows.refetch(); if (seed && recommended.isError) void recommended.refetch(); }}>Try again</button></div>}
+    {discoveryFailed && <div role="status" className="text-sm text-muted-foreground">Some discovery sources could not load. Available sources are still included. <button type="button" className="underline" onClick={() => { if (discovery.isError) void discovery.refetch(); if (trending.isError) void trending.refetch(); if (films.isError) void films.refetch(); if (shows.isError) void shows.refetch(); if (seed && recommended.isError) void recommended.refetch(); }}>Try again</button></div>}
     {details.isError && <div role="status" className="text-sm text-muted-foreground">Availability and runtime could not be checked. Remove those filters or <button type="button" className="underline" onClick={() => void details.refetch()}>try again</button>.</div>}
     {!details.isError && details.data?.hadFailures && <div role="status" className="text-sm text-muted-foreground">Some availability and runtime checks failed, so filters may hide options. Available results are still shown. <button type="button" className="underline" onClick={() => void details.refetch()}>Try those checks again</button></div>}
     {showResults && <section aria-labelledby="tonight-results" className="space-y-3"><h2 id="tonight-results" className="font-display text-xl font-semibold">Your options</h2>

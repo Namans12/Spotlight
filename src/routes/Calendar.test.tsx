@@ -263,7 +263,7 @@ describe('Calendar event details', () => {
     renderCalendar();
     expect(await screen.findByText(/North American schedule; local date unconfirmed/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Cinema United' })).toHaveAttribute('href', 'https://cinemaunited.org/release-calendar/');
-    expect(screen.getByText('Region unknown')).toBeInTheDocument();
+    expect(screen.getByText(/Region: unknown/)).toBeInTheDocument();
   });
   it('shows additional merged sources and does not link unsafe URLs', async () => {
     vi.mocked(fetchCalendarMonth).mockResolvedValue({ month: '2026-08', entries: [entry({ title: 'Multiple sources',
@@ -282,7 +282,7 @@ describe('Calendar event details', () => {
     renderCalendar();
     expect(await screen.findByText(/Date needs review/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Studio' })).toHaveAttribute('href', 'https://example.com/studio');
-    expect(screen.getByText('Region unknown')).toBeInTheDocument();
+    expect(screen.getByText(/Region: unknown/)).toBeInTheDocument();
   });
 
   it('distinguishes an announced season premiere from the series first air date', async () => {
@@ -302,7 +302,7 @@ describe('Calendar event details', () => {
     })] });
     renderCalendar();
     expect(await screen.findByText('Netflix, ZEE5')).toBeInTheDocument();
-    expect(screen.getByText('Region unknown')).toBeInTheDocument();
+    expect(screen.getByText(/Region: unknown/)).toBeInTheDocument();
   });
 
   it('checks current India offers without claiming a regional premiere or season', async () => {

@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { queryClient } from '@/lib/queryClient';
 import { WatchlistProvider } from '@/contexts/WatchlistContext';
 import { WebMcpBridge } from '@/webmcp/WebMcpBridge';
-import { AutoGuestSession } from '@/webmcp/AutoGuestSession';
 import { AgentChat } from '@/webmcp/AgentChat';
 import { AppShell } from '@/components/layout/AppShell';
 import { RequireAuth } from '@/components/auth/RequireAuth';
@@ -44,7 +43,6 @@ const App = () => (
         <IntroGate>
           <Toaster />
           <BrowserRouter>
-            <AutoGuestSession />
             {/* Boundary sits above Suspense so it catches a *rejected* lazy
                 import (a stale chunk after a deploy), which Suspense itself
                 rethrows rather than handles. */}

@@ -12,7 +12,7 @@ const fixtures = [movie(1, 'Comedy choice'), movie(2, 'Mystery choice'), movie(3
 const state = vi.hoisted(() => ({ watchedKeys: new Set<string>(), watchlist: [], watchLater: [], customListItems: {}, isAuthenticated: false, addToWatchlistAsync: vi.fn() }));
 vi.mock('@/contexts/watchlist-context', () => ({ useWatchlistContext: () => state }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ isAuthenticated: state.isAuthenticated }) }));
-vi.mock('@/lib/tmdb', () => ({ getTrending: vi.fn(), getPopularMovies: vi.fn(), getPopularTV: vi.fn(), getYouMayAlsoLike: vi.fn() }));
+vi.mock('@/lib/tmdb', () => ({ discover: vi.fn().mockResolvedValue([]), getTrending: vi.fn(), getPopularMovies: vi.fn(), getPopularTV: vi.fn(), getYouMayAlsoLike: vi.fn() }));
 vi.mock('@/lib/providers', async (importOriginal) => ({ ...await importOriginal<typeof import('@/lib/providers')>(), fetchProvidersBatch: vi.fn() }));
 import { getTrending, getPopularMovies, getPopularTV } from '@/lib/tmdb';
 import { fetchProvidersBatch } from '@/lib/providers';
